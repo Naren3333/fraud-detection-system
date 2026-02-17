@@ -4,6 +4,37 @@ Real-time payment fraud detection system built with Node.js microservices, Kafka
 
 ---
 
+```mermaid
+flowchart TD
+
+    %% External Layer
+    Client[External Clients]
+    Gateway[API Gateway :3000]
+
+    Client --> Gateway
+
+    %% First Split
+    Gateway --> Transaction[Transaction Service :3001]
+    Gateway --> Audit[Audit Service :3007]
+
+    %% Transaction to Kafka
+    Transaction -- "Kafka Topic: transaction.created" --> Kafka[(Kafka Cluster)]
+
+    %% Kafka to Fraud Detection
+    Kafka --> Fraud[Fraud Detection Service :3003]
+
+    %% Fraud to ML (HTTP)
+    Fraud -- "HTTP Call" --> ML[ML Scoring Service :3004]
+
+    %% Kafka to Decision Engine
+    Kafka -- "Kafka Topic: transaction.scored" --> Decision[Decision Engine :3005]
+
+    %% Decision to Notification + Analytics
+    Decision -- "Kafka Topic: transaction.finalized" --> Notification[Notification Service :3006]
+    Decision -- "Kafka Topic: transaction.finalized" --> Analytics[Analytics Service :3008]
+
+```
+
 ## Current Services
 
 | Service | Port | Status |

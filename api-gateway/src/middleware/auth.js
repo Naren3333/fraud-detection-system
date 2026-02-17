@@ -1,0 +1,130 @@
+const jwt = require('jsonwebtoken');
+const config = require('../config');
+const logger = require('../config/logger');
+const { UnauthorizedError, ForbiddenError } = require('../utils/errors');
+const MetricsService = require('../utils/metrics');
+
+const verifyToken = (token) => {
+  try {
+    return jwt.verify(token, config.jwt.secret, {
+      issuer: config.jwt.issuer,
+    });
+  } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      throw new UnauthorizedError('Token has expired');
+    }
+    if (error.name === 'JsonWebTokenError') {
+      throw new UnauthorizedError('Invalid token');
+    }
+    throw new UnauthorizedError('Token verification failed');
+  }
+};
+
+const authenticate = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      MetricsService.recordAuthAttempt('missing_token');
+      throw new UnauthorizedError('No authentication token provided');
+    }
+
+    const token = authHeader.substring(7);
+    
+    if (!token) {
+      MetricsService.recordAuthAttempt('empty_token');
+      throw new UnauthorizedError('Invalid authentication token');
+    }
+
+    const decoded = verifyToken(token);
+
+    // Attach user information to request
+    req.user = {
+      userId: decoded.userId,
+      email: decoded.email,
+      role: decoded.role,
+      permissions: decoded.permissions || [],
+    };
+
+    req.token = token;
+
+    MetricsService.recordAuthAttempt('success');
+    logger.debug('User authenticated successfully', { userId: decoded.userId });
+
+    next();
+  } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      next(error);
+    } else {
+      MetricsService.recordAuthAttempt('error');
+      logger.error('Authentication error:', error);
+      next(new UnauthorizedError('Authentication failed'));
+    }
+  }
+};
+
+const authorize = (...allowedRoles) => {
+  return (req, res, next) => {
+    try {
+      if (!req.user) {
+        throw new UnauthorizedError('User not authenticated');
+      }
+
+      const hasRole = allowedRoles.includes(req.user.role);
+
+      if (!hasRole) {
+        logger.warn('Authorization failed', {
+          userId: req.user.userId,
+          userRole: req.user.role,
+          requiredRoles: allowedRoles,
+        });
+        throw new ForbiddenError('Insufficient permissions');
+      }
+
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+};
+
+const optionalAuth = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return next();
+    }
+
+    const token = authHeader.substring(7);
+    
+    if (!token) {
+      return next();
+    }
+
+    try {
+      const decoded = verifyToken(token);
+      req.user = {
+        userId: decoded.userId,
+        email: decoded.email,
+        role: decoded.role,
+        permissions: decoded.permissions || [],
+      };
+      req.token = token;
+    } catch (error) {
+      // Silently fail for optional auth
+      logger.debug('Optional auth failed:', error.message);
+    }
+
+    next();
+  } catch (error) {
+    next();
+  }
+};
+
+module.exports = {
+  authenticate,
+  authorize,
+  optionalAuth,
+  verifyToken,
+};

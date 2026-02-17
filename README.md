@@ -223,30 +223,23 @@ No authentication required.
 
 ---
 
-## Example curl Commands
+## Testing the API
 
-### 1. Get a token
-```bash
-curl -X POST http://localhost:3000/api/v1/auth/login ^
--H "Content-Type: application/json" ^
--d "{\"email\":\"admin@example.com\",\"password\":\"admin123\"}"
-```
+A Postman collection is provided for testing the system.
 
-### 2. Submit a transaction
-```bash
-curl -X POST http://localhost:3000/api/v1/transactions ^
--H "Authorization: Bearer <your-token>" ^
--H "Content-Type: application/json" ^
--H "X-Idempotency-Key: unique-key-001" ^
--d "{\"customerId\":\"customer_123\",\"merchantId\":\"merchant_456\",\"amount\":1500.00,\"currency\":\"USD\",\"cardNumber\":\"4111111111111111\",\"cardType\":\"visa\",\"deviceId\":\"device_abc\",\"ipAddress\":\"192.168.1.100\",\"location\":{\"country\":\"SG\",\"city\":\"Singapore\"},\"metadata\":{\"channel\":\"mobile\"}}"
-```
+1. Start the services:
+   docker-compose up --build
 
-### 3. Fetch a transaction
-```bash
-curl -X GET http://localhost:3000/api/v1/transactions/<transactionId> ^
--H "Authorization: Bearer <your-token>"
-```
+2. Open Postman
+3. Import `testing/test.json`
+4. Create an environment with:
+   baseUrl = http://localhost:3000
+5. Run requests in order:
+   - Login
+   - Create Transaction
+   - Get Transaction
 
+For full testing documentation, see `testing/TESTING.md`
 ---
 
 ## Architecture

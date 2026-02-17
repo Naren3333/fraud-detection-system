@@ -1,0 +1,115 @@
+{
+  "info": {
+    "name": "Fraud Detection Platform",
+    "_postman_id": "fdp-collection-001",
+    "description": "Postman collection for Fraud Detection Platform microservices",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "token", "value": "" },
+    { "key": "transactionId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "auth", "login"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"admin123\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "let json = pm.response.json();",
+              "pm.environment.set('token', json.data.token);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Transaction",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" },
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "X-Idempotency-Key", "value": "unique-key-001" },
+          { "key": "X-Correlation-ID", "value": "test-corr-001" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/transactions",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "transactions"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"customerId\": \"customer_123\",\n  \"merchantId\": \"merchant_456\",\n  \"amount\": 1500.00,\n  \"currency\": \"USD\",\n  \"cardNumber\": \"4111111111111111\",\n  \"cardType\": \"visa\",\n  \"deviceId\": \"device_abc\",\n  \"ipAddress\": \"192.168.1.100\",\n  \"location\": {\n    \"country\": \"SG\",\n    \"city\": \"Singapore\"\n  },\n  \"metadata\": {\n    \"channel\": \"mobile\"\n  }\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "let json = pm.response.json();",
+              "pm.environment.set('transactionId', json.data.transactionId);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get Transaction By ID",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/transactions/{{transactionId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "transactions", "{{transactionId}}"]
+        }
+      }
+    },
+    {
+      "name": "Get Transactions By Customer",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/transactions/customer/customer_123",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "transactions", "customer", "customer_123"]
+        }
+      }
+    },
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "health"]
+        }
+      }
+    }
+  ]
+}

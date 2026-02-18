@@ -270,3 +270,50 @@ services:
     restart: unless-stopped
     command: sh -c "npm run migrate && npm start"
     stop_grace_period: 9s
+
+  fraud-detection-service:
+      build:
+        context: ./fraud-detection-service
+        dockerfile: Dockerfile
+      container_name: fraud-detection-service
+      networks: [fraud-net]
+      ports:
+        - "3003:3003"
+      depends_on:
+        kafka:
+          condition: service_healthy
+        redis:
+          condition: service_healthy
+      environment:
+        NODE_ENV:              production
+        PORT:                  3003
+        SERVICE_NAME:          fraud-detection-service
+        LOG_LEVEL:             info
+        # Kafka
+        KAFKA_BROKERS:         kafka:9092
+        KAFKA_CLIENT_ID:       fraud-detection-service
+        KAFKA_GROUP_ID:        fraud-detection-group
+        KAFKA_INPUT_TOPIC:     transaction.created
+        KAFKA_OUTPUT_TOPIC:    transaction.scored
+        # Redis
+        REDIS_HOST:            redis
+        REDIS_PORT:            6379
+        REDIS_DB:              3
+        # ML Scoring Service
+        ML_SCORING_SERVICE_URL: http://ml-scoring-service:3004
+        ML_SCORING_TIMEOUT:    5000
+        # Fraud Rules
+        VELOCITY_MAX_AMOUNT_PER_HOUR: 10000
+        VELOCITY_MAX_COUNT_PER_HOUR:  10
+        VELOCITY_MAX_COUNT_PER_DAY:   50
+        HIGH_RISK_COUNTRIES:   NG,RU,CN,PK
+        HIGH_AMOUNT_THRESHOLD: 5000
+        SUSPICIOUS_AMOUNT_THRESHOLD: 10000
+        BIN_BLACKLIST:         123456,654321
+      healthcheck:
+        test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3003/api/v1/health/live"]
+        interval: 30s
+        timeout: 10s
+        retries: 3
+        start_period: 20s
+      restart: unless-stopped

@@ -49,7 +49,6 @@ Expected: HTTP 200 OK
 
 </details>
 
----
 
 # 2. Postman Setup
 
@@ -96,7 +95,6 @@ via Postman test scripts.
 
 </details>
 
----
 
 # 3. Authentication Flow
 
@@ -115,7 +113,6 @@ Expected:
 * User created
 * `userId` stored automatically
 
----
 
 ## Login
 
@@ -130,7 +127,6 @@ Expected:
 * refreshToken returned
 * Tokens stored automatically
 
----
 
 ## Validate Token
 
@@ -149,7 +145,6 @@ Expected:
 * HTTP 200
 * Token validation success
 
----
 
 ## Refresh Access Token
 
@@ -163,7 +158,6 @@ Expected:
 * New accessToken issued
 * accessToken updated
 
----
 
 ## Logout
 
@@ -178,7 +172,6 @@ Expected:
 
 </details>
 
----
 
 # 4. User Profile Management
 
@@ -196,7 +189,6 @@ Expected:
 * HTTP 200
 * Authenticated user profile returned
 
----
 
 ## Update Profile
 
@@ -209,7 +201,6 @@ Expected:
 * HTTP 200
 * Profile updated successfully
 
----
 
 ## Change Password
 
@@ -225,7 +216,6 @@ Expected:
 
 </details>
 
----
 
 # 5. Transaction Testing
 
@@ -234,7 +224,6 @@ Expected:
 
 Login first to obtain `accessToken`.
 
----
 
 ## Create Transaction
 
@@ -263,7 +252,6 @@ Validation:
 * Only last four digits persisted
 * Correlation ID matches
 
----
 
 ## Get Transaction by ID
 
@@ -277,7 +265,6 @@ Expected:
 * Correct transaction returned
 * No sensitive card data exposed
 
----
 
 ## Get Transactions by Customer
 
@@ -290,7 +277,6 @@ Expected:
 * HTTP 200
 * Array of transactions
 
----
 
 ## Idempotency Test
 
@@ -310,7 +296,6 @@ Expected:
 
 </details>
 
----
 
 # 6. Health & Monitoring
 
@@ -330,7 +315,6 @@ Expected:
 * HTTP 200
 * Dependency status visible
 
----
 
 ## Prometheus Metrics
 
@@ -346,7 +330,6 @@ Expected:
 
 </details>
 
----
 
 # 7. End-to-End Scenario
 
@@ -374,7 +357,6 @@ This validates:
 
 </details>
 
----
 
 # 8. Rate Limiting
 
@@ -399,7 +381,6 @@ Validates:
 
 </details>
 
----
 
 # 9. Optional Advanced Verification
 
@@ -416,7 +397,6 @@ Expected:
 
 * Transaction events visible when transactions are created
 
----
 
 ## Database Verification
 
@@ -438,7 +418,6 @@ Verify:
 
 </details>
 
----
 
 # 10. Full System Reset
 
@@ -459,7 +438,6 @@ docker-compose down -v
 
 </details>
 
----
 
 # Test Coverage Summary
 

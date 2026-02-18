@@ -61,6 +61,7 @@ const makeProxyHandler = (target, serviceName, rewriteTo, pathPrefix) => {
         data:    ['GET', 'HEAD', 'DELETE'].includes(req.method.toUpperCase()) ? undefined : req.body,
         headers: {
           'Content-Type':      'application/json',
+          'Authorization':     req.headers.authorization || '',
           'X-Request-ID':      req.requestId    || '',
           'X-Correlation-ID':  req.correlationId || '',
           'X-User-ID':         req.user?.userId  || '',

@@ -30,6 +30,7 @@ router.use('/auth', authLimiter, async (req, res) => {
       params: req.query,
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': req.headers.authorization || '',
         'X-Request-ID': req.requestId || '',
         'X-Correlation-ID': req.correlationId || '',
         'X-Forwarded-For': req.ip || '',

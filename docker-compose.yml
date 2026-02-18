@@ -100,6 +100,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    stop_grace_period: 3s
 
   transaction-db:
     image: postgres:15-alpine
@@ -268,3 +269,4 @@ services:
       start_period: 10s
     restart: unless-stopped
     command: sh -c "npm run migrate && npm start"
+    stop_grace_period: 9s

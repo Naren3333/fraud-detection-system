@@ -30,23 +30,36 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 let server;
+let isShuttingDown = false;
 
 const shutdown = async (signal) => {
-  logger.info(`${signal} received – starting graceful shutdown`);
+  if (isShuttingDown) return;
+  isShuttingDown = true;
 
-  server.close(async () => {
-    logger.info('HTTP server closed');
-  });
+  logger.info(`${signal} received - starting graceful shutdown`);
 
-  await closeRedisClient();
-  await closePool();
+  try {
+    await new Promise((resolve) => {
+      if (!server) return resolve();
+      server.close(() => {
+        logger.info('HTTP server closed');
+        resolve();
+      });
+    });
 
-  logger.info('Graceful shutdown complete');
-  process.exit(0);
+    await closeRedisClient();
+    await closePool();
+
+    logger.info('Graceful shutdown complete');
+    process.exit(0);
+  } catch (err) {
+    logger.error('Error during shutdown', { error: err.message });
+    process.exit(1);
+  }
 };
 
 process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGINT',  () => shutdown('SIGINT'));
 
 process.on('uncaughtException', (err) => {
   logger.error('Uncaught exception', { error: err.message, stack: err.stack });
@@ -54,6 +67,9 @@ process.on('uncaughtException', (err) => {
 });
 
 process.on('unhandledRejection', (reason) => {
+  // Ignore Redis "client is closed" errors that fire during shutdown teardown
+  if (reason?.message === 'The client is closed') return;
+
   logger.error('Unhandled rejection', { reason: String(reason) });
   shutdown('unhandledRejection');
 });

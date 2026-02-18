@@ -13,6 +13,9 @@ flowchart TD
 
     Client --> Gateway
 
+    %% Auth flow
+    Gateway --> User[User Service :3002]
+    
     %% First Split
     Gateway --> Transaction[Transaction Service :3001]
     Gateway --> Audit[Audit Service :3007]
@@ -32,7 +35,6 @@ flowchart TD
     %% Decision to Notification + Analytics
     Decision -- "Kafka Topic: transaction.finalized" --> Notification[Notification Service :3006]
     Decision -- "Kafka Topic: transaction.finalized" --> Analytics[Analytics Service :3008]
-
 ```
 
 ## Current Services
@@ -41,6 +43,7 @@ flowchart TD
 |---|---|---|
 | API Gateway | 3000 | Live |
 | Transaction Service | 3001 | Live |
+| User Service | 3002 | Live |
 | Fraud Detection Service | 3003 | Planned |
 | ML Scoring Service | 3004 | Planned |
 | Decision Engine | 3005 | Planned |
@@ -76,137 +79,52 @@ Once running, the API is available at `http://localhost:3000`.
 
 ```
 fraud-detection-system/
+├── .gitignore
+├── README.md
 ├── docker-compose.yml
+├── Fraud-Detection-Platform.postman_collection.json
+│
 ├── api-gateway/
 │   ├── src/
-│   │   ├── config/         # App config, Redis, logger, route map
-│   │   ├── middleware/      # JWT auth, rate limiter, error handler
-│   │   ├── routes/          # Health, auth, proxy router
-│   │   ├── services/        # Auth service, proxy service
-│   │   └── utils/           # Errors, metrics, constants
+│   │   ├── config/           # App config, logger, Redis client
+│   │   ├── middleware/       # JWT auth, rate limiter, error handler, circuit breaker
+│   │   ├── routes/           # Health, auth proxy, service proxy
+│   │   ├── utils/            # Errors, metrics, constants
+│   │   └── index.js
+│   ├── .dockerignore
 │   ├── Dockerfile
 │   └── package.json
+│
+├── user-service/
+│   ├── src/
+│   │   ├── config/           # App config, logger, Redis client
+│   │   ├── controllers/      # User HTTP handlers
+│   │   ├── db/               # PostgreSQL pool, migrations
+│   │   ├── middleware/       # Auth, validation, request context, error handler
+│   │   ├── repositories/     # User DB operations
+│   │   ├── routes/           # User routes, health endpoints
+│   │   ├── services/         # Auth logic (bcrypt, JWT generation)
+│   │   ├── utils/            # Errors, constants (roles, status)
+│   │   └── index.js
+│   ├── .dockerignore
+│   ├── Dockerfile
+│   └── package.json
+│
 └── transaction-service/
     ├── src/
-    │   ├── config/          # App config, logger
-    │   ├── controllers/     # Transaction controller
-    │   ├── db/              # PostgreSQL pool, migrations
-    │   ├── kafka/           # Producer, outbox publisher
-    │   ├── middleware/      # Request context, validation, error handler
-    │   ├── repositories/    # Transaction repository
-    │   ├── routes/          # Transaction routes, health
-    │   ├── services/        # Transaction service (core business logic)
-    │   └── utils/           # Errors, constants, metrics
+    │   ├── config/           # App config, logger
+    │   ├── controllers/      # Transaction HTTP handlers
+    │   ├── db/               # PostgreSQL pool, migrations
+    │   ├── kafka/            # Producer, outbox publisher
+    │   ├── middleware/       # Request context, validation, error handler
+    │   ├── repositories/     # Transaction DB operations
+    │   ├── routes/           # Transaction routes, health endpoints
+    │   ├── services/         # Transaction business logic
+    │   ├── utils/            # Errors, constants, metrics
+    │   └── index.js
+    ├── .dockerignore
     ├── Dockerfile
     └── package.json
-```
-
----
-
-## API Reference
-
-### Authentication
-
-All protected endpoints require a Bearer token in the `Authorization` header.
-
-#### Login
-```
-POST /api/v1/auth/login
-```
-```json
-{
-  "email": "admin@example.com",
-  "password": "admin123"
-}
-```
-
-**Test credentials:**
-| Email | Password | Role |
-|---|---|---|
-| admin@example.com | admin123 | admin |
-| user@example.com | user123 | user |
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "token": "<jwt>",
-    "user": { "userId": "...", "email": "...", "role": "admin" }
-  }
-}
-```
-
----
-
-### Transactions
-
-All transaction endpoints require `Authorization: Bearer <token>`.
-
-#### Create Transaction
-```
-POST /api/v1/transactions
-```
-
-**Headers:**
-| Header | Required | Description |
-|---|---|---|
-| Authorization | ✓ | Bearer JWT token |
-| Content-Type | ✓ | application/json |
-| X-Idempotency-Key | Recommended | Unique key to prevent duplicate submissions |
-| X-Correlation-ID | Optional | For distributed tracing |
-
-**Body:**
-```json
-{
-  "customerId": "customer_123",
-  "merchantId": "merchant_456",
-  "amount": 1500.00,
-  "currency": "USD",
-  "cardNumber": "4111111111111111",
-  "cardType": "visa",
-  "deviceId": "device_abc",
-  "ipAddress": "192.168.1.100",
-  "location": {
-    "country": "SG",
-    "city": "Singapore"
-  },
-  "metadata": {
-    "channel": "mobile"
-  }
-}
-```
-
-**Response `201`:**
-```json
-{
-  "success": true,
-  "idempotent": false,
-  "data": {
-    "transactionId": "9f83e9a1-2ed3-4a0e-a438-8817eb266899",
-    "status": "PENDING",
-    "amount": 1500,
-    "currency": "USD",
-    "customerId": "customer_123",
-    "merchantId": "merchant_456",
-    "cardLastFour": "1111",
-    "createdAt": "2026-02-17T14:57:10.845Z",
-    "correlationId": "test-corr-001",
-    "message": "Transaction received and queued for fraud analysis"
-  }
-}
-```
-
-> **Note:** Card numbers are never stored — only the last 4 digits are persisted.
-
-#### Get Transaction by ID
-```
-GET /api/v1/transactions/:id
-```
-
-#### Get Transactions by Customer
-```
-GET /api/v1/transactions/customer/:customerId
 ```
 
 ---
@@ -243,26 +161,31 @@ For full testing documentation, see `testing/TESTING.md`
 ---
 
 ## Architecture
-
 ```
 Client
   │
   ▼
 API Gateway :3000
-  │  JWT auth · Rate limiting · Request routing
+  │  JWT validation · Rate limiting · Request routing
   │
-  ▼
-Transaction Service :3001
-  │  Validation · Idempotency · Card masking
+  ├──▶ User Service :3002
+  │     Registration · Login · Profile · JWT generation
+  │     ├─▶ PostgreSQL (user-db)
+  │     │    Users, login attempts, refresh tokens
+  │     └─▶ Redis (db:2)
+  │          Rate limiting, session blacklist
   │
-  ├──▶ PostgreSQL (transaction-db)
-  │     Stores transaction + outbox event atomically
-  │
-  └──▶ Kafka (transaction.created)
-        Consumed by fraud detection pipeline (coming soon)
-```
+  └──▶ Transaction Service :3001
+        Validation · Idempotency · Card masking
+        ├─▶ PostgreSQL (transaction-db)
+        │    Atomic: transaction + outbox event
+        └─▶ Kafka (transaction.created)
+             → Fraud Detection Pipeline (coming soon)
 
----
+Shared Infrastructure:
+  • Redis :6379 (db:0 = gateway rate limits, db:2 = user sessions)
+  • Kafka + Zookeeper (7 topics pre-created)
+```
 
 ## Infrastructure
 
@@ -274,6 +197,7 @@ All infrastructure is managed by Docker Compose:
 | kafka | confluentinc/cp-kafka:7.5.0 | Event streaming |
 | kafka-init | confluentinc/cp-kafka:7.5.0 | Topic creation on startup |
 | redis | redis:7-alpine | Rate limiting, caching |
+| user-db | postgres:15-alpine | User authentication & profile storage |
 | transaction-db | postgres:15-alpine | Transaction storage |
 
 ### Kafka Topics

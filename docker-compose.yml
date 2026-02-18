@@ -6,6 +6,7 @@ networks:
 
 volumes:
   transaction-db-data:
+  user-db-data:
   redis-data:
   kafka-data:
   zookeeper-data:
@@ -204,3 +205,66 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+
+  user-db:
+    image: postgres:15-alpine
+    container_name: user-db
+    networks: [fraud-net]
+    environment:
+      POSTGRES_DB: user_db
+      POSTGRES_USER: user_admin
+      POSTGRES_PASSWORD: user_password
+    volumes:
+      - user-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user_admin -d user_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  user-service:
+    build:
+      context: ./user-service
+      dockerfile: Dockerfile
+    container_name: user-service
+    networks: [fraud-net]
+    ports:
+      - "3002:3002"
+    depends_on:
+      user-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV:              production
+      PORT:                  3002
+      SERVICE_NAME:          user-service
+      LOG_LEVEL:             info
+      # DB
+      DB_HOST:               user-db
+      DB_PORT:               5432
+      DB_NAME:               user_db
+      DB_USER:               user_admin
+      DB_PASSWORD:           user_password
+      # JWT (must match API Gateway)
+      JWT_SECRET:            super-secret-change-in-prod
+      JWT_EXPIRES_IN:        24h
+      JWT_ISSUER:            fraud-detection-platform
+      JWT_REFRESH_SECRET:    super-secret-refresh-token
+      JWT_REFRESH_EXPIRES_IN: 7d
+      # Redis
+      REDIS_HOST:            redis
+      REDIS_PORT:            6379
+      REDIS_DB:              2
+      # Security
+      BCRYPT_ROUNDS:         12
+      LOGIN_MAX_ATTEMPTS:    5
+      LOGIN_LOCKOUT_DURATION: 900000
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3002/api/v1/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    command: sh -c "npm run migrate && npm start"

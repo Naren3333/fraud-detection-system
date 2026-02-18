@@ -1,14 +1,21 @@
-# TESTING.md
+# Fraud Detection Platform – Testing Guide
 
-# Fraud Detection Platform - Testing Guide
+This document describes how to test the Fraud Detection Platform using the provided Postman collection:
 
-This document describes how to test the Fraud Detection Platform using the provided Postman collection.
+```
+testing/test.json
+```
 
 The system must be running locally via Docker before executing any tests.
 
 ---
 
-# 1. Prerequisites
+# 1. Setup
+
+<details open>
+<summary><strong>Prerequisites & System Startup</strong></summary>
+
+## Prerequisites
 
 Ensure the following are installed:
 
@@ -16,9 +23,7 @@ Ensure the following are installed:
 * Docker Compose
 * Postman
 
----
-
-# 2. Start the System
+## Start the System
 
 From the project root:
 
@@ -28,8 +33,9 @@ docker-compose up --build
 
 Wait until:
 
-* PostgreSQL is ready
+* PostgreSQL is healthy
 * Kafka and Zookeeper are running
+* Redis is ready
 * API Gateway is listening on port 3000
 * Transaction Service is listening on port 3001
 
@@ -39,11 +45,18 @@ Verify the gateway is up:
 GET http://localhost:3000/api/v1/health
 ```
 
-Expected: HTTP 200 response.
+Expected: HTTP 200 OK
+
+</details>
 
 ---
 
-# 3. Import Postman Collection
+# 2. Postman Setup
+
+<details>
+<summary><strong>Import Collection & Configure Environment</strong></summary>
+
+## Import Collection
 
 1. Open Postman
 2. Click **Import**
@@ -54,67 +67,176 @@ Expected: HTTP 200 response.
 testing/test.json
 ```
 
----
+The collection includes built-in variables:
 
-# 4. Create a Postman Environment
+* `baseUrl`
+* `accessToken`
+* `refreshToken`
+* `transactionId`
+* `userId`
 
-Create a new environment with the following variable:
+## Create Environment
+
+Create a new environment:
 
 | Variable | Value                                          |
 | -------- | ---------------------------------------------- |
 | baseUrl  | [http://localhost:3000](http://localhost:3000) |
 
-Save and select this environment (top right corner, switch from no environment to this newly created one).
+Select the environment from the top-right dropdown.
 
-The collection will automatically store:
+The collection automatically manages:
 
-* `token`
-* `transactionId`
+* accessToken
+* refreshToken
+* transactionId
+* userId
 
-after running specific requests.
+via Postman test scripts.
 
----
-
-# 5. Standard Test Flow
-
-Run requests in the following order.
+</details>
 
 ---
 
-## 5.1 Login
+# 3. Authentication Flow
 
-Endpoint:
+<details>
+<summary><strong>Register, Login, Token Validation, Refresh, Logout</strong></summary>
+
+## Register New User
+
+```
+POST /api/v1/auth/register
+```
+
+Expected:
+
+* HTTP 201 or 200
+* User created
+* `userId` stored automatically
+
+---
+
+## Login
 
 ```
 POST /api/v1/auth/login
 ```
 
-Body:
+Expected:
 
-```json
-{
-  "email": "admin@example.com",
-  "password": "admin123"
-}
+* HTTP 200
+* accessToken returned
+* refreshToken returned
+* Tokens stored automatically
+
+---
+
+## Validate Token
+
+```
+POST /api/v1/auth/validate
+```
+
+Headers:
+
+```
+Authorization: Bearer {{accessToken}}
 ```
 
 Expected:
 
 * HTTP 200
-* JWT token returned
-* Token stored automatically in environment variable `token`
-
-Failure cases to test:
-
-* Wrong password → 401
-* Missing body → 400
-* Excessive attempts → 429 (rate limited)
+* Token validation success
 
 ---
 
-## 5.2 Create Transaction
+## Refresh Access Token
 
-Endpoint:
+```
+POST /api/v1/auth/refresh
+```
+
+Expected:
+
+* HTTP 200
+* New accessToken issued
+* accessToken updated
+
+---
+
+## Logout
+
+```
+POST /api/v1/auth/logout
+```
+
+Expected:
+
+* HTTP 200
+* Tokens cleared
+
+</details>
+
+---
+
+# 4. User Profile Management
+
+<details>
+<summary><strong>Profile Retrieval & Update</strong></summary>
+
+## Get My Profile
+
+```
+GET /api/v1/auth/profile
+```
+
+Expected:
+
+* HTTP 200
+* Authenticated user profile returned
+
+---
+
+## Update Profile
+
+```
+PATCH /api/v1/auth/profile
+```
+
+Expected:
+
+* HTTP 200
+* Profile updated successfully
+
+---
+
+## Change Password
+
+```
+POST /api/v1/auth/change-password
+```
+
+Expected:
+
+* HTTP 200
+* Tokens revoked
+* Must login again
+
+</details>
+
+---
+
+# 5. Transaction Testing
+
+<details>
+<summary><strong>Create, Fetch & Idempotency Validation</strong></summary>
+
+Login first to obtain `accessToken`.
+
+---
+
+## Create Transaction
 
 ```
 POST /api/v1/transactions
@@ -123,32 +245,9 @@ POST /api/v1/transactions
 Headers:
 
 ```
-Authorization: Bearer {{token}}
-Content-Type: application/json
-X-Idempotency-Key: unique-key-001
-X-Correlation-ID: test-corr-001
-```
-
-Body:
-
-```json
-{
-  "customerId": "customer_123",
-  "merchantId": "merchant_456",
-  "amount": 1500.00,
-  "currency": "USD",
-  "cardNumber": "4111111111111111",
-  "cardType": "visa",
-  "deviceId": "device_abc",
-  "ipAddress": "192.168.1.100",
-  "location": {
-    "country": "SG",
-    "city": "Singapore"
-  },
-  "metadata": {
-    "channel": "mobile"
-  }
-}
+Authorization: Bearer {{accessToken}}
+X-Idempotency-Key: {{$guid}}
+X-Correlation-ID: corr-{{$timestamp}}
 ```
 
 Expected:
@@ -158,35 +257,15 @@ Expected:
 * transactionId returned
 * transactionId stored automatically
 
-Validation checks:
+Validation:
 
-* Card number should not be returned
-* Only last four digits should be stored
-* Correlation ID should match request
-
----
-
-## 5.3 Idempotency Test
-
-Repeat the same request with the same:
-
-```
-X-Idempotency-Key: unique-key-001
-```
-
-Expected:
-
-* HTTP 200 or 201
-* idempotent = true
-* No duplicate transaction created in database
-
-Change the idempotency key to confirm new record creation.
+* Full card number never returned
+* Only last four digits persisted
+* Correlation ID matches
 
 ---
 
-## 5.4 Get Transaction By ID
-
-Endpoint:
+## Get Transaction by ID
 
 ```
 GET /api/v1/transactions/{{transactionId}}
@@ -198,16 +277,9 @@ Expected:
 * Correct transaction returned
 * No sensitive card data exposed
 
-Failure test:
-
-* Invalid ID → 404
-* Missing JWT → 401
-
 ---
 
-## 5.5 Get Transactions By Customer
-
-Endpoint:
+## Get Transactions by Customer
 
 ```
 GET /api/v1/transactions/customer/customer_123
@@ -217,13 +289,35 @@ Expected:
 
 * HTTP 200
 * Array of transactions
-* Includes newly created transaction
 
 ---
 
-## 5.6 Health Endpoints
+## Idempotency Test
 
-Test without authentication:
+Run:
+
+```
+Test Idempotency (Duplicate Request)
+```
+
+Then run it again.
+
+Expected:
+
+* First call → new transaction
+* Second call → idempotent = true
+* No duplicate database entry
+
+</details>
+
+---
+
+# 6. Health & Monitoring
+
+<details>
+<summary><strong>Health Endpoints & Prometheus Metrics</strong></summary>
+
+## Health Endpoints
 
 ```
 GET /api/v1/health
@@ -233,78 +327,98 @@ GET /api/v1/health/ready
 
 Expected:
 
-* 200 OK
-* Dependencies listed (Redis, etc.)
+* HTTP 200
+* Dependency status visible
 
 ---
 
-# 6. Rate Limiting Tests
+## Prometheus Metrics
 
-## Auth Rate Limit
-
-Attempt login more than 5 times within 15 minutes.
-
-Expected:
-
-* HTTP 429
-* Error message indicating rate limit exceeded
-
-## Transaction Rate Limit
-
-Send more than 50 transaction requests within 1 minute.
-
-Expected:
-
-* HTTP 429
-
----
-
-# 7. JWT Security Tests
-
-## Missing Token
-
-Remove Authorization header.
-
-Expected:
-
-* HTTP 401
-
-## Invalid Token
-
-Modify token manually.
-
-Expected:
-
-* HTTP 401
-
-## Expired Token (if implemented)
-
-Wait until expiry or simulate invalid signature.
-
-Expected:
-
-* HTTP 401
-
----
-
-# 8. Kafka Verification (Optional Advanced Testing)
-
-To verify events are being published:
-
-```bash
-docker exec -it kafka kafka-console-consumer \
---bootstrap-server kafka:9092 \
---topic transaction.created \
---from-beginning
+```
+GET /api/v1/metrics
 ```
 
-You should see events when transactions are created.
+Expected:
+
+* Plain text Prometheus metrics
+* HTTP request counters
+* Service metrics
+
+</details>
 
 ---
 
-# 9. Database Verification (Optional)
+# 7. End-to-End Scenario
 
-Connect to PostgreSQL container:
+<details>
+<summary><strong>Full Flow – Register → Login → Create Transaction</strong></summary>
+
+Navigate to:
+
+```
+Test Scenarios → Full Flow - Register → Login → Create Transaction
+```
+
+Run in order:
+
+1. Register
+2. Login
+3. Create Transaction
+
+This validates:
+
+* User creation
+* Authentication
+* Token issuance
+* Transaction creation
+
+</details>
+
+---
+
+# 8. Rate Limiting
+
+<details>
+<summary><strong>Brute Force & Rate Limit Testing</strong></summary>
+
+Run:
+
+```
+Rate Limit Test (Run 6x quickly)
+```
+
+Expected:
+
+* Initial attempts → 401
+* After threshold → HTTP 429 Too Many Requests
+
+Validates:
+
+* Auth rate limiting
+* Brute force protection
+
+</details>
+
+---
+
+# 9. Optional Advanced Verification
+
+<details>
+<summary><strong>Kafka & Database Verification</strong></summary>
+
+## Kafka Event Verification (Windows CMD)
+
+```cmd
+docker exec -it kafka kafka-console-consumer --bootstrap-server kafka:9092 --topic transaction.created --from-beginning
+```
+
+Expected:
+
+* Transaction events visible when transactions are created
+
+---
+
+## Database Verification
 
 ```bash
 docker exec -it transaction-db psql -U postgres
@@ -316,58 +430,56 @@ Then:
 SELECT * FROM transactions;
 ```
 
-Confirm:
+Verify:
 
 * No full card numbers stored
 * Only last four digits present
-* No duplicate entries for same idempotency key
+* No duplicate idempotency keys
+
+</details>
 
 ---
 
 # 10. Full System Reset
 
-To stop services:
+<details>
+<summary><strong>Reset Containers & Data</strong></summary>
+
+Stop containers:
 
 ```bash
 docker-compose down
 ```
 
-To remove all data:
+Remove all data:
 
 ```bash
 docker-compose down -v
 ```
 
+</details>
+
 ---
 
-# 11. Expected Test Coverage
+# Test Coverage Summary
 
-This testing flow validates:
+This testing guide validates:
 
-* Authentication
-* Authorization
+* User registration
+* JWT authentication
+* Refresh token lifecycle
+* Logout & token revocation
+* Profile management
+* Password change logic
+* Authorization middleware
 * Rate limiting
-* Idempotency
+* Idempotency control
+* Secure card masking
 * Data persistence
-* Health checks
-* Secure card handling
-* Event publication to Kafka
+* Kafka event publication
 * API Gateway routing
-
----
-
-# 12. Testing Order Summary
-
-1. Start Docker
-2. Import Postman collection
-3. Create environment
-4. Login
-5. Create transaction
-6. Test idempotency
-7. Fetch by ID
-8. Fetch by customer
-9. Test rate limits
-10. Test JWT failures
+* Health & readiness probes
+* Prometheus metrics exposure
 
 ---
 
@@ -375,10 +487,12 @@ This testing flow validates:
 
 The system is considered functioning correctly when:
 
-* All endpoints return expected status codes
-* Idempotency prevents duplicate transactions
+* All endpoints return expected HTTP status codes
+* Tokens are issued, refreshed, and revoked properly
+* Transactions are created and stored correctly
+* Idempotency prevents duplicates
 * Rate limits are enforced
-* JWT authentication is required
-* Sensitive card data is not stored
+* No sensitive card data is persisted
 * Kafka events are published successfully
+* Health and metrics endpoints are accessible
 ---

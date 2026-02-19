@@ -1,106 +1,173 @@
+const config = require('../config');
 const logger = require('../config/logger');
 const fraudRulesEngine = require('../rules/fraudRulesEngine');
 const mlScoringClient = require('./mlScoringClient');
+const {
+  transactionsProcessedTotal,
+  transactionProcessingDuration,
+  riskScoreDistribution,
+  errorsTotal,
+} = require('../metrics');
+
+const ANALYSIS_VERSION = '2.0.0';
 
 class FraudDetectionService {
   /**
-   * Main fraud detection pipeline
-   * 1. Run rule-based checks
-   * 2. Call ML scoring service
-   * 3. Combine results
+   * Main fraud detection pipeline:
+   *  1. Rule-based evaluation (parallel rules, graduated scores)
+   *  2. ML risk scoring (with circuit breaker + fallback)
+   *  3. Weighted combination with configurable thresholds
    */
-  async analyzeTransaction(transaction) {
+  async analyzeTransaction(transaction, correlationId) {
     const startTime = Date.now();
-    
-    logger.info('Starting fraud analysis', {
+
+    // Per-transaction child logger carries correlationId through all downstream calls
+    const log = logger.child({
       transactionId: transaction.id,
       customerId: transaction.customerId,
+      correlationId,
+    });
+
+    log.info('Starting fraud analysis', {
       amount: transaction.amount,
+      currency: transaction.currency,
+      merchantId: transaction.merchantId,
     });
 
     try {
-      // Step 1: Rule-based fraud detection
-      const ruleResults = await fraudRulesEngine.evaluate(transaction);
+      // Step 1: Rule-based detection (runs all rules in parallel internally)
+      const ruleResults = await fraudRulesEngine.evaluate(transaction, log);
 
-      // Step 2: ML-based risk scoring
-      const mlResults = await mlScoringClient.getScore(transaction, ruleResults);
+      // Step 2: ML risk scoring (circuit-breaker protected, falls back gracefully)
+      const mlResults = await mlScoringClient.getScore(transaction, ruleResults, log);
 
-      // Step 3: Combine results
-      const combinedResults = this._combineResults(transaction, ruleResults, mlResults);
+      // Step 3: Combine into final assessment
+      const combined = this._combineResults(transaction, ruleResults, mlResults);
 
-      const duration = Date.now() - startTime;
+      const durationMs = Date.now() - startTime;
 
-      logger.info('Fraud analysis completed', {
-        transactionId: transaction.id,
-        finalScore: combinedResults.riskScore,
-        flagged: combinedResults.flagged,
-        durationMs: duration,
+      // Metrics
+      transactionsProcessedTotal.inc({
+        status: 'success',
+        flagged: combined.flagged ? 'true' : 'false',
+      });
+      transactionProcessingDuration.observe({ status: 'success' }, durationMs);
+      riskScoreDistribution.observe({ source: 'combined' }, combined.riskScore);
+      riskScoreDistribution.observe({ source: 'rules' }, ruleResults.ruleScore);
+      riskScoreDistribution.observe({ source: 'ml' }, mlResults.score);
+
+      log.info('Fraud analysis completed', {
+        riskScore: combined.riskScore,
+        flagged: combined.flagged,
+        ruleScore: ruleResults.ruleScore,
+        mlScore: mlResults.score,
+        mlModelVersion: mlResults.modelVersion,
+        durationMs,
       });
 
-      return combinedResults;
+      return combined;
     } catch (error) {
-      logger.error('Fraud analysis failed', {
-        transactionId: transaction.id,
+      const durationMs = Date.now() - startTime;
+
+      transactionsProcessedTotal.inc({ status: 'error', flagged: 'false' });
+      transactionProcessingDuration.observe({ status: 'error' }, durationMs);
+      errorsTotal.inc({ component: 'fraud_detection_service', type: 'analysis_failure' });
+
+      log.error('Fraud analysis failed — returning safe defaults', {
         error: error.message,
         stack: error.stack,
+        durationMs,
       });
 
-      // Return safe defaults on error
-      return {
-        transactionId: transaction.id,
-        riskScore: 50, // Neutral score
-        flagged: false,
-        reasons: ['analysis_error'],
-        ruleResults: { flagged: false, reasons: [], riskFactors: {} },
-        mlResults: { score: 50, modelVersion: 'error', features: {} },
-        analysisError: error.message,
-        timestamp: new Date().toISOString(),
-      };
+      // Safe defaults: neutral score, not flagged, so we don't block the transaction
+      return this._safeDefault(transaction, error.message);
     }
   }
 
+  // Result Combination
+
   /**
-   * Combine rule-based and ML results into final risk assessment
+   * Weighted combination of rule and ML scores.
+   *
+   * Formula:  combinedScore = (ruleScore * rulesWeight) + (mlScore * mlWeight)
+   *
+   * Flagged if:
+   *   - Rules engine hard-flagged the transaction, OR
+   *   - ML score exceeds mlFlagThreshold
    */
   _combineResults(transaction, ruleResults, mlResults) {
-    // Weighted combination: 40% rules, 60% ML
-    const ruleScore = ruleResults.flagged ? 80 : 20;
-    const mlScore = mlResults.score;
-    
+    // FIX: config is now a direct require at the top of the file.
+    // Previously it was a lazy function `const config = () => require('../config')`
+    // defined AFTER the class body — confusing, unnecessary, and fragile.
+    const { rulesWeight, mlWeight, mlFlagThreshold } = config.fraudRules.combination;
+
     const combinedScore = Math.round(
-      (ruleScore * 0.4) + (mlScore * 0.6)
+      ruleResults.ruleScore * rulesWeight + mlResults.score * mlWeight
     );
 
-    // Final flagged status: either rules flagged OR ML score > 70
-    const finalFlagged = ruleResults.flagged || mlScore > 70;
+    const finalFlagged = ruleResults.flagged || mlResults.score > mlFlagThreshold;
+
+    // Merge rule reasons and any ML-provided reasons
+    const allReasons = [...ruleResults.reasons];
+    if (mlResults.score > mlFlagThreshold) {
+      allReasons.push(`ML model score ${mlResults.score} exceeds threshold (${mlFlagThreshold})`);
+    }
 
     return {
+      // Identity
       transactionId: transaction.id,
       customerId: transaction.customerId,
       merchantId: transaction.merchantId,
       amount: transaction.amount,
       currency: transaction.currency,
-      
+
       // Risk assessment
       riskScore: combinedScore,
       flagged: finalFlagged,
-      reasons: ruleResults.reasons,
-      
-      // Detailed breakdown
+      reasons: allReasons,
+
+      // Full audit trail for downstream consumers / compliance
       ruleResults: {
         flagged: ruleResults.flagged,
+        ruleScore: ruleResults.ruleScore,
         reasons: ruleResults.reasons,
         riskFactors: ruleResults.riskFactors,
       },
       mlResults: {
         score: mlResults.score,
         modelVersion: mlResults.modelVersion,
+        confidence: mlResults.confidence ?? null,
         features: mlResults.features,
+        isFallback: mlResults.modelVersion === 'fallback-v1',
       },
-      
+
       // Metadata
       analyzedAt: new Date().toISOString(),
-      analysisVersion: '1.0.0',
+      analysisVersion: ANALYSIS_VERSION,
+    };
+  }
+
+  _safeDefault(transaction, errorMessage) {
+    return {
+      transactionId: transaction.id,
+      customerId: transaction.customerId,
+      merchantId: transaction.merchantId,
+      amount: transaction.amount,
+      currency: transaction.currency,
+      riskScore: 50,
+      flagged: false,
+      reasons: ['analysis_error'],
+      ruleResults: { flagged: false, ruleScore: 0, reasons: [], riskFactors: {} },
+      mlResults: {
+        score: 50,
+        modelVersion: 'error',
+        confidence: null,
+        features: {},
+        isFallback: true,
+      },
+      analysisError: errorMessage,
+      analyzedAt: new Date().toISOString(),
+      analysisVersion: ANALYSIS_VERSION,
     };
   }
 }

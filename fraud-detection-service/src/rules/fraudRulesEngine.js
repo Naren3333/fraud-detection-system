@@ -1,82 +1,109 @@
 const config = require('../config');
 const logger = require('../config/logger');
 const { getClient } = require('../config/redis');
+const {
+  ruleEvaluationsTotal,
+  ruleEvaluationDuration,
+  errorsTotal,
+} = require('../metrics');
 
 class FraudRulesEngine {
   /**
-   * Run all fraud detection rules on a transaction
-   * Returns { flagged: boolean, reasons: string[], riskFactors: object }
+   * Run all fraud detection rules against a transaction.
+   *
+   * Returns:
+   *   flagged     {boolean}   — true if any hard-flag rule triggered
+   *   ruleScore   {number}    — graduated 0–100 risk contribution from rules
+   *   reasons     {string[]}  — human-readable descriptions of triggered rules
+   *   riskFactors {object}    — raw factor data per rule for audit trail
    */
-  async evaluate(transaction) {
+  async evaluate(transaction, childLogger) {
+    const log = childLogger || logger;
+    const startTime = Date.now();
     const riskFactors = {};
     const reasons = [];
+    let totalRuleScore = 0;
     let flagged = false;
 
     try {
-      // Rule 1: Velocity checks (transaction frequency)
-      const velocityResult = await this._checkVelocity(transaction);
-      if (velocityResult.flagged) {
-        flagged = true;
-        reasons.push(...velocityResult.reasons);
-        riskFactors.velocity = velocityResult.factors;
+      const [velocityResult, geoResult, amountResult, cardResult, timeResult] =
+        await Promise.allSettled([
+          this._checkVelocity(transaction, log),
+          Promise.resolve(this._checkGeography(transaction)),
+          Promise.resolve(this._checkAmount(transaction)),
+          Promise.resolve(this._checkCard(transaction)),
+          Promise.resolve(this._checkTime(transaction)),
+        ]);
+
+      const results = [
+        { name: 'velocity', result: velocityResult },
+        { name: 'geography', result: geoResult },
+        { name: 'amount', result: amountResult },
+        { name: 'card', result: cardResult },
+        { name: 'time', result: timeResult },
+      ];
+
+      for (const { name, result } of results) {
+        if (result.status === 'rejected') {
+          log.error(`Rule [${name}] threw an exception`, {
+            transactionId: transaction.id,
+            error: result.reason?.message,
+          });
+          errorsTotal.inc({ component: `rule_${name}`, type: 'exception' });
+          ruleEvaluationsTotal.inc({ rule: name, triggered: 'error' });
+          continue;
+        }
+
+        const r = result.value;
+        ruleEvaluationsTotal.inc({ rule: name, triggered: r.flagged ? 'true' : 'false' });
+
+        if (r.flagged) {
+          flagged = true;
+          reasons.push(...r.reasons);
+        }
+
+        if (r.factors) {
+          riskFactors[name] = r.factors;
+        }
+
+        totalRuleScore += r.score || 0;
       }
 
-      // Rule 2: High-risk geography
-      const geoResult = this._checkGeography(transaction);
-      if (geoResult.flagged) {
-        flagged = true;
-        reasons.push(...geoResult.reasons);
-        riskFactors.geography = geoResult.factors;
-      }
+      // Normalise rule score to 0–100
+      const ruleScore = Math.min(Math.round(totalRuleScore), 100);
+      const durationMs = Date.now() - startTime;
 
-      // Rule 3: Suspicious amounts
-      const amountResult = this._checkAmount(transaction);
-      if (amountResult.flagged) {
-        flagged = true;
-        reasons.push(...amountResult.reasons);
-        riskFactors.amount = amountResult.factors;
-      }
+      ruleEvaluationDuration.observe({ flagged: flagged ? 'true' : 'false' }, durationMs);
 
-      // Rule 4: Card patterns (BIN blacklist, repeated failures)
-      const cardResult = this._checkCard(transaction);
-      if (cardResult.flagged) {
-        flagged = true;
-        reasons.push(...cardResult.reasons);
-        riskFactors.card = cardResult.factors;
-      }
-
-      // Rule 5: Time-based anomalies (unusual transaction times)
-      const timeResult = this._checkTime(transaction);
-      if (timeResult.flagged) {
-        flagged = true;
-        reasons.push(...timeResult.reasons);
-        riskFactors.time = timeResult.factors;
-      }
-
-      logger.info('Fraud rules evaluated', {
+      log.info('Fraud rules evaluated', {
         transactionId: transaction.id,
         flagged,
+        ruleScore,
         reasonCount: reasons.length,
+        durationMs,
       });
 
-      return { flagged, reasons, riskFactors };
+      return { flagged, ruleScore, reasons, riskFactors };
     } catch (error) {
-      logger.error('Fraud rules evaluation failed', {
+      log.error('Fraud rules evaluation critically failed', {
         transactionId: transaction.id,
         error: error.message,
+        stack: error.stack,
       });
-      // Return non-flagged on error (fail open to avoid blocking legitimate transactions)
-      return { flagged: false, reasons: ['evaluation_error'], riskFactors: {} };
+      errorsTotal.inc({ component: 'rules_engine', type: 'critical' });
+
+      // Fail open - do not block legitimate transactions on evaluation error
+      return { flagged: false, ruleScore: 0, reasons: ['evaluation_error'], riskFactors: {} };
     }
   }
 
-  /**
-   * Velocity check: too many transactions in short time window
-   */
-  async _checkVelocity(transaction) {
+  // Velocity Check
+
+  async _checkVelocity(transaction, log) {
     const redis = getClient();
-    const { customerId, merchantId, amount } = transaction;
-    
+    const { customerId, amount } = transaction;
+    const weights = config.fraudRules.scoring;
+
     const now = Date.now();
     const oneHourAgo = now - 3600000;
     const oneDayAgo = now - 86400000;
@@ -84,67 +111,75 @@ class FraudRulesEngine {
     const reasons = [];
     const factors = {};
     let flagged = false;
+    let score = 0;
 
-    try {
-      // Count transactions per customer in last hour
-      const customerHourKey = `velocity:customer:${customerId}:hour`;
-      await redis.zRemRangeByScore(customerHourKey, 0, oneHourAgo);
-      await redis.zAdd(customerHourKey, { score: now, value: transaction.id });
-      await redis.expire(customerHourKey, 3600);
-      
-      const customerHourCount = await redis.zCard(customerHourKey);
-      factors.customerTransactionsLastHour = customerHourCount;
+    // --- Hourly count ---
+    const customerHourKey = `velocity:customer:${customerId}:hour`;
+    await redis.zRemRangeByScore(customerHourKey, 0, oneHourAgo);
+    await redis.zAdd(customerHourKey, { score: now, value: transaction.id });
+    await redis.expire(customerHourKey, 3600);
+    const customerHourCount = await redis.zCard(customerHourKey);
+    factors.customerTransactionsLastHour = customerHourCount;
 
-      if (customerHourCount > config.fraudRules.velocity.maxCountPerHour) {
-        flagged = true;
-        reasons.push(`Customer exceeded ${config.fraudRules.velocity.maxCountPerHour} transactions per hour`);
-      }
-
-      // Sum transaction amounts per customer in last hour
-      const customerAmountKey = `velocity:customer:${customerId}:amount:hour`;
-      const currentAmount = await redis.get(customerAmountKey) || '0';
-      const newAmount = parseFloat(currentAmount) + amount;
-      await redis.set(customerAmountKey, newAmount.toString(), { EX: 3600 });
-      
-      factors.customerAmountLastHour = newAmount;
-
-      if (newAmount > config.fraudRules.velocity.maxAmountPerHour) {
-        flagged = true;
-        reasons.push(`Customer exceeded $${config.fraudRules.velocity.maxAmountPerHour} in one hour`);
-      }
-
-      // Count transactions per customer in last day
-      const customerDayKey = `velocity:customer:${customerId}:day`;
-      await redis.zRemRangeByScore(customerDayKey, 0, oneDayAgo);
-      await redis.zAdd(customerDayKey, { score: now, value: transaction.id });
-      await redis.expire(customerDayKey, 86400);
-      
-      const customerDayCount = await redis.zCard(customerDayKey);
-      factors.customerTransactionsLastDay = customerDayCount;
-
-      if (customerDayCount > config.fraudRules.velocity.maxCountPerDay) {
-        flagged = true;
-        reasons.push(`Customer exceeded ${config.fraudRules.velocity.maxCountPerDay} transactions per day`);
-      }
-
-    } catch (error) {
-      logger.error('Velocity check failed', { error: error.message });
+    const maxCountPerHour = config.fraudRules.velocity.maxCountPerHour;
+    if (customerHourCount > maxCountPerHour) {
+      flagged = true;
+      score += weights.velocityCountHourWeight;
+      // Scale up proportionally the further over threshold we are
+      const overage = (customerHourCount - maxCountPerHour) / maxCountPerHour;
+      score += Math.min(weights.velocityCountHourWeight * overage, weights.velocityCountHourWeight);
+      reasons.push(
+        `Exceeded hourly transaction count (${customerHourCount}/${maxCountPerHour})`
+      );
     }
 
-    return { flagged, reasons, factors };
+    // --- Hourly amount ---
+    const customerAmountKey = `velocity:customer:${customerId}:amount:hour`;
+    const currentAmount = parseFloat((await redis.get(customerAmountKey)) || '0');
+    const newAmount = currentAmount + amount;
+    await redis.set(customerAmountKey, newAmount.toString(), { EX: 3600 });
+    factors.customerAmountLastHour = newAmount;
+
+    const maxAmountPerHour = config.fraudRules.velocity.maxAmountPerHour;
+    if (newAmount > maxAmountPerHour) {
+      flagged = true;
+      score += weights.velocityAmountHourWeight;
+      reasons.push(
+        `Exceeded hourly spend limit ($${newAmount.toFixed(2)}/$${maxAmountPerHour})`
+      );
+    }
+
+    // --- Daily count ---
+    const customerDayKey = `velocity:customer:${customerId}:day`;
+    await redis.zRemRangeByScore(customerDayKey, 0, oneDayAgo);
+    await redis.zAdd(customerDayKey, { score: now, value: transaction.id });
+    await redis.expire(customerDayKey, 86400);
+    const customerDayCount = await redis.zCard(customerDayKey);
+    factors.customerTransactionsLastDay = customerDayCount;
+
+    const maxCountPerDay = config.fraudRules.velocity.maxCountPerDay;
+    if (customerDayCount > maxCountPerDay) {
+      flagged = true;
+      score += weights.velocityCountDayWeight;
+      reasons.push(
+        `Exceeded daily transaction count (${customerDayCount}/${maxCountPerDay})`
+      );
+    }
+
+    return { flagged, score, reasons, factors };
   }
 
-  /**
-   * Geography check: high-risk countries
-   */
+  // Geography Check
+
   _checkGeography(transaction) {
     const { location } = transaction;
     const reasons = [];
     const factors = {};
     let flagged = false;
+    let score = 0;
 
-    if (!location || !location.country) {
-      return { flagged, reasons, factors };
+    if (!location?.country) {
+      return { flagged, score, reasons, factors };
     }
 
     const country = location.country.toUpperCase();
@@ -152,77 +187,85 @@ class FraudRulesEngine {
 
     if (config.fraudRules.geographic.highRiskCountries.includes(country)) {
       flagged = true;
-      reasons.push(`Transaction from high-risk country: ${country}`);
+      score += config.fraudRules.scoring.highRiskCountryWeight;
+      reasons.push(`Transaction originates from high-risk country: ${country}`);
     }
 
-    return { flagged, reasons, factors };
+    return { flagged, score, reasons, factors };
   }
 
-  /**
-   * Amount check: suspiciously high or round amounts
-   */
+  // Amount Check 
+
   _checkAmount(transaction) {
     const { amount, currency } = transaction;
     const reasons = [];
     const factors = { amount, currency };
     let flagged = false;
+    let score = 0;
+    const weights = config.fraudRules.scoring;
+    const { suspiciousAmountThreshold, highAmountThreshold } = config.fraudRules.amounts;
 
-    // High amount check
-    if (amount >= config.fraudRules.amounts.suspiciousAmountThreshold) {
+    if (amount >= suspiciousAmountThreshold) {
       flagged = true;
-      reasons.push(`Amount exceeds suspicious threshold ($${config.fraudRules.amounts.suspiciousAmountThreshold})`);
-    } else if (amount >= config.fraudRules.amounts.highAmountThreshold) {
-      // High but not suspicious - flag for review but not fraud
+      score += weights.suspiciousAmountWeight;
+      reasons.push(`Amount $${amount} exceeds suspicious threshold ($${suspiciousAmountThreshold})`);
+      factors.suspicious = true;
+    } else if (amount >= highAmountThreshold) {
+      score += weights.highAmountWeight;
       factors.highAmount = true;
+      // Not a hard flag - contributes to score but doesn't flag alone
     }
 
-    // Round amount check (e.g., exactly $1000.00, $5000.00)
+    // Round-number heuristic (e.g. $1000.00, $5000.00)
     if (amount >= 100 && amount % 100 === 0) {
+      score += weights.roundAmountWeight;
       factors.roundAmount = true;
-      // Don't flag alone, but contributes to overall risk
     }
 
-    return { flagged, reasons, factors };
+    return { flagged, score, reasons, factors };
   }
 
-  /**
-   * Card check: BIN blacklist, card patterns
-   */
+  // Card Check 
+
   _checkCard(transaction) {
-    const { cardLastFour, cardType } = transaction;
+    const { cardBin, cardLastFour, cardType } = transaction;
     const reasons = [];
     const factors = { cardLastFour, cardType };
     let flagged = false;
+    let score = 0;
 
-    // BIN check (first 6 digits - we only have last 4, but this is a placeholder)
-    // In production, you'd check the full BIN from the original transaction
-    if (config.fraudRules.cards.binBlacklist.length > 0) {
-      // This is a simplified check - in reality you'd need the full BIN
+    if (cardBin && config.fraudRules.cards.binBlacklist.length > 0) {
       factors.binCheckApplied = true;
+      if (config.fraudRules.cards.binBlacklist.includes(cardBin)) {
+        flagged = true;
+        score += config.fraudRules.scoring.binBlacklistWeight;
+        reasons.push(`Card BIN ${cardBin} is on the blacklist`);
+        factors.binBlacklisted = true;
+      }
     }
 
-    return { flagged, reasons, factors };
+    return { flagged, score, reasons, factors };
   }
 
-  /**
-   * Time check: unusual transaction times (e.g., 3am local time)
-   */
+
   _checkTime(transaction) {
     const { createdAt } = transaction;
     const reasons = [];
     const factors = {};
     let flagged = false;
+    let score = 0;
 
     const hour = new Date(createdAt).getUTCHours();
     factors.transactionHourUTC = hour;
 
-    // Transactions between 2am-5am UTC are slightly suspicious
+    // 02:00–05:00 UTC - elevated risk window
     if (hour >= 2 && hour < 5) {
+      score += config.fraudRules.scoring.unusualTimeWeight;
       factors.unusualTime = true;
-      // Don't flag alone, but contributes to risk
+      // Soft signal - contributes to score but does not hard-flag alone
     }
 
-    return { flagged, reasons, factors };
+    return { flagged, score, reasons, factors };
   }
 }
 

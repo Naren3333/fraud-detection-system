@@ -295,13 +295,14 @@ services:
         KAFKA_GROUP_ID:        fraud-detection-group
         KAFKA_INPUT_TOPIC:     transaction.created
         KAFKA_OUTPUT_TOPIC:    transaction.scored
+        KAFKA_DLQ_TOPIC:       transaction.dlq   
         # Redis
         REDIS_HOST:            redis
         REDIS_PORT:            6379
         REDIS_DB:              3
         # ML Scoring Service
         ML_SCORING_SERVICE_URL: http://ml-scoring-service:3004
-        ML_SCORING_TIMEOUT:    5000
+        ML_SCORING_TIMEOUT:    3000
         # Fraud Rules
         VELOCITY_MAX_AMOUNT_PER_HOUR: 10000
         VELOCITY_MAX_COUNT_PER_HOUR:  10

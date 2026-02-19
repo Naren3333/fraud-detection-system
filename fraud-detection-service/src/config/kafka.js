@@ -1,8 +1,16 @@
-const { Kafka, Partitioners, CompressionTypes } = require('kafkajs');
+const { Kafka, Partitioners, CompressionTypes, logLevel: KafkaLogLevel } = require('kafkajs');
 const config = require('./index');
 const logger = require('./logger');
 
 let kafka = null;
+
+const kafkaLogLevelMap = {
+  [KafkaLogLevel.NOTHING]: 'silent',
+  [KafkaLogLevel.ERROR]: 'error',
+  [KafkaLogLevel.WARN]: 'warn',
+  [KafkaLogLevel.INFO]: 'info',
+  [KafkaLogLevel.DEBUG]: 'debug',
+};
 
 const createKafka = () => {
   if (kafka) return kafka;
@@ -14,8 +22,12 @@ const createKafka = () => {
     requestTimeout: 30000,
     retry: config.kafka.retry,
     logCreator: () => ({ namespace, level, label, log }) => {
+      const mappedLevel = kafkaLogLevelMap[level] || 'debug';
       const { message, ...extra } = log;
-      logger.debug(`[Kafka ${label}] ${message}`, extra);
+      // Only surface WARN+ from Kafka internals to keep logs clean
+      if (level <= KafkaLogLevel.WARN) {
+        logger[mappedLevel](`[Kafka:${namespace}] ${message}`, extra);
+      }
     },
   });
 
@@ -23,18 +35,24 @@ const createKafka = () => {
 };
 
 const createConsumer = async () => {
-  const kafka = createKafka();
-  
-  const consumer = kafka.consumer({
+  const k = createKafka();
+
+  const consumer = k.consumer({
     groupId: config.kafka.groupId,
     sessionTimeout: config.kafka.sessionTimeout,
     heartbeatInterval: config.kafka.heartbeatInterval,
     maxWaitTimeInMs: 100,
     retry: config.kafka.retry,
+    // Manual offset management
+    autoCommit: false,
   });
 
   consumer.on(consumer.events.CRASH, ({ payload }) => {
-    logger.error('Kafka consumer crashed', { error: payload.error });
+    logger.error('Kafka consumer crashed', {
+      error: payload.error?.message,
+      groupId: payload.groupId,
+      restart: payload.restart,
+    });
   });
 
   consumer.on(consumer.events.DISCONNECT, () => {
@@ -42,7 +60,18 @@ const createConsumer = async () => {
   });
 
   consumer.on(consumer.events.CONNECT, () => {
-    logger.info('Kafka consumer connected');
+    logger.info('Kafka consumer connected', { groupId: config.kafka.groupId });
+  });
+
+  consumer.on(consumer.events.REBALANCING, () => {
+    logger.info('Kafka consumer rebalancing');
+  });
+
+  consumer.on(consumer.events.GROUP_JOIN, ({ payload }) => {
+    logger.info('Kafka consumer joined group', {
+      groupId: payload.groupId,
+      memberId: payload.memberId,
+    });
   });
 
   await consumer.connect();
@@ -50,13 +79,14 @@ const createConsumer = async () => {
 };
 
 const createProducer = async () => {
-  const kafka = createKafka();
-  
-  const producer = kafka.producer({
+  const k = createKafka();
+
+  const producer = k.producer({
     createPartitioner: Partitioners.DefaultPartitioner,
     allowAutoTopicCreation: true,
     idempotent: true,
     maxInFlightRequests: 1,
+    transactionTimeout: 30000,
   });
 
   producer.on(producer.events.CONNECT, () => {
@@ -71,19 +101,28 @@ const createProducer = async () => {
   return producer;
 };
 
+/**
+ * Publish a message to a Kafka topic with structured headers and compression.
+ */
 const publish = async (producer, topic, partitionKey, payload, headers = {}) => {
+  const messageHeaders = {
+    'content-type': 'application/json',
+    'service-source': config.serviceName,
+    'service-version': config.serviceVersion,
+    'published-at': new Date().toISOString(),
+    ...headers,
+  };
+
   const result = await producer.send({
     topic,
     compression: CompressionTypes.GZIP,
-    messages: [{
-      key: partitionKey,
-      value: JSON.stringify(payload),
-      headers: {
-        'content-type': 'application/json',
-        'service-source': config.serviceName,
-        ...headers,
+    messages: [
+      {
+        key: partitionKey ? String(partitionKey) : null,
+        value: JSON.stringify(payload),
+        headers: messageHeaders,
       },
-    }],
+    ],
   });
 
   logger.info('Kafka message published', {
@@ -96,4 +135,31 @@ const publish = async (producer, topic, partitionKey, payload, headers = {}) => 
   return result;
 };
 
-module.exports = { createKafka, createConsumer, createProducer, publish };
+/**
+ * Publish a batch of messages in a single producer.send call.
+ */
+const publishBatch = async (producer, topic, messages) => {
+  const result = await producer.send({
+    topic,
+    compression: CompressionTypes.GZIP,
+    messages: messages.map(({ key, payload, headers = {} }) => ({
+      key: key ? String(key) : null,
+      value: JSON.stringify(payload),
+      headers: {
+        'content-type': 'application/json',
+        'service-source': config.serviceName,
+        'published-at': new Date().toISOString(),
+        ...headers,
+      },
+    })),
+  });
+
+  logger.info('Kafka batch published', {
+    topic,
+    count: messages.length,
+  });
+
+  return result;
+};
+
+module.exports = { createKafka, createConsumer, createProducer, publish, publishBatch };

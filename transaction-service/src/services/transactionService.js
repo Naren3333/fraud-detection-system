@@ -50,7 +50,7 @@ class TransactionService {
         userAgent:    ctx.userAgent || null,
         location:     body.location  || {},
         metadata:     body.metadata  || {},
-        timestamp:    new Date().toISOString(),
+        createdAt:    new Date().toISOString(),
       },
     };
 

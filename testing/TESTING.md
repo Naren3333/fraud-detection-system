@@ -1,4 +1,4 @@
-# Fraud Detection Platform – Testing Guide
+# Fraud Detection Platform — Testing Guide
 
 This document describes how to test the Fraud Detection Platform using the provided Postman collection:
 
@@ -38,6 +38,7 @@ Wait until:
 * Redis is ready
 * API Gateway is listening on port 3000
 * Transaction Service is listening on port 3001
+* Fraud Detection Service is listening on port 3003
 
 Verify the gateway is up:
 
@@ -45,7 +46,13 @@ Verify the gateway is up:
 GET http://localhost:3000/api/v1/health
 ```
 
-Expected: HTTP 200 OK
+Verify the fraud detection service is up:
+
+```
+GET http://localhost:3003/api/v1/health
+```
+
+Both should return HTTP 200 OK.
 
 </details>
 
@@ -78,20 +85,15 @@ The collection includes built-in variables:
 
 Create a new environment:
 
-| Variable | Value                                          |
-| -------- | ---------------------------------------------- |
-| baseUrl  | [http://localhost:3000](http://localhost:3000) |
+| Variable | Value                    |
+| -------- | ------------------------ |
+| baseUrl  | http://localhost:3000    |
 
 Select the environment from the top-right dropdown.
 
-The collection automatically manages:
+The collection automatically manages `accessToken`, `refreshToken`, `transactionId`, and `userId` via Postman test scripts.
 
-* accessToken
-* refreshToken
-* transactionId
-* userId
-
-via Postman test scripts.
+> **Note:** Fraud Detection Service health and metrics endpoints hit `http://localhost:3003` directly — they are not proxied through the API Gateway.
 
 </details>
 
@@ -243,14 +245,19 @@ Expected:
 
 * HTTP 201
 * status = PENDING
-* transactionId returned
-* transactionId stored automatically
+* transactionId returned and stored automatically
 
 Validation:
 
 * Full card number never returned
 * Only last four digits persisted
 * Correlation ID matches
+
+Once created, the transaction is published to Kafka (`transaction.created`) and picked up by the Fraud Detection Service within milliseconds. Check fraud processing output:
+
+```bash
+docker logs fraud-detection-service --tail 20
+```
 
 
 ## Get Transaction by ID
@@ -280,29 +287,123 @@ Expected:
 
 ## Idempotency Test
 
-Run:
-
-```
-Test Idempotency (Duplicate Request)
-```
-
-Then run it again.
+Run **Test Idempotency (Duplicate Request)** twice with the same `X-Idempotency-Key: idempotent-test-key-001`.
 
 Expected:
 
-* First call → new transaction
-* Second call → idempotent = true
-* No duplicate database entry
+* First call → HTTP 201, new transaction
+* Second call → HTTP 200, `idempotent: true`, no duplicate database entry
 
 </details>
 
 
-# 6. Health & Monitoring
+# 6. Fraud Detection
+
+<details>
+<summary><strong>Pipeline Verification & High-Risk Transaction Testing</strong></summary>
+
+The fraud detection pipeline runs asynchronously. When a transaction is created via the API, it is published to Kafka and processed by the Fraud Detection Service in the background. There is no synchronous fraud response on the transaction creation endpoint — verification is done via logs or Kafka topic inspection.
+
+## Verify a Normal Transaction Was Scored
+
+After creating any transaction, run:
+
+```bash
+docker logs fraud-detection-service --tail 20
+```
+
+Expected log output (summarised):
+
+```
+"message": "Raw Kafka message received"
+"message": "Fraud rules evaluated"
+"message": "Fraud analysis completed", "flagged": false, "riskScore": <n>
+"message": "Transaction processed successfully"
+```
+
+Or consume the scored topic directly:
+
+```bash
+docker exec -it kafka kafka-console-consumer \
+  --bootstrap-server kafka:9092 \
+  --topic transaction.scored \
+  --from-beginning
+```
+
+## High-Risk Transaction (Fraud Flag Expected)
+
+Run the **High-Risk Transaction (Fraud Flag Expected)** request from the **Test Scenarios** folder.
+
+This sends:
+
+```json
+{
+  "amount": 15000.00,
+  "location": { "country": "KP" }
+}
+```
+
+Rules triggered:
+
+| Rule | Reason | Score contribution |
+|---|---|---|
+| Suspicious amount | $15,000 exceeds $10,000 threshold | +30 |
+| High-risk country | KP (North Korea) in blocklist | +25 |
+| Round amount | $15,000 is divisible by 100 | +5 |
+
+Expected fraud service log:
+
+```
+"message": "Fraud analysis completed", "flagged": true, "riskScore": <n>
+```
+
+## Fraud Detection Health Check
+
+The fraud detection service exposes its own health endpoint at port 3003 (not behind the API Gateway):
+
+```
+GET http://localhost:3003/api/v1/health
+```
+
+The response includes:
+
+* Redis connectivity
+* ML Scoring Service circuit breaker state (`CLOSED` / `OPEN` / `HALF_OPEN`)
+* Process uptime and memory
+
+```
+GET http://localhost:3003/api/v1/health/live    — liveness probe
+GET http://localhost:3003/api/v1/health/ready   — readiness probe (Redis check)
+```
+
+## Fraud Detection Metrics
+
+```
+GET http://localhost:3003/api/v1/metrics
+```
+
+Key metrics exposed:
+
+| Metric | Description |
+|---|---|
+| `fraud_detection_transactions_processed_total` | Transactions processed, by status and flagged |
+| `fraud_detection_transaction_processing_duration_ms` | End-to-end processing time histogram |
+| `fraud_detection_risk_score_distribution` | Risk score histogram by source (rules / ml / combined) |
+| `fraud_detection_rule_evaluations_total` | Individual rule evaluations, by rule and triggered |
+| `fraud_detection_ml_scoring_requests_total` | ML scoring requests by status (success / fallback / circuit_open) |
+| `fraud_detection_ml_circuit_breaker_state` | Circuit breaker state (0=closed, 1=open, 2=half-open) |
+| `fraud_detection_kafka_messages_consumed_total` | Kafka messages consumed by status |
+| `fraud_detection_kafka_dlq_messages_total` | Dead letter queue messages by reason |
+
+</details>
+
+
+# 7. Health & Monitoring
 
 <details>
 <summary><strong>Health Endpoints & Prometheus Metrics</strong></summary>
 
-## Health Endpoints
+## API Gateway Health
 
 ```
 GET /api/v1/health
@@ -315,8 +416,7 @@ Expected:
 * HTTP 200
 * Dependency status visible
 
-
-## Prometheus Metrics
+## Prometheus Metrics (API Gateway)
 
 ```
 GET /api/v1/metrics
@@ -328,13 +428,17 @@ Expected:
 * HTTP request counters
 * Service metrics
 
+## Fraud Detection Health & Metrics
+
+See **Section 6** above — the fraud detection service runs on port 3003 directly.
+
 </details>
 
 
-# 7. End-to-End Scenario
+# 8. End-to-End Scenario
 
 <details>
-<summary><strong>Full Flow – Register → Login → Create Transaction</strong></summary>
+<summary><strong>Full Flow — Register → Login → Create Transaction</strong></summary>
 
 Navigate to:
 
@@ -354,11 +458,18 @@ This validates:
 * Authentication
 * Token issuance
 * Transaction creation
+* Kafka event publication → fraud detection pipeline
+
+After step 3, verify fraud processing:
+
+```bash
+docker logs fraud-detection-service --tail 10
+```
 
 </details>
 
 
-# 8. Rate Limiting
+# 9. Rate Limiting
 
 <details>
 <summary><strong>Brute Force & Rate Limit Testing</strong></summary>
@@ -382,21 +493,43 @@ Validates:
 </details>
 
 
-# 9. Optional Advanced Verification
+# 10. Optional Advanced Verification
 
 <details>
 <summary><strong>Kafka & Database Verification</strong></summary>
 
-## Kafka Event Verification (Windows CMD)
+## Kafka: Incoming Transactions
 
-```cmd
-docker exec -it kafka kafka-console-consumer --bootstrap-server kafka:9092 --topic transaction.created --from-beginning
+```bash
+docker exec -it kafka kafka-console-consumer \
+  --bootstrap-server kafka:9092 \
+  --topic transaction.created \
+  --from-beginning
 ```
 
-Expected:
+Expected: transaction events appear when transactions are created.
 
-* Transaction events visible when transactions are created
+## Kafka: Fraud Scored Transactions
 
+```bash
+docker exec -it kafka kafka-console-consumer \
+  --bootstrap-server kafka:9092 \
+  --topic transaction.scored \
+  --from-beginning
+```
+
+Expected: scored event per transaction with `riskScore`, `flagged`, full `ruleResults` and `mlResults` audit trail.
+
+## Kafka: Dead Letter Queue
+
+```bash
+docker exec -it kafka kafka-console-consumer \
+  --bootstrap-server kafka:9092 \
+  --topic transaction.dlq \
+  --from-beginning
+```
+
+Expected: empty under normal operation. Messages appear here if transaction payload fails validation or processing fails after retries.
 
 ## Database Verification
 
@@ -407,7 +540,7 @@ docker exec -it transaction-db psql -U postgres
 Then:
 
 ```sql
-SELECT * FROM transactions;
+SELECT id, customer_id, amount, currency, card_last_four, status FROM transactions;
 ```
 
 Verify:
@@ -419,7 +552,7 @@ Verify:
 </details>
 
 
-# 10. Full System Reset
+# 11. Full System Reset
 
 <details>
 <summary><strong>Reset Containers & Data</strong></summary>
@@ -443,21 +576,19 @@ docker-compose down -v
 
 This testing guide validates:
 
-* User registration
-* JWT authentication
-* Refresh token lifecycle
-* Logout & token revocation
-* Profile management
-* Password change logic
-* Authorization middleware
-* Rate limiting
-* Idempotency control
-* Secure card masking
-* Data persistence
-* Kafka event publication
+* User registration and JWT authentication
+* Refresh token lifecycle and logout / token revocation
+* Profile management and password change
+* Authorization middleware and rate limiting
+* Idempotency control and duplicate prevention
+* Secure card masking and data persistence
+* Kafka event publication (`transaction.created`)
+* Fraud detection pipeline (rules engine, ML fallback, score combination)
+* Fraud risk scoring and flagging (`transaction.scored`)
+* Dead letter queue behaviour
 * API Gateway routing
-* Health & readiness probes
-* Prometheus metrics exposure
+* Health and readiness probes (API Gateway + Fraud Detection Service)
+* Prometheus metrics (API Gateway + Fraud Detection Service)
 
 ---
 
@@ -467,10 +598,11 @@ The system is considered functioning correctly when:
 
 * All endpoints return expected HTTP status codes
 * Tokens are issued, refreshed, and revoked properly
-* Transactions are created and stored correctly
+* Transactions are created and stored correctly with card data masked
 * Idempotency prevents duplicates
 * Rate limits are enforced
-* No sensitive card data is persisted
-* Kafka events are published successfully
-* Health and metrics endpoints are accessible
----
+* Kafka events are published to `transaction.created`
+* Fraud Detection Service consumes and scores every transaction
+* High-risk transactions are flagged (`flagged: true`) in fraud service logs
+* Results are published to `transaction.scored`
+* Health and metrics endpoints are accessible on both gateway (`:3000`) and fraud service (`:3003`)

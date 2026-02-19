@@ -41,15 +41,15 @@ flowchart TD
 
 | Service | Port | Status |
 |---|---|---|
-| API Gateway | 3000 | Live |
-| Transaction Service | 3001 | Live |
-| User Service | 3002 | Live |
-| Fraud Detection Service | 3003 | Planned |
-| ML Scoring Service | 3004 | Planned |
-| Decision Engine | 3005 | Planned |
-| Notification Service | 3006 | Planned |
-| Audit Service | 3007 | Planned |
-| Analytics Service | 3008 | Planned |
+| API Gateway | 3000 | ✅ Live |
+| Transaction Service | 3001 | ✅ Live |
+| User Service | 3002 | ✅ Live |
+| Fraud Detection Service | 3003 | ✅ Live |
+| ML Scoring Service | 3004 | 🔧 Planned |
+| Decision Engine | 3005 | 🔧 Planned |
+| Notification Service | 3006 | 🔧 Planned |
+| Audit Service | 3007 | 🔧 Planned |
+| Analytics Service | 3008 | 🔧 Planned |
 
 ---
 
@@ -73,6 +73,7 @@ docker-compose up --build -d
 ```
 
 Once running, the API is available at `http://localhost:3000`.
+
 ---
 
 ## Project Structure
@@ -110,17 +111,31 @@ fraud-detection-system/
 │   ├── Dockerfile
 │   └── package.json
 │
-└── transaction-service/
+├── transaction-service/
+│   ├── src/
+│   │   ├── config/           # App config, logger
+│   │   ├── controllers/      # Transaction HTTP handlers
+│   │   ├── db/               # PostgreSQL pool, migrations
+│   │   ├── kafka/            # Producer, outbox publisher
+│   │   ├── middleware/       # Request context, validation, error handler
+│   │   ├── repositories/     # Transaction DB operations
+│   │   ├── routes/           # Transaction routes, health endpoints
+│   │   ├── services/         # Transaction business logic
+│   │   ├── utils/            # Errors, constants, metrics
+│   │   └── index.js
+│   ├── .dockerignore
+│   ├── Dockerfile
+│   └── package.json
+│
+└── fraud-detection-service/
     ├── src/
-    │   ├── config/           # App config, logger
-    │   ├── controllers/      # Transaction HTTP handlers
-    │   ├── db/               # PostgreSQL pool, migrations
-    │   ├── kafka/            # Producer, outbox publisher
-    │   ├── middleware/       # Request context, validation, error handler
-    │   ├── repositories/     # Transaction DB operations
-    │   ├── routes/           # Transaction routes, health endpoints
-    │   ├── services/         # Transaction business logic
-    │   ├── utils/            # Errors, constants, metrics
+    │   ├── config/           # App config, logger, Redis client, Kafka
+    │   ├── consumers/        # Kafka transaction consumer
+    │   ├── metrics/          # Prometheus metrics
+    │   ├── middleware/       # Correlation ID, request logger
+    │   ├── routes/           # Health endpoints, metrics scrape
+    │   ├── rules/            # Rule-based fraud engine (velocity, geo, amount, card, time)
+    │   ├── services/         # Fraud detection orchestration, ML scoring client, circuit breaker
     │   └── index.js
     ├── .dockerignore
     ├── Dockerfile
@@ -135,8 +150,8 @@ No authentication required.
 
 | Endpoint | Description |
 |---|---|
-| `GET /api/v1/health/live` | Liveness - is the process running? |
-| `GET /api/v1/health/ready` | Readiness - are dependencies (Redis) ready? |
+| `GET /api/v1/health/live` | Liveness — is the process running? |
+| `GET /api/v1/health/ready` | Readiness — are dependencies (Redis) ready? |
 | `GET /api/v1/health` | Full health with dependency status |
 
 ---
@@ -146,21 +161,19 @@ No authentication required.
 A Postman collection is provided for testing the system.
 
 1. Start the services:
+   ```bash
    docker-compose up --build
+   ```
+2. Open Postman and import `testing/test.json`
+3. Create an environment with `baseUrl = http://localhost:3000`
+4. Run requests in order: **Login → Create Transaction → Get Transaction**
 
-2. Open Postman
-3. Import `testing/test.json`
-4. Create an environment with:
-   baseUrl = http://localhost:3000
-5. Run requests in order:
-   - Login
-   - Create Transaction
-   - Get Transaction
+For full testing documentation, see `testing/TESTING.md`.
 
-For full testing documentation, see `testing/TESTING.md`
 ---
 
 ## Architecture
+
 ```
 Client
   │
@@ -180,12 +193,32 @@ API Gateway :3000
         ├─▶ PostgreSQL (transaction-db)
         │    Atomic: transaction + outbox event
         └─▶ Kafka (transaction.created)
-             → Fraud Detection Pipeline (coming soon)
+             │
+             ▼
+        Fraud Detection Service :3003
+          Rule engine · ML scoring · Risk combination
+          ├─▶ Redis (db:3)
+          │    Velocity tracking (hourly/daily counts + amounts)
+          ├─▶ ML Scoring Service :3004 (planned)
+          │    HTTP · Circuit breaker · Graceful fallback
+          └─▶ Kafka (transaction.scored)
+               → Decision Engine (planned)
 
 Shared Infrastructure:
-  • Redis :6379 (db:0 = gateway rate limits, db:2 = user sessions)
+  • Redis :6379 (db:0 = gateway rate limits, db:2 = user sessions, db:3 = fraud velocity)
   • Kafka + Zookeeper (7 topics pre-created)
 ```
+
+### Fraud Detection Pipeline
+
+Each transaction consumed from `transaction.created` is processed as follows:
+
+1. **Rule engine** — runs five checks in parallel: velocity (hourly/daily count + spend), geography (high-risk countries), amount thresholds, card BIN blacklist, and unusual transaction time. Each rule contributes a weighted score (0–100).
+2. **ML scoring** — HTTP call to the ML Scoring Service, protected by a circuit breaker. Falls back to a rule-derived score if the service is unavailable.
+3. **Score combination** — weighted blend of rule score (40%) and ML score (60%). Transaction is flagged if rules hard-trigger or ML score exceeds threshold (default: 70).
+4. **Result published** to `transaction.scored` for the Decision Engine.
+
+---
 
 ## Infrastructure
 
@@ -196,15 +229,16 @@ All infrastructure is managed by Docker Compose:
 | zookeeper | confluentinc/cp-zookeeper:7.5.0 | Kafka coordination |
 | kafka | confluentinc/cp-kafka:7.5.0 | Event streaming |
 | kafka-init | confluentinc/cp-kafka:7.5.0 | Topic creation on startup |
-| redis | redis:7-alpine | Rate limiting, caching |
+| redis | redis:7-alpine | Rate limiting, caching, velocity tracking |
 | user-db | postgres:15-alpine | User authentication & profile storage |
 | transaction-db | postgres:15-alpine | Transaction storage |
 
 ### Kafka Topics
+
 | Topic | Partitions | Purpose |
 |---|---|---|
 | transaction.created | 6 | New transactions entering the pipeline |
-| transaction.scored | 6 | ML risk scores |
+| transaction.scored | 6 | Fraud risk scores from fraud detection service |
 | transaction.finalised | 6 | Approved / declined decisions |
 | transaction.flagged | 6 | Flagged for manual review |
 | transaction.reviewed | 3 | Human review outcomes |

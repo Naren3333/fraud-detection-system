@@ -2,15 +2,35 @@
   "info": {
     "name": "Fraud Detection Platform",
     "_postman_id": "fdp-collection-002",
-    "description": "Complete Postman collection for Fraud Detection Platform - API Gateway + User Service + Transaction Service",
+    "description": "Complete Postman collection for Fraud Detection Platform - API Gateway, User Service, Transaction Service, and Fraud Detection Service",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:3000", "type": "string" },
-    { "key": "accessToken", "value": "", "type": "string" },
-    { "key": "refreshToken", "value": "", "type": "string" },
-    { "key": "transactionId", "value": "", "type": "string" },
-    { "key": "userId", "value": "", "type": "string" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "transactionId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    }
   ],
   "item": [
     {
@@ -21,12 +41,22 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/register",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "auth", "register"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
             },
             "body": {
               "mode": "raw",
@@ -53,12 +83,22 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "auth", "login"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
             },
             "body": {
               "mode": "raw",
@@ -87,12 +127,22 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/refresh",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "auth", "refresh"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "refresh"
+              ]
             },
             "body": {
               "mode": "raw",
@@ -119,12 +169,22 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/logout",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "auth", "logout"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout"
+              ]
             },
             "body": {
               "mode": "raw",
@@ -151,12 +211,22 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/validate",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "auth", "validate"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "validate"
+              ]
             }
           }
         }
@@ -170,12 +240,22 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/profile",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "auth", "profile"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "profile"
+              ]
             }
           }
         },
@@ -184,13 +264,26 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/profile",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "auth", "profile"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "profile"
+              ]
             },
             "body": {
               "mode": "raw",
@@ -203,13 +296,26 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/change-password",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "auth", "change-password"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "change-password"
+              ]
             },
             "body": {
               "mode": "raw",
@@ -241,15 +347,33 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "X-Idempotency-Key", "value": "{{$guid}}" },
-              { "key": "X-Correlation-ID", "value": "corr-{{$timestamp}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Idempotency-Key",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "corr-{{$timestamp}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/transactions",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "transactions"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions"
+              ]
             },
             "body": {
               "mode": "raw",
@@ -276,12 +400,22 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/transactions/{{transactionId}}",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "transactions", "{{transactionId}}"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions",
+                "{{transactionId}}"
+              ]
             }
           }
         },
@@ -290,12 +424,23 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/transactions/customer/customer_123",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "transactions", "customer", "customer_123"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions",
+                "customer",
+                "customer_123"
+              ]
             }
           }
         },
@@ -304,15 +449,33 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "X-Idempotency-Key", "value": "idempotent-test-key-001" },
-              { "key": "X-Correlation-ID", "value": "idempotent-corr-001" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Idempotency-Key",
+                "value": "idempotent-test-key-001"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "idempotent-corr-001"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/transactions",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "transactions"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions"
+              ]
             },
             "body": {
               "mode": "raw",
@@ -331,8 +494,14 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/health",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "health"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "health"
+              ]
             }
           }
         },
@@ -342,8 +511,15 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/health/live",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "health", "live"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "health",
+                "live"
+              ]
             }
           }
         },
@@ -353,8 +529,15 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/health/ready",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "health", "ready"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "health",
+                "ready"
+              ]
             }
           }
         },
@@ -364,9 +547,101 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/api/v1/metrics",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "metrics"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "metrics"
+              ]
             }
+          }
+        },
+        {
+          "name": "Fraud Detection - Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3003/api/v1/health",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3003",
+              "path": [
+                "api",
+                "v1",
+                "health"
+              ]
+            },
+            "description": "Full health check for fraud detection service including Redis and ML scoring circuit breaker state"
+          }
+        },
+        {
+          "name": "Fraud Detection - Liveness",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3003/api/v1/health/live",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3003",
+              "path": [
+                "api",
+                "v1",
+                "health",
+                "live"
+              ]
+            },
+            "description": "Kubernetes liveness probe - confirms process is alive"
+          }
+        },
+        {
+          "name": "Fraud Detection - Readiness",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3003/api/v1/health/ready",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3003",
+              "path": [
+                "api",
+                "v1",
+                "health",
+                "ready"
+              ]
+            },
+            "description": "Kubernetes readiness probe - confirms Redis dependency is available"
+          }
+        },
+        {
+          "name": "Fraud Detection - Metrics (Prometheus)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3003/api/v1/metrics",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3003",
+              "path": [
+                "api",
+                "v1",
+                "metrics"
+              ]
+            },
+            "description": "Prometheus metrics: transaction processing duration, risk score distribution, rule evaluations, ML scoring requests, circuit breaker state, Kafka consumer stats"
           }
         }
       ]
@@ -375,19 +650,29 @@
       "name": "Test Scenarios",
       "item": [
         {
-          "name": "Full Flow - Register → Login → Create Transaction",
+          "name": "Full Flow - Register \u2192 Login \u2192 Create Transaction",
           "item": [
             {
               "name": "1. Register",
               "request": {
                 "method": "POST",
                 "header": [
-                  { "key": "Content-Type", "value": "application/json" }
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
                 ],
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/auth/register",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "v1", "auth", "register"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "register"
+                  ]
                 },
                 "body": {
                   "mode": "raw",
@@ -400,12 +685,22 @@
               "request": {
                 "method": "POST",
                 "header": [
-                  { "key": "Content-Type", "value": "application/json" }
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
                 ],
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/auth/login",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "v1", "auth", "login"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "login"
+                  ]
                 },
                 "body": {
                   "mode": "raw",
@@ -431,14 +726,29 @@
               "request": {
                 "method": "POST",
                 "header": [
-                  { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-                  { "key": "Content-Type", "value": "application/json" },
-                  { "key": "X-Idempotency-Key", "value": "flow-test-{{$guid}}" }
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Idempotency-Key",
+                    "value": "flow-test-{{$guid}}"
+                  }
                 ],
                 "url": {
                   "raw": "{{baseUrl}}/api/v1/transactions",
-                  "host": ["{{baseUrl}}"],
-                  "path": ["api", "v1", "transactions"]
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "transactions"
+                  ]
                 },
                 "body": {
                   "mode": "raw",
@@ -453,18 +763,89 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/auth/login",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "auth", "login"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
             },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"email\": \"wrong@example.com\",\n  \"password\": \"WrongPassword\"\n}"
             }
           }
+        },
+        {
+          "name": "High-Risk Transaction (Fraud Flag Expected)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Idempotency-Key",
+                "value": "fraud-test-{{$guid}}"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "fraud-corr-{{$timestamp}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"customer_test\",\n  \"merchantId\": \"merchant_test\",\n  \"amount\": 15000.0,\n  \"currency\": \"USD\",\n  \"cardNumber\": \"4111111111111111\",\n  \"cardType\": \"visa\",\n  \"deviceId\": \"device_test\",\n  \"ipAddress\": \"192.168.1.1\",\n  \"location\": {\n    \"country\": \"KP\",\n    \"city\": \"Pyongyang\"\n  },\n  \"metadata\": {\n    \"channel\": \"web\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/transactions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "transactions"
+              ]
+            },
+            "description": "Sends a transaction designed to trigger multiple fraud rules:\n- Amount $15,000 exceeds suspicious threshold ($10,000) \u2192 +30 rule score\n- Country KP (North Korea) is in high-risk list \u2192 +25 rule score\n- Round amount heuristic \u2192 +5 rule score\nExpected: flagged=true in fraud-detection-service logs\n\nVerify result:\n  docker logs fraud-detection-service --tail 10\n\nOr consume scored topic:\n  docker exec -it kafka kafka-console-consumer --bootstrap-server kafka:9092 --topic transaction.scored --from-beginning"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "let json = pm.response.json();",
+                  "if (json.success && json.data) {",
+                  "  pm.collectionVariables.set('transactionId', json.data.transactionId);",
+                  "  console.log('High-risk transaction created:', json.data.transactionId);",
+                  "  console.log('Check fraud-detection-service logs for flagged=true');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
         }
       ]
     }

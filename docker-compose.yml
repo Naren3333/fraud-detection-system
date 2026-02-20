@@ -318,3 +318,51 @@ services:
         retries: 3
         start_period: 20s
       restart: unless-stopped
+
+  ml-scoring-service:
+    build:
+      context: ./ml-scoring-service
+      dockerfile: Dockerfile
+    container_name: ml-scoring-service
+    networks: [fraud-net]
+    ports:
+      - "3004:3004"
+      - "9094:9094"  # Prometheus metrics
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV:              production
+      PORT:                  3004
+      SERVICE_NAME:          ml-scoring-service
+      SERVICE_VERSION:       2.0.0
+      LOG_LEVEL:             info
+      # Redis
+      REDIS_HOST:            redis
+      REDIS_PORT:            6379
+      REDIS_DB:              4
+      # Model
+      MODEL_VERSION:         xgboost-v2.1
+      MODEL_CACHE_TTL:       3600
+      MODEL_WARM_CACHE:      true
+      # Features
+      FEATURE_AMOUNT_BINS:   5,10,50,100,500,1000,5000,10000
+      FEATURE_HOUR_BINS:     0,6,12,18,24
+      FEATURE_VELOCITY_DECAY: 0.5
+      # Scoring
+      CONFIDENCE_THRESHOLD:  0.6
+      MIN_FEATURES_REQUIRED: 8
+      # Performance
+      REQUEST_TIMEOUT_MS:    2500
+      MAX_BATCH_SIZE:        100
+      ENABLE_MODEL_WARMING:  true
+      # Metrics
+      METRICS_ENABLED:       true
+      METRICS_PORT:          9094
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3004/api/v1/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped

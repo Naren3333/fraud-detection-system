@@ -23,17 +23,12 @@ class MLScoringClient {
     });
   }
 
-  /**
-   * Get ML risk score (0–100) for a transaction.
-   * Automatically falls back to a rule-derived score if the service is unavailable.
-   */
   async getScore(transaction, ruleResults, childLogger) {
     const log = childLogger || logger;
     const startTime = Date.now();
 
-    // Short-circuit immediately if circuit is open — no need to even try
     if (circuitBreaker.isOpen()) {
-      log.warn('ML scoring skipped — circuit breaker is OPEN', {
+      log.warn('ML scoring skipped – circuit breaker is OPEN', {
         transactionId: transaction.id,
         circuitStats: circuitBreaker.getStats(),
       });
@@ -61,13 +56,13 @@ class MLScoringClient {
     } catch (err) {
       const durationMs = Date.now() - startTime;
 
-      // Don't double-log circuit breaker open errors
       if (!err.circuitOpen) {
         log.error('ML scoring failed', {
           transactionId: transaction.id,
           error: err.message,
           code: err.code,
           httpStatus: err.response?.status,
+          responseData: err.response?.data, // ← ADD THIS to see validation errors
           durationMs,
         });
         errorsTotal.inc({ component: 'ml_scoring', type: err.code || 'http_error' });
@@ -88,57 +83,60 @@ class MLScoringClient {
     }
   }
 
-  /**
-   * Actual HTTP call to the ML scoring service.
-   */
   async _callScoringService(transaction, ruleResults, log) {
+    // ─── FIXED: Normalize transaction data ───────────────────────────────────
+    const normalizedTransaction = {
+      id: transaction.id,
+      customerId: transaction.customerId,
+      merchantId: transaction.merchantId || 'unknown',
+      amount: parseFloat(transaction.amount),
+      currency: transaction.currency || 'USD',
+      cardType: transaction.cardType || 'unknown',
+      deviceId: transaction.deviceId || null,
+      ipAddress: transaction.ipAddress || null,
+      location: transaction.location || {},
+      metadata: transaction.metadata || {},
+      createdAt: transaction.createdAt || new Date().toISOString(),
+    };
+
+    // ─── FIXED: Normalize rule results ──────────────────────────────────────
+    const normalizedRuleResults = {
+      flagged: Boolean(ruleResults.flagged),
+      ruleScore: ruleResults.ruleScore || 0,
+      reasons: Array.isArray(ruleResults.reasons) ? ruleResults.reasons : [],
+      riskFactors: ruleResults.riskFactors || {},
+    };
+
+    log.debug('Calling ML scoring service', {
+      transactionId: normalizedTransaction.id,
+      url: `${config.mlScoring.url}/api/v1/score`,
+    });
+
     const response = await this.httpClient.post('/api/v1/score', {
-      transaction: {
-        id: transaction.id,
-        customerId: transaction.customerId,
-        merchantId: transaction.merchantId,
-        amount: transaction.amount,
-        currency: transaction.currency,
-        cardType: transaction.cardType,
-        deviceId: transaction.deviceId,
-        ipAddress: transaction.ipAddress,
-        location: transaction.location,
-        metadata: transaction.metadata,
-        createdAt: transaction.createdAt,
-      },
-      ruleResults: {
-        flagged: ruleResults.flagged,
-        reasons: ruleResults.reasons,
-        riskFactors: ruleResults.riskFactors,
-        ruleScore: ruleResults.ruleScore,
-      },
+      transaction: normalizedTransaction,
+      ruleResults: normalizedRuleResults,
     });
 
     const { data } = response;
 
-    if (!data || typeof data.score !== 'number' || data.score < 0 || data.score > 100) {
-      throw new Error(`Invalid ML scoring response: ${JSON.stringify(data)}`);
+    if (!data || !data.success || !data.data) {
+      throw new Error(`Invalid ML scoring response format: ${JSON.stringify(data)}`);
+    }
+
+    const mlData = data.data;
+
+    if (typeof mlData.score !== 'number' || mlData.score < 0 || mlData.score > 100) {
+      throw new Error(`Invalid ML score: ${mlData.score}`);
     }
 
     return {
-      score: data.score,
-      modelVersion: data.modelVersion || 'unknown',
-      features: data.features || {},
-      confidence: data.confidence || null,
+      score: mlData.score,
+      modelVersion: mlData.modelVersion || 'unknown',
+      features: mlData.features || {},
+      confidence: mlData.confidence || null,
     };
   }
 
-  /**
-   * Graduated fallback score derived from rule-based signals.
-   *
-   * Score breakdown:
-   *   30  — base score for any transaction
-   *   +40 — if rules engine flagged the transaction
-   *   +5  — per distinct rule reason (max +20)
-   *   +5  — if transaction is high-value (amount >= highAmountThreshold)
-   *
-   * Capped at 95 to distinguish from the ML model's potential 100.
-   */
   _fallback(ruleResults, reason) {
     let score = 30;
 
@@ -150,7 +148,6 @@ class MLScoringClient {
       score += Math.min(ruleResults.reasons.length * 5, 20);
     }
 
-    // High-amount factor
     if (ruleResults.riskFactors?.amount?.highAmount) {
       score += 5;
     }
@@ -166,9 +163,6 @@ class MLScoringClient {
     };
   }
 
-  /**
-   * Expose circuit breaker state for health checks.
-   */
   getCircuitBreakerStats() {
     return circuitBreaker.getStats();
   }

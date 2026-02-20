@@ -83,7 +83,6 @@ fraud-detection-system/
 ├── .gitignore
 ├── README.md
 ├── docker-compose.yml
-├── Fraud-Detection-Platform.postman_collection.json
 │
 ├── api-gateway/
 │   ├── src/

@@ -52,7 +52,13 @@ Verify the fraud detection service is up:
 GET http://localhost:3003/api/v1/health
 ```
 
-Both should return HTTP 200 OK.
+Verify the ML scoring service is up:
+
+```
+GET http://localhost:3004/api/v1/health
+```
+
+All should return HTTP 200 OK.
 
 </details>
 
@@ -398,7 +404,106 @@ Key metrics exposed:
 </details>
 
 
-# 7. Health & Monitoring
+# 7. ML Scoring Service
+
+<details>
+<summary><strong>Direct Scoring, Health, Metrics & Explainability</strong></summary>
+
+The ML Scoring Service runs on port 3004 and is called directly by the Fraud Detection Service via HTTP. It is not proxied through the API Gateway.
+
+## Health Check
+
+```
+GET http://localhost:3004/api/v1/health
+```
+
+Response includes:
+
+* Redis connectivity (result cache on db:4)
+* ML model load status and version
+* Cache hit rate and request counts
+
+```
+GET http://localhost:3004/api/v1/health/live    — liveness probe
+GET http://localhost:3004/api/v1/health/ready   — readiness probe (Redis + model check)
+```
+
+## Score a Transaction Directly
+
+```
+POST http://localhost:3004/api/v1/score
+Content-Type: application/json
+
+{
+  "transaction": {
+    "id": "txn_test_001",
+    "customerId": "customer_123",
+    "amount": 15000.00,
+    "currency": "USD",
+    "createdAt": "2026-02-20T01:00:00.000Z",
+    "location": { "country": "KP" }
+  },
+  "ruleResults": {
+    "flagged": true,
+    "ruleScore": 75,
+    "reasons": ["High-risk country", "Suspicious amount"],
+    "riskFactors": {
+      "velocity": {
+        "customerTransactionsLastHour": 5,
+        "customerAmountLastHour": 20000,
+        "customerTransactionsLastDay": 12
+      },
+      "amount": { "suspicious": true, "highAmount": true },
+      "geography": { "country": "KP" },
+      "time": { "unusualTime": false }
+    }
+  }
+}
+```
+
+Expected response:
+
+* `score` — 0–100 risk score
+* `probability` — raw model probability
+* `confidence` — feature coverage confidence
+* `explanation.topContributors` — ranked feature contributions with impact direction
+* `explanation.reasons` — human-readable risk reasons
+* `metadata.inferenceTimeMs` — model inference latency
+
+> **Note:** Repeated calls with the same transaction ID and rule hash return cached results from Redis. Check `metadata.inferenceTimeMs` — a cache hit will be sub-millisecond.
+
+## Model Information
+
+```
+GET http://localhost:3004/api/v1/model/info
+```
+
+Returns model version, feature count, cache hit rate, and top feature importances.
+
+## Metrics
+
+```
+GET http://localhost:3004/api/v1/metrics
+```
+
+Key metrics:
+
+| Metric | Description |
+|---|---|
+| `ml_scoring_scoring_requests_total` | Total scoring requests by status |
+| `ml_scoring_scoring_duration_ms` | End-to-end scoring latency histogram, by cached |
+| `ml_scoring_score_distribution` | Distribution of output risk scores |
+| `ml_scoring_confidence_distribution` | Distribution of prediction confidence |
+| `ml_scoring_model_inference_duration_ms` | Raw model inference latency |
+| `ml_scoring_feature_extraction_duration_ms` | Feature engineering latency |
+| `ml_scoring_cache_hits_total` | Redis cache hits |
+| `ml_scoring_cache_misses_total` | Redis cache misses |
+| `ml_scoring_errors_total` | Errors by component and type |
+
+</details>
+
+
+# 8. Health & Monitoring
 
 <details>
 <summary><strong>Health Endpoints & Prometheus Metrics</strong></summary>
@@ -435,7 +540,7 @@ See **Section 6** above — the fraud detection service runs on port 3003 direct
 </details>
 
 
-# 8. End-to-End Scenario
+# 9. End-to-End Scenario
 
 <details>
 <summary><strong>Full Flow — Register → Login → Create Transaction</strong></summary>
@@ -469,7 +574,7 @@ docker logs fraud-detection-service --tail 10
 </details>
 
 
-# 9. Rate Limiting
+# 10. Rate Limiting
 
 <details>
 <summary><strong>Brute Force & Rate Limit Testing</strong></summary>
@@ -493,7 +598,7 @@ Validates:
 </details>
 
 
-# 10. Optional Advanced Verification
+# 11. Optional Advanced Verification
 
 <details>
 <summary><strong>Kafka & Database Verification</strong></summary>
@@ -552,7 +657,7 @@ Verify:
 </details>
 
 
-# 11. Full System Reset
+# 12. Full System Reset
 
 <details>
 <summary><strong>Reset Containers & Data</strong></summary>
@@ -583,7 +688,8 @@ This testing guide validates:
 * Idempotency control and duplicate prevention
 * Secure card masking and data persistence
 * Kafka event publication (`transaction.created`)
-* Fraud detection pipeline (rules engine, ML fallback, score combination)
+* Fraud detection pipeline (rules engine, ML scoring, score combination)
+* ML Scoring Service — direct scoring, feature engineering, explainability, result caching
 * Fraud risk scoring and flagging (`transaction.scored`)
 * Dead letter queue behaviour
 * API Gateway routing
@@ -605,4 +711,4 @@ The system is considered functioning correctly when:
 * Fraud Detection Service consumes and scores every transaction
 * High-risk transactions are flagged (`flagged: true`) in fraud service logs
 * Results are published to `transaction.scored`
-* Health and metrics endpoints are accessible on both gateway (`:3000`) and fraud service (`:3003`)
+* Health and metrics endpoints are accessible on gateway (`:3000`), fraud service (`:3003`), and ML scoring service (`:3004`)

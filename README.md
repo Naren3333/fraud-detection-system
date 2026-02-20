@@ -41,15 +41,15 @@ flowchart TD
 
 | Service | Port | Status |
 |---|---|---|
-| API Gateway | 3000 | ✅ Live |
-| Transaction Service | 3001 | ✅ Live |
-| User Service | 3002 | ✅ Live |
-| Fraud Detection Service | 3003 | ✅ Live |
-| ML Scoring Service | 3004 | 🔧 Planned |
-| Decision Engine | 3005 | 🔧 Planned |
-| Notification Service | 3006 | 🔧 Planned |
-| Audit Service | 3007 | 🔧 Planned |
-| Analytics Service | 3008 | 🔧 Planned |
+| API Gateway | 3000 | Live |
+| Transaction Service | 3001 | Live |
+| User Service | 3002 | Live |
+| Fraud Detection Service | 3003 | Live |
+| ML Scoring Service | 3004 | Live |
+| Decision Engine | 3005 | Planned |
+| Notification Service | 3006 | Planned |
+| Audit Service | 3007 | Planned |
+| Analytics Service | 3008 | Planned |
 
 ---
 
@@ -58,7 +58,7 @@ flowchart TD
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 - [Docker Compose](https://docs.docker.com/compose/)
 
-No Node.js installation required — everything runs in containers.
+No Node.js installation required - everything runs in containers.
 
 ---
 
@@ -127,16 +127,29 @@ fraud-detection-system/
 │   ├── Dockerfile
 │   └── package.json
 │
-└── fraud-detection-service/
+├── fraud-detection-service/
+│   ├── src/
+│   │   ├── config/           # App config, logger, Redis client, Kafka
+│   │   ├── consumers/        # Kafka transaction consumer
+│   │   ├── metrics/          # Prometheus metrics
+│   │   ├── middleware/       # Correlation ID, request logger
+│   │   ├── routes/           # Health endpoints, metrics scrape
+│   │   ├── rules/            # Rule-based fraud engine (velocity, geo, amount, card, time)
+│   │   ├── services/         # Fraud detection orchestration, ML scoring client, circuit breaker
+│   │   └── index.js
+│   ├── .dockerignore
+│   ├── Dockerfile
+│   └── package.json
+│
+└── ml-scoring-service/
     ├── src/
-    │   ├── config/           # App config, logger, Redis client, Kafka
-    │   ├── consumers/        # Kafka transaction consumer
-    │   ├── metrics/          # Prometheus metrics
-    │   ├── middleware/       # Correlation ID, request logger
-    │   ├── routes/           # Health endpoints, metrics scrape
-    │   ├── rules/            # Rule-based fraud engine (velocity, geo, amount, card, time)
-    │   ├── services/         # Fraud detection orchestration, ML scoring client, circuit breaker
-    │   └── index.js
+    │   ├── config/           # App config, logger, Redis client
+    │   ├── controllers/      # Scoring HTTP handlers
+    │   ├── middleware/       # Correlation ID, request logger, timeout, validation
+    │   ├── models/           # Fraud model (XGBoost-simulated weighted scoring)
+    │   ├── routes/           # Health, metrics, scoring endpoints
+    │   ├── services/         # Feature engineering, ML scoring orchestration
+    │   └── utils/            # Errors, metrics
     ├── .dockerignore
     ├── Dockerfile
     └── package.json
@@ -199,8 +212,8 @@ API Gateway :3000
           Rule engine · ML scoring · Risk combination
           ├─▶ Redis (db:3)
           │    Velocity tracking (hourly/daily counts + amounts)
-          ├─▶ ML Scoring Service :3004 (planned)
-          │    HTTP · Circuit breaker · Graceful fallback
+          ├─▶ ML Scoring Service :3004
+          │    HTTP · Circuit breaker · Graceful fallback · Redis cache
           └─▶ Kafka (transaction.scored)
                → Decision Engine (planned)
 
@@ -214,7 +227,7 @@ Shared Infrastructure:
 Each transaction consumed from `transaction.created` is processed as follows:
 
 1. **Rule engine** — runs five checks in parallel: velocity (hourly/daily count + spend), geography (high-risk countries), amount thresholds, card BIN blacklist, and unusual transaction time. Each rule contributes a weighted score (0–100).
-2. **ML scoring** — HTTP call to the ML Scoring Service, protected by a circuit breaker. Falls back to a rule-derived score if the service is unavailable.
+2. **ML scoring** — HTTP call to the ML Scoring Service (`:3004`), protected by a circuit breaker with a graceful rule-derived fallback. The ML service runs feature engineering (35+ features across amount, velocity, geography, temporal, and card dimensions) and a calibrated gradient-boosted model to return a fraud probability score (0–100) with per-feature explainability. Results are cached in Redis (db:4) with a configurable TTL.
 3. **Score combination** — weighted blend of rule score (40%) and ML score (60%). Transaction is flagged if rules hard-trigger or ML score exceeds threshold (default: 70).
 4. **Result published** to `transaction.scored` for the Decision Engine.
 

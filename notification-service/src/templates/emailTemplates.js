@@ -211,7 +211,7 @@ const declinedCustomerTemplate = Handlebars.compile(`
     <div class="container">
 
       <div class="header">
-        <div class="header-eyebrow">Security Alert — Action May Be Required</div>
+        <div class="header-eyebrow">Security Alert - Action May Be Required</div>
         <div class="header-title">Transaction Declined</div>
       </div>
 
@@ -286,7 +286,7 @@ const declinedFraudTeamTemplate = Handlebars.compile(`
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-  <title>Fraud Alert — Transaction Declined</title>
+  <title>Fraud Alert - Transaction Declined</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500;600&family=DM+Mono&display=swap');
 
@@ -544,7 +544,7 @@ const declinedFraudTeamTemplate = Handlebars.compile(`
     <div class="container">
 
       <div class="header">
-        <div class="header-eyebrow">Internal — Fraud Team Only</div>
+        <div class="header-eyebrow">Internal - Fraud Team Only</div>
         <div class="header-title">Transaction Declined</div>
         <div class="header-meta">Correlation ID: {{transactionId}}</div>
       </div>
@@ -644,7 +644,7 @@ const declinedFraudTeamTemplate = Handlebars.compile(`
       <div class="footer">
         <span class="footer-brand">Fraud Detection Platform</span>
         <div class="footer-meta">
-          Internal use only — do not forward<br />
+          Internal use only - do not forward<br />
           Automated alert · Decision Engine v{{decisionVersion}}
         </div>
       </div>
@@ -940,7 +940,7 @@ const flaggedFraudTeamTemplate = Handlebars.compile(`
     <div class="container">
 
       <div class="header">
-        <div class="header-eyebrow">Internal — Manual Review Required</div>
+        <div class="header-eyebrow">Internal - Manual Review Required</div>
         <div class="header-title">Transaction Flagged</div>
         <div class="header-meta">Correlation ID: {{transactionId}}</div>
       </div>
@@ -1037,7 +1037,7 @@ const flaggedFraudTeamTemplate = Handlebars.compile(`
       <div class="footer">
         <span class="footer-brand">Fraud Detection Platform</span>
         <div class="footer-meta">
-          Internal use only — do not forward<br />
+          Internal use only - do not forward<br />
           Automated alert · Decision Engine v{{decisionVersion}}
         </div>
       </div>
@@ -1051,7 +1051,7 @@ const flaggedFraudTeamTemplate = Handlebars.compile(`
 
 function renderDeclinedCustomerEmail(data) {
   return {
-    subject: `Transaction Declined — Reference ${data.transactionId.substring(0, 8).toUpperCase()}`,
+    subject: `Transaction Declined - Reference ${data.transactionId.substring(0, 8).toUpperCase()}`,
     html: declinedCustomerTemplate(data),
     text: `Transaction Declined\n\nYour transaction for ${data.amount} ${data.currency} at ${data.merchantId} has been declined.\n\nReason: ${data.decisionReason}\n\nTransaction ID: ${data.transactionId}\n\nIf you believe this is an error, contact fraud-support@frauddetection.com or call 1-800-FRAUD-HELP.`,
   };
@@ -1059,7 +1059,7 @@ function renderDeclinedCustomerEmail(data) {
 
 function renderDeclinedFraudTeamEmail(data) {
   return {
-    subject: `DECLINED — ${data.customerId} — ${data.amount} ${data.currency} — Score ${data.riskScore}/100`,
+    subject: `DECLINED - ${data.customerId} - ${data.amount} ${data.currency} - Score ${data.riskScore}/100`,
     html: declinedFraudTeamTemplate({
       ...data,
       decisionFactorsJson: JSON.stringify(data.decisionFactors, null, 2),
@@ -1070,7 +1070,7 @@ function renderDeclinedFraudTeamEmail(data) {
 
 function renderFlaggedFraudTeamEmail(data) {
   return {
-    subject: `REVIEW REQUIRED — ${data.customerId} — ${data.amount} ${data.currency} — Score ${data.riskScore}/100`,
+    subject: `REVIEW REQUIRED - ${data.customerId} - ${data.amount} ${data.currency} - Score ${data.riskScore}/100`,
     html: flaggedFraudTeamTemplate(data),
     text: `Manual Review Required\n\nTransaction ID: ${data.transactionId}\nCustomer: ${data.customerId}\nAmount: ${data.amount} ${data.currency}\nMerchant: ${data.merchantId}\nRisk Score: ${data.riskScore}/100\nDecision: FLAGGED\nReason: ${data.decisionReason}\n\nAction required: https://fraud-dashboard.example.com/review/${data.transactionId}`,
   };

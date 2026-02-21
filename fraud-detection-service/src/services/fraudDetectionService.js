@@ -73,7 +73,7 @@ class FraudDetectionService {
       transactionProcessingDuration.observe({ status: 'error' }, durationMs);
       errorsTotal.inc({ component: 'fraud_detection_service', type: 'analysis_failure' });
 
-      log.error('Fraud analysis failed — returning safe defaults', {
+      log.error('Fraud analysis failed - returning safe defaults', {
         error: error.message,
         stack: error.stack,
         durationMs,
@@ -98,7 +98,7 @@ class FraudDetectionService {
   _combineResults(transaction, ruleResults, mlResults) {
     // FIX: config is now a direct require at the top of the file.
     // Previously it was a lazy function `const config = () => require('../config')`
-    // defined AFTER the class body — confusing, unnecessary, and fragile.
+    // defined AFTER the class body - confusing, unnecessary, and fragile.
     const { rulesWeight, mlWeight, mlFlagThreshold } = config.fraudRules.combination;
 
     const combinedScore = Math.round(

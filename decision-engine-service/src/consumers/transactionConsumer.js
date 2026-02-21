@@ -96,7 +96,7 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
     // ── Parse ────────────────────────────────────────────────────────────────
     const raw = message.value?.toString();
     if (!raw) {
-      logger.warn('Received empty Kafka message — skipping', { partition, offset });
+      logger.warn('Received empty Kafka message - skipping', { partition, offset });
       await commitOffset(partition, offset);
       kafkaMessagesConsumed.inc({ topic, status: 'skipped' });
       return;
@@ -106,7 +106,7 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
     try {
       data = JSON.parse(raw);
     } catch (parseErr) {
-      logger.error('Malformed JSON in Kafka message — sending to DLQ', {
+      logger.error('Malformed JSON in Kafka message - sending to DLQ', {
         partition,
         offset,
         error: parseErr.message,
@@ -124,7 +124,7 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
     const originalTransaction = data.originalTransaction;
 
     if (!fraudAnalysis || !transactionId) {
-      logger.error('Invalid message structure — missing fraudAnalysis', {
+      logger.error('Invalid message structure - missing fraudAnalysis', {
         transactionId,
         correlationId,
         partition,
@@ -294,7 +294,7 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
       await commitOffset(partition, offset);
       kafkaMessagesConsumed.inc({ topic, status: 'dlq' });
     } catch (dlqErr) {
-      logger.error('Failed to send message to DLQ — offset NOT committed', {
+      logger.error('Failed to send message to DLQ - offset NOT committed', {
         transactionId,
         dlqError: dlqErr.message,
         partition,
@@ -364,3 +364,4 @@ const sendToDlq = async ({ raw, data, transactionId, correlationId, reason, erro
 };
 
 module.exports = { start, stop };
+

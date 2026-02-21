@@ -15,7 +15,7 @@ class TransactionService {
       const cached = await repo.findIdempotencyKey(ctx.idempotencyKey);
       if (cached) {
         metrics.idempotencyHits.inc();
-        logger.info('Duplicate request – returning cached response', {
+        logger.info('Duplicate request - returning cached response', {
           key: ctx.idempotencyKey, transactionId: cached.transaction_id,
         });
         return { idempotent: true, statusCode: cached.status_code,
@@ -81,7 +81,7 @@ class TransactionService {
         );
       } catch (err) {
         metrics.kafkaErrors.inc();
-        logger.warn('Live Kafka publish failed – outbox will retry', {
+        logger.warn('Live Kafka publish failed - outbox will retry', {
           transactionId, error: err.message,
         });
       }

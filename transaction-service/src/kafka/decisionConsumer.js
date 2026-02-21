@@ -85,7 +85,7 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
   try {
     const raw = message.value?.toString();
     if (!raw) {
-      logger.warn('Empty message received on decision topic — skipping', { topic, partition, offset });
+      logger.warn('Empty message received on decision topic - skipping', { topic, partition, offset });
       await commitOffset(topic, partition, offset);
       return;
     }
@@ -94,7 +94,7 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
     try {
       data = JSON.parse(raw);
     } catch (err) {
-      logger.error('Malformed JSON in decision message — skipping', {
+      logger.error('Malformed JSON in decision message - skipping', {
         topic, partition, offset, error: err.message,
       });
       await commitOffset(topic, partition, offset);
@@ -105,7 +105,7 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
     const decision = data.decision;
 
     if (!transactionId || !decision) {
-      logger.error('Decision message missing transactionId or decision — skipping', {
+      logger.error('Decision message missing transactionId or decision - skipping', {
         topic, partition, offset, data,
       });
       await commitOffset(topic, partition, offset);
@@ -116,7 +116,7 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
 
     const newStatus = DECISION_TO_STATUS[decision];
     if (!newStatus) {
-      logger.error('Unknown decision value — skipping', {
+      logger.error('Unknown decision value - skipping', {
         transactionId, decision, topic, partition, offset,
       });
       await commitOffset(topic, partition, offset);
@@ -149,7 +149,7 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
       error: err.message,
       stack: err.stack,
     });
-    // Still commit — a bad message should not block the partition forever
+    // Still commit - a bad message should not block the partition forever
     await commitOffset(topic, partition, offset);
   }
 };

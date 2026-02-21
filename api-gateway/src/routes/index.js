@@ -18,7 +18,7 @@ router.get('/metrics', async (req, res) => {
 
 // Auth Routes Proxy
 // All /auth/* requests are proxied to user-service:3002
-// No more mock authService — real authentication via user service
+// No more mock authService - real authentication via user service
 router.use('/auth', authLimiter, async (req, res) => {
   const targetUrl = `http://user-service:3002/api/v1/auth${req.path}`;
 

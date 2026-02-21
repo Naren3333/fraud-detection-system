@@ -12,10 +12,10 @@ class FraudRulesEngine {
    * Run all fraud detection rules against a transaction.
    *
    * Returns:
-   *   flagged     {boolean}   — true if any hard-flag rule triggered
-   *   ruleScore   {number}    — graduated 0–100 risk contribution from rules
-   *   reasons     {string[]}  — human-readable descriptions of triggered rules
-   *   riskFactors {object}    — raw factor data per rule for audit trail
+   *   flagged     {boolean}   - true if any hard-flag rule triggered
+   *   ruleScore   {number}    - graduated 0-100 risk contribution from rules
+   *   reasons     {string[]}  - human-readable descriptions of triggered rules
+   *   riskFactors {object}    - raw factor data per rule for audit trail
    */
   async evaluate(transaction, childLogger) {
     const log = childLogger || logger;
@@ -69,7 +69,7 @@ class FraudRulesEngine {
         totalRuleScore += r.score || 0;
       }
 
-      // Normalise rule score to 0–100
+      // Normalise rule score to 0-100
       const ruleScore = Math.min(Math.round(totalRuleScore), 100);
       const durationMs = Date.now() - startTime;
 
@@ -113,7 +113,7 @@ class FraudRulesEngine {
     let flagged = false;
     let score = 0;
 
-    // --- Hourly count ---
+    // Hourly count
     const customerHourKey = `velocity:customer:${customerId}:hour`;
     await redis.zRemRangeByScore(customerHourKey, 0, oneHourAgo);
     await redis.zAdd(customerHourKey, { score: now, value: transaction.id });
@@ -133,7 +133,7 @@ class FraudRulesEngine {
       );
     }
 
-    // --- Hourly amount ---
+    // Hourly amount
     const customerAmountKey = `velocity:customer:${customerId}:amount:hour`;
     const currentAmount = parseFloat((await redis.get(customerAmountKey)) || '0');
     const newAmount = currentAmount + amount;
@@ -149,7 +149,7 @@ class FraudRulesEngine {
       );
     }
 
-    // --- Daily count ---
+    // Daily count
     const customerDayKey = `velocity:customer:${customerId}:day`;
     await redis.zRemRangeByScore(customerDayKey, 0, oneDayAgo);
     await redis.zAdd(customerDayKey, { score: now, value: transaction.id });
@@ -258,7 +258,7 @@ class FraudRulesEngine {
     const hour = new Date(createdAt).getUTCHours();
     factors.transactionHourUTC = hour;
 
-    // 02:00–05:00 UTC - elevated risk window
+    // 02:00-05:00 UTC - elevated risk window
     if (hour >= 2 && hour < 5) {
       score += config.fraudRules.scoring.unusualTimeWeight;
       factors.unusualTime = true;
@@ -270,3 +270,4 @@ class FraudRulesEngine {
 }
 
 module.exports = new FraudRulesEngine();
+

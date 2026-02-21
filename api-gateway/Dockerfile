@@ -1,4 +1,4 @@
-# ---------- Stage 1: Builder ----------
+# Stage 1: Builder
 FROM node:18-alpine AS builder
 
 WORKDIR /app
@@ -8,7 +8,7 @@ RUN npm ci --only=production
 
 COPY . .
 
-# ---------- Stage 2: Runtime ----------
+# Stage 2: Runtime
 FROM node:18-alpine
 
 RUN apk add --no-cache dumb-init

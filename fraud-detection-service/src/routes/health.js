@@ -3,7 +3,7 @@ const { getClient: getRedisClient } = require('../config/redis');
 const mlScoringClient = require('../services/mlScoringClient');
 const logger = require('../config/logger');
 
-// Full dependency check — used by load balancers and monitoring systems.
+// Full dependency check - used by load balancers and monitoring systems.
 router.get('/health', async (req, res) => {
   const health = {
     status: 'healthy',
@@ -45,7 +45,7 @@ router.get('/health', async (req, res) => {
     health.dependencies.mlScoringService = { status: 'unknown', error: err.message };
   }
 
-  // Kafka — inferred from consumer running state
+  // Kafka - inferred from consumer running state
   health.dependencies.kafka = {
     status: 'healthy',
     note: 'Consumer crash triggers process restart via uncaughtException handler',
@@ -55,7 +55,7 @@ router.get('/health', async (req, res) => {
   res.status(degraded ? 503 : 200).json(health);
 });
 
-// Kubernetes readiness probe — fails until all dependencies are available.
+// Kubernetes readiness probe - fails until all dependencies are available.
 router.get('/health/ready', async (req, res) => {
   try {
     const redis = getRedisClient();
@@ -74,7 +74,7 @@ router.get('/health/ready', async (req, res) => {
   }
 });
 
-// Kubernetes liveness probe — just confirms the process is alive.
+// Kubernetes liveness probe - just confirms the process is alive.
 router.get('/health/live', (_req, res) => {
   res.status(200).json({
     status: 'alive',

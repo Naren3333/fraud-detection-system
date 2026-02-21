@@ -28,7 +28,7 @@ class MLScoringClient {
     const startTime = Date.now();
 
     if (circuitBreaker.isOpen()) {
-      log.warn('ML scoring skipped – circuit breaker is OPEN', {
+      log.warn('ML scoring skipped - circuit breaker is OPEN', {
         transactionId: transaction.id,
         circuitStats: circuitBreaker.getStats(),
       });
@@ -169,3 +169,4 @@ class MLScoringClient {
 }
 
 module.exports = new MLScoringClient();
+

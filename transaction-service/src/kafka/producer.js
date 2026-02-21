@@ -39,7 +39,7 @@ const createProducer = async () => {
  */
 const publish = async (topic, partitionKey, payload, headers = {}) => {
   if (!producer || !ready) {
-    logger.warn('Producer not ready – reconnecting');
+    logger.warn('Producer not ready - reconnecting');
     await createProducer();
   }
 

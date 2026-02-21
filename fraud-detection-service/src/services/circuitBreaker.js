@@ -2,9 +2,9 @@ const logger = require('../config/logger');
 const { mlCircuitBreakerState } = require('../metrics');
 
 const STATE = {
-  CLOSED: 'CLOSED',       // Normal operation — requests flow through
-  OPEN: 'OPEN',           // Failing — requests short-circuit immediately
-  HALF_OPEN: 'HALF_OPEN', // Testing — limited requests allowed through
+  CLOSED: 'CLOSED',       // Normal operation - requests flow through
+  OPEN: 'OPEN',           // Failing - requests short-circuit immediately
+  HALF_OPEN: 'HALF_OPEN', // Testing - limited requests allowed through
 };
 
 const STATE_METRICS = {

@@ -60,7 +60,7 @@ const shutdown = async (signal) => {
   if (isShuttingDown) return;
   isShuttingDown = true;
 
-  logger.info(`${signal} received – starting graceful shutdown`);
+  logger.info(`${signal} received - starting graceful shutdown`);
 
   // Stop accepting new HTTP connections
   if (server) {
@@ -140,7 +140,7 @@ const bootstrap = async () => {
       process.exit(1);
     });
 
-    logger.info('Bootstrap complete – service is ready');
+    logger.info('Bootstrap complete - service is ready');
   } catch (err) {
     logger.error('Bootstrap failed', { error: err.message, stack: err.stack });
     process.exit(1);
@@ -150,3 +150,4 @@ const bootstrap = async () => {
 bootstrap();
 
 module.exports = app;
+

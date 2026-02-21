@@ -24,7 +24,7 @@ const redact = (obj, depth = 0) => {
 };
 
 // FIX: Preserve Winston's internal Symbol properties after redaction.
-// Object.fromEntries(Object.entries()) strips Symbols — Winston needs
+// Object.fromEntries(Object.entries()) strips Symbols - Winston needs
 // Symbol.for('level') and Symbol.for('message') to route and output logs.
 // Without them, colorize() silently fails and Console transport writes nothing.
 const redactFilter = winston.format((info) => {
@@ -61,7 +61,7 @@ const devFormat = winston.format.combine(
   })
 );
 
-// FIX: Do NOT set format at the logger level — only set it on the transport.
+// FIX: Do NOT set format at the logger level - only set it on the transport.
 // When format is specified at BOTH createLogger and transport level, Winston
 // chains them: logger-level format runs first, then transport-level format.
 // This caused: json() serializing the info object BEFORE devFormat's printf
@@ -74,7 +74,7 @@ const transports = [
 
 const logger = winston.createLogger({
   level: config.logLevel,
-  // No format here — format is handled entirely by each transport above
+  // No format here - format is handled entirely by each transport above
   defaultMeta: {
     service: config.serviceName,
     version: config.serviceVersion,

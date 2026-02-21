@@ -34,7 +34,7 @@ const start = async () => {
   logger.info('Subscribed to input topic', { topic: config.kafka.inputTopic });
 
   await consumer.run({
-    // Manual offset commits — we only commit AFTER successfully publishing results
+    // Manual offset commits - we only commit AFTER successfully publishing results
     autoCommit: false,
     eachMessage: async ({ topic, partition, message, heartbeat, commitOffsetsIfNecessary }) => {
       await handleMessage({ topic, partition, message, heartbeat, commitOffsetsIfNecessary });
@@ -96,7 +96,7 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
     // ── Parse ────────────────────────────────────────────────────────────────
     const raw = message.value?.toString();
     if (!raw) {
-      logger.warn('Received empty Kafka message — skipping', { partition, offset });
+      logger.warn('Received empty Kafka message - skipping', { partition, offset });
       await commitOffset(partition, offset);
       kafkaMessagesConsumed.inc({ topic, status: 'skipped' });
       return;
@@ -106,7 +106,7 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
     try {
       data = JSON.parse(raw);
     } catch (parseErr) {
-      logger.error('Malformed JSON in Kafka message — sending to DLQ', {
+      logger.error('Malformed JSON in Kafka message - sending to DLQ', {
         partition,
         offset,
         error: parseErr.message,
@@ -141,7 +141,7 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
     // ── Validate ─────────────────────────────────────────────────────────────
     const validationError = validateTransaction(transaction);
     if (validationError) {
-      logger.error('Invalid transaction payload — sending to DLQ', {
+      logger.error('Invalid transaction payload - sending to DLQ', {
         transactionId: transaction?.id,
         correlationId,
         reason: validationError,
@@ -200,7 +200,7 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
     );
 
     // ── Commit Offset ────────────────────────────────────────────────────────
-    // Only commit AFTER successfully publishing — guarantees at-least-once delivery
+    // Only commit AFTER successfully publishing - guarantees at-least-once delivery
     await commitOffset(partition, offset);
 
     const durationMs = Date.now() - startTime;
@@ -242,14 +242,14 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
       await commitOffset(partition, offset);
       kafkaMessagesConsumed.inc({ topic, status: 'dlq' });
     } catch (dlqErr) {
-      logger.error('Failed to send message to DLQ — offset NOT committed', {
+      logger.error('Failed to send message to DLQ - offset NOT committed', {
         transactionId: transaction?.id,
         dlqError: dlqErr.message,
         partition,
         offset,
       });
       errorsTotal.inc({ component: 'transaction_consumer', type: 'dlq_failure' });
-      // Do NOT commit — Kafka will redeliver this message on restart
+      // Do NOT commit - Kafka will redeliver this message on restart
     }
   }
 };

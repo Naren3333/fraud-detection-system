@@ -33,8 +33,8 @@ flowchart TD
     Kafka -- "Kafka Topic: transaction.scored" --> Decision[Decision Engine :3005]
 
     %% Decision to Notification + Analytics
-    Decision -- "Kafka Topic: transaction.finalized" --> Notification[Notification Service :3006]
-    Decision -- "Kafka Topic: transaction.finalized" --> Analytics[Analytics Service :3008]
+    Decision -- "Kafka Topic: transaction.finalised" --> Notification[Notification Service :3006]
+    Decision -- "Kafka Topic: transaction.finalised" --> Analytics[Analytics Service :3008]
 ```
 
 ## Current Services
@@ -46,7 +46,7 @@ flowchart TD
 | User Service | 3002 | Live |
 | Fraud Detection Service | 3003 | Live |
 | ML Scoring Service | 3004 | Live |
-| Decision Engine | 3005 | Planned |
+| Decision Engine | 3005 | Live |
 | Notification Service | 3006 | Planned |
 | Audit Service | 3007 | Planned |
 | Analytics Service | 3008 | Planned |
@@ -115,7 +115,7 @@ fraud-detection-system/
 │   │   ├── config/           # App config, logger
 │   │   ├── controllers/      # Transaction HTTP handlers
 │   │   ├── db/               # PostgreSQL pool, migrations
-│   │   ├── kafka/            # Producer, outbox publisher
+│   │   ├── kafka/            # Producer, outbox publisher, decision consumer
 │   │   ├── middleware/       # Request context, validation, error handler
 │   │   ├── repositories/     # Transaction DB operations
 │   │   ├── routes/           # Transaction routes, health endpoints
@@ -153,6 +153,8 @@ fraud-detection-system/
     ├── Dockerfile
     └── package.json
 ```
+
+Additional service in this repo: `decision-engine-service/` (Kafka consumer, decision logic, audit persistence, and decision query APIs).
 
 ---
 
@@ -214,11 +216,17 @@ API Gateway :3000
           ├─▶ ML Scoring Service :3004
           │    HTTP · Circuit breaker · Graceful fallback · Redis cache
           └─▶ Kafka (transaction.scored)
-               → Decision Engine (planned)
+               → Decision Engine :3005
+                  ├─▶ PostgreSQL (decision-db)
+                  │   Decisions + decision history
+                  ├─▶ Kafka (transaction.finalised)
+                  │   Approved and declined outcomes
+                  └─▶ Kafka (transaction.flagged)
+                      Manual review outcomes
 
 Shared Infrastructure:
-  • Redis :6379 (db:0 = gateway rate limits, db:2 = user sessions, db:3 = fraud velocity)
-  • Kafka + Zookeeper (7 topics pre-created)
+  • Redis :6379 (db:0 = gateway rate limits, db:2 = user sessions, db:3 = fraud velocity, db:4 = ML cache)
+  • Kafka + Zookeeper (8 topics pre-created)
 ```
 
 ### Fraud Detection Pipeline
@@ -229,6 +237,17 @@ Each transaction consumed from `transaction.created` is processed as follows:
 2. **ML scoring** — HTTP call to the ML Scoring Service (`:3004`), protected by a circuit breaker with a graceful rule-derived fallback. The ML service runs feature engineering (35+ features across amount, velocity, geography, temporal, and card dimensions) and a calibrated gradient-boosted model to return a fraud probability score (0–100) with per-feature explainability. Results are cached in Redis (db:4) with a configurable TTL.
 3. **Score combination** — weighted blend of rule score (40%) and ML score (60%). Transaction is flagged if rules hard-trigger or ML score exceeds threshold (default: 70).
 4. **Result published** to `transaction.scored` for the Decision Engine.
+
+### Decision Engine Pipeline
+
+Each message consumed from `transaction.scored` is processed as follows:
+
+1. **Decision logic** — applies overrides (list, high-value, geography), confidence adjustment, and threshold-based decisioning.
+2. **Persistence** — stores the final decision and full audit snapshot in `decision-db`.
+3. **Kafka output** — publishes:
+   - `transaction.finalised` for `APPROVED` and `DECLINED`
+   - `transaction.flagged` for `FLAGGED`
+4. **Transaction status update** — Transaction Service consumes these topics and updates transaction status (`APPROVED`, `REJECTED`, `FLAGGED`).
 
 ---
 
@@ -244,6 +263,7 @@ All infrastructure is managed by Docker Compose:
 | redis | redis:7-alpine | Rate limiting, caching, velocity tracking |
 | user-db | postgres:15-alpine | User authentication & profile storage |
 | transaction-db | postgres:15-alpine | Transaction storage |
+| decision-db | postgres:15-alpine | Decision storage and audit history |
 
 ### Kafka Topics
 
@@ -256,6 +276,7 @@ All infrastructure is managed by Docker Compose:
 | transaction.reviewed | 3 | Human review outcomes |
 | transaction.reversed | 3 | Chargebacks and reversals |
 | transaction.dlq | 3 | Dead letter queue |
+| transaction.decision.dlq | 3 | Decision engine dead letter queue |
 
 ---
 

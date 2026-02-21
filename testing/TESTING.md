@@ -39,6 +39,8 @@ Wait until:
 * API Gateway is listening on port 3000
 * Transaction Service is listening on port 3001
 * Fraud Detection Service is listening on port 3003
+* ML Scoring Service is listening on port 3004
+* Decision Engine Service is listening on port 3005
 
 Verify the gateway is up:
 
@@ -56,6 +58,12 @@ Verify the ML scoring service is up:
 
 ```
 GET http://localhost:3004/api/v1/health
+```
+
+Verify the decision engine service is up:
+
+```
+GET http://localhost:3005/api/v1/health
 ```
 
 All should return HTTP 200 OK.
@@ -401,6 +409,46 @@ Key metrics exposed:
 | `fraud_detection_kafka_messages_consumed_total` | Kafka messages consumed by status |
 | `fraud_detection_kafka_dlq_messages_total` | Dead letter queue messages by reason |
 
+## Verify Decision Engine Output
+
+After a scored transaction is published, check the decision engine log:
+
+```bash
+docker logs decision-engine-service --tail 20
+```
+
+Expected log output (summarised):
+
+```
+"message": "Processing scored transaction"
+"message": "Decision made", "decision": "<APPROVED|DECLINED|FLAGGED>"
+"message": "Transaction decision completed"
+```
+
+Verify final decision topics:
+
+```bash
+docker exec -it kafka kafka-console-consumer \
+  --bootstrap-server kafka:9092 \
+  --topic transaction.finalised \
+  --from-beginning
+```
+
+```bash
+docker exec -it kafka kafka-console-consumer \
+  --bootstrap-server kafka:9092 \
+  --topic transaction.flagged \
+  --from-beginning
+```
+
+Verify transaction status sync in transaction service:
+
+```bash
+docker logs transaction-service --tail 20
+```
+
+Expected: status update logs from decision topic consumption (`APPROVED`, `REJECTED`, or `FLAGGED`).
+
 </details>
 
 
@@ -537,18 +585,41 @@ Expected:
 
 See **Section 6** above — the fraud detection service runs on port 3003 directly.
 
+## Decision Engine Health & Metrics
+
+The decision engine service runs on port 3005 directly (not proxied through the API Gateway):
+
+```
+GET http://localhost:3005/api/v1/health
+GET http://localhost:3005/api/v1/health/live
+GET http://localhost:3005/api/v1/health/ready
+GET http://localhost:3005/api/v1/metrics
+GET http://localhost:3005/api/v1/thresholds
+```
+
+Key metrics exposed:
+
+| Metric | Description |
+|---|---|
+| `decision_engine_decisions_total` | Decisions made by decision type |
+| `decision_engine_decision_duration_ms` | End-to-end decision + persistence latency |
+| `decision_engine_risk_score_distribution` | Risk score distribution by decision |
+| `decision_engine_kafka_messages_consumed_total` | Consumed Kafka messages by status |
+| `decision_engine_kafka_messages_published_total` | Published Kafka decision events by topic |
+| `decision_engine_errors_total` | Error counts by component and type |
+
 </details>
 
 
 # 9. End-to-End Scenario
 
 <details>
-<summary><strong>Full Flow — Register → Login → Create Transaction</strong></summary>
+<summary><strong>Full Flow — Register → Login → Create Transaction → Verify Decision</strong></summary>
 
 Navigate to:
 
 ```
-Test Scenarios → Full Flow - Register → Login → Create Transaction
+Test Scenarios → Full Flow - Register → Login → Create Transaction → Verify Decision
 ```
 
 Run in order:
@@ -564,11 +635,20 @@ This validates:
 * Token issuance
 * Transaction creation
 * Kafka event publication → fraud detection pipeline
+* Decision engine processing and final decision publication
+* Transaction status update from decision topics
 
 After step 3, verify fraud processing:
 
 ```bash
 docker logs fraud-detection-service --tail 10
+```
+
+Then verify decision processing:
+
+```bash
+docker logs decision-engine-service --tail 10
+docker logs transaction-service --tail 10
 ```
 
 </details>
@@ -636,6 +716,39 @@ docker exec -it kafka kafka-console-consumer \
 
 Expected: empty under normal operation. Messages appear here if transaction payload fails validation or processing fails after retries.
 
+## Kafka: Finalised Decisions
+
+```bash
+docker exec -it kafka kafka-console-consumer \
+  --bootstrap-server kafka:9092 \
+  --topic transaction.finalised \
+  --from-beginning
+```
+
+Expected: approved/declined decisions published by decision engine.
+
+## Kafka: Flagged Decisions
+
+```bash
+docker exec -it kafka kafka-console-consumer \
+  --bootstrap-server kafka:9092 \
+  --topic transaction.flagged \
+  --from-beginning
+```
+
+Expected: flagged decisions that require manual review.
+
+## Kafka: Decision DLQ
+
+```bash
+docker exec -it kafka kafka-console-consumer \
+  --bootstrap-server kafka:9092 \
+  --topic transaction.decision.dlq \
+  --from-beginning
+```
+
+Expected: empty under normal operation; contains failed decision-processing messages.
+
 ## Database Verification
 
 ```bash
@@ -653,6 +766,26 @@ Verify:
 * No full card numbers stored
 * Only last four digits present
 * No duplicate idempotency keys
+
+Decision DB verification:
+
+```bash
+docker exec -it decision-db psql -U decision_admin -d decision_db
+```
+
+```sql
+SELECT transaction_id, decision, risk_score, fraud_flagged, decided_at
+FROM decisions
+ORDER BY decided_at DESC
+LIMIT 20;
+```
+
+```sql
+SELECT transaction_id, decision, recorded_at
+FROM decision_history
+ORDER BY recorded_at DESC
+LIMIT 20;
+```
 
 </details>
 
@@ -689,12 +822,15 @@ This testing guide validates:
 * Secure card masking and data persistence
 * Kafka event publication (`transaction.created`)
 * Fraud detection pipeline (rules engine, ML scoring, score combination)
+* Decision engine pipeline (decision logic, persistence, Kafka publication)
 * ML Scoring Service — direct scoring, feature engineering, explainability, result caching
 * Fraud risk scoring and flagging (`transaction.scored`)
+* Final decision publication (`transaction.finalised`, `transaction.flagged`)
+* Transaction status updates from decision topics
 * Dead letter queue behaviour
 * API Gateway routing
-* Health and readiness probes (API Gateway + Fraud Detection Service)
-* Prometheus metrics (API Gateway + Fraud Detection Service)
+* Health and readiness probes (API Gateway + Fraud Detection Service + Decision Engine)
+* Prometheus metrics (API Gateway + Fraud Detection Service + Decision Engine)
 
 ---
 
@@ -711,4 +847,6 @@ The system is considered functioning correctly when:
 * Fraud Detection Service consumes and scores every transaction
 * High-risk transactions are flagged (`flagged: true`) in fraud service logs
 * Results are published to `transaction.scored`
-* Health and metrics endpoints are accessible on gateway (`:3000`), fraud service (`:3003`), and ML scoring service (`:3004`)
+* Decision Engine consumes `transaction.scored` and publishes `transaction.finalised` / `transaction.flagged`
+* Transaction Service updates statuses from decision topics
+* Health and metrics endpoints are accessible on gateway (`:3000`), fraud service (`:3003`), ML scoring service (`:3004`), and decision engine (`:3005`)

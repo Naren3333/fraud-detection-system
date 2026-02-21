@@ -12,6 +12,7 @@ const logger      = require('./config/logger');
 const { createPool, closePool } = require('./db/pool');
 const { createProducer, disconnectProducer } = require('./kafka/producer');
 const { startOutboxPublisher, stopOutboxPublisher } = require('./kafka/outboxPublisher');
+const { start: startDecisionConsumer, stop: stopDecisionConsumer } = require('./kafka/decisionConsumer');
 const requestContext = require('./middleware/requestContext');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const routes     = require('./routes');
@@ -35,11 +36,20 @@ let server;
 
 const shutdown = async (signal) => {
   logger.info(`${signal} received - starting graceful shutdown`);
-  server.close(async () => {
-    logger.info('HTTP server closed');
-  });
-  
+
+  if (server) {
+    server.close(() => logger.info('HTTP server closed'));
+  }
+
   stopOutboxPublisher();
+
+  try {
+    await stopDecisionConsumer();
+    logger.info('Decision consumer stopped');
+  } catch (err) {
+    logger.error('Error stopping decision consumer', { error: err.message });
+  }
+
   await disconnectProducer();
   await closePool();
   logger.info('Graceful shutdown complete');
@@ -62,12 +72,19 @@ process.on('unhandledRejection', (reason) => {
 const bootstrap = async () => {
   try {
     logger.info('Bootstrapping Transaction Service...');
+
     createPool();
     logger.info('PostgreSQL pool initialised');
+
     await createProducer();
     logger.info('Kafka producer connected');
+
     startOutboxPublisher();
     logger.info('Outbox publisher started');
+
+    await startDecisionConsumer();
+    logger.info('Decision consumer started');
+
     server = app.listen(config.port, () => {
       logger.info(`Transaction Service listening on port ${config.port}`, {
         env:  config.env,
@@ -88,4 +105,4 @@ const bootstrap = async () => {
 
 bootstrap();
 
-module.exports = app;   // for testing
+module.exports = app;

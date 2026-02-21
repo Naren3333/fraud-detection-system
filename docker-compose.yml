@@ -11,6 +11,7 @@ volumes:
   kafka-data:
   zookeeper-data:
   zookeeper-log:
+  decision-db-data:
 
 services:
   zookeeper:
@@ -366,3 +367,86 @@ services:
       retries: 3
       start_period: 10s
     restart: unless-stopped
+
+# Decision Database
+  decision-db:
+    image: postgres:15-alpine
+    container_name: decision-db
+    networks: [fraud-net]
+    environment:
+      POSTGRES_DB:       decision_db
+      POSTGRES_USER:     decision_admin
+      POSTGRES_PASSWORD: decision_password
+    volumes:
+      - decision-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U decision_admin -d decision_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Decision Engine Service
+  decision-engine-service:
+    build:
+      context: ./decision-engine-service
+      dockerfile: Dockerfile
+    container_name: decision-engine-service
+    networks: [fraud-net]
+    ports:
+      - "3005:3005"
+      - "9095:9095"  # Prometheus metrics
+    depends_on:
+      decision-db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV:              production
+      PORT:                  3005
+      SERVICE_NAME:          decision-engine-service
+      SERVICE_VERSION:       1.0.0
+      LOG_LEVEL:             info
+      # Database
+      DB_HOST:               decision-db
+      DB_PORT:               5432
+      DB_NAME:               decision_db
+      DB_USER:               decision_admin
+      DB_PASSWORD:           decision_password
+      DB_MAX_CONNECTIONS:    20
+      # Kafka
+      KAFKA_BROKERS:         kafka:9092
+      KAFKA_CLIENT_ID:       decision-engine-service
+      KAFKA_GROUP_ID:        decision-engine-group
+      KAFKA_INPUT_TOPIC:     transaction.scored
+      KAFKA_OUTPUT_TOPIC_APPROVED: transaction.finalised
+      KAFKA_OUTPUT_TOPIC_FLAGGED:  transaction.flagged
+      KAFKA_DLQ_TOPIC:       transaction.decision.dlq
+      # Decision Thresholds
+      THRESHOLD_APPROVE_MAX: 49
+      THRESHOLD_FLAG_MIN:    50
+      THRESHOLD_FLAG_MAX:    79
+      THRESHOLD_DECLINE_MIN: 80
+      # Overrides
+      THRESHOLD_RULES_FLAGGED_AUTO_DECLINE: true
+      THRESHOLD_HIGH_CONFIDENCE_APPROVE:    0.95
+      THRESHOLD_LOW_CONFIDENCE_FLAG:        0.60
+      THRESHOLD_HIGH_VALUE_AMOUNT:          10000
+      THRESHOLD_HIGH_VALUE_AUTO_FLAG:       true
+      # Business Rules
+      AUTO_APPROVE_WHITELIST_CUSTOMERS: ""
+      AUTO_DECLINE_BLACKLIST_CUSTOMERS: ""
+      REQUIRE_MANUAL_REVIEW_COUNTRIES:  NG,RU,CN,PK
+      # Metrics
+      METRICS_ENABLED:       true
+      METRICS_PORT:          9095
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3005/api/v1/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    command: sh -c "npm run migrate && npm start"

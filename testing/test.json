@@ -2,7 +2,7 @@
   "info": {
     "name": "Fraud Detection Platform",
     "_postman_id": "fdp-collection-002",
-    "description": "Complete Postman collection for Fraud Detection Platform - API Gateway, User Service, Transaction Service, and Fraud Detection Service",
+    "description": "Complete Postman collection for Fraud Detection Platform - API Gateway, User Service, Transaction Service, Fraud Detection Service, ML Scoring Service, and Decision Engine Service",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -420,6 +420,27 @@
           }
         },
         {
+          "name": "Decision Engine - Get Decision By Transaction ID",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:3005/api/v1/decisions/{{transactionId}}",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3005",
+              "path": [
+                "api",
+                "v1",
+                "decisions",
+                "{{transactionId}}"
+              ]
+            },
+            "description": "Fetches the persisted decision record for the transaction from Decision Engine Service"
+          }
+        },
+        {
           "name": "Get Transactions By Customer",
           "request": {
             "method": "GET",
@@ -643,6 +664,113 @@
             },
             "description": "Prometheus metrics: transaction processing duration, risk score distribution, rule evaluations, ML scoring requests, circuit breaker state, Kafka consumer stats"
           }
+        },
+        {
+          "name": "Decision Engine - Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3005/api/v1/health",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3005",
+              "path": [
+                "api",
+                "v1",
+                "health"
+              ]
+            },
+            "description": "Full health check for decision engine service including database dependency status"
+          }
+        },
+        {
+          "name": "Decision Engine - Liveness",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3005/api/v1/health/live",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3005",
+              "path": [
+                "api",
+                "v1",
+                "health",
+                "live"
+              ]
+            },
+            "description": "Kubernetes liveness probe for decision engine service"
+          }
+        },
+        {
+          "name": "Decision Engine - Readiness",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3005/api/v1/health/ready",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3005",
+              "path": [
+                "api",
+                "v1",
+                "health",
+                "ready"
+              ]
+            },
+            "description": "Kubernetes readiness probe for decision engine service database connectivity"
+          }
+        },
+        {
+          "name": "Decision Engine - Metrics (Prometheus)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3005/api/v1/metrics",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3005",
+              "path": [
+                "api",
+                "v1",
+                "metrics"
+              ]
+            },
+            "description": "Prometheus metrics for decision throughput, latency, Kafka consumer/publisher activity, and errors"
+          }
+        },
+        {
+          "name": "Decision Engine - Thresholds",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:3005/api/v1/thresholds",
+              "protocol": "http",
+              "host": [
+                "localhost"
+              ],
+              "port": "3005",
+              "path": [
+                "api",
+                "v1",
+                "thresholds"
+              ]
+            },
+            "description": "Returns current decision thresholds and confidence settings used by decision engine"
+          }
         }
       ]
     },
@@ -650,7 +778,7 @@
       "name": "Test Scenarios",
       "item": [
         {
-          "name": "Full Flow - Register \u2192 Login \u2192 Create Transaction",
+          "name": "Full Flow - Register \u2192 Login \u2192 Create Transaction \u2192 Verify Decision",
           "item": [
             {
               "name": "1. Register",
@@ -754,6 +882,41 @@
                   "mode": "raw",
                   "raw": "{\n  \"customerId\": \"flow_test_customer\",\n  \"merchantId\": \"flow_test_merchant\",\n  \"amount\": 5000.00,\n  \"currency\": \"USD\",\n  \"cardNumber\": \"4111111111111111\",\n  \"cardType\": \"visa\"\n}"
                 }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "let json = pm.response.json();",
+                      "if (json.success && json.data && json.data.transactionId) {",
+                      "  pm.collectionVariables.set('transactionId', json.data.transactionId);",
+                      "  console.log('Flow transaction created:', json.data.transactionId);",
+                      "}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "4. Verify Decision By Transaction ID",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "http://localhost:3005/api/v1/decisions/{{transactionId}}",
+                  "protocol": "http",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "3005",
+                  "path": [
+                    "api",
+                    "v1",
+                    "decisions",
+                    "{{transactionId}}"
+                  ]
+                },
+                "description": "Checks if the decision record has been persisted for the transaction. If immediate 404, retry after a short delay because processing is asynchronous."
               }
             }
           ]
@@ -828,7 +991,7 @@
                 "transactions"
               ]
             },
-            "description": "Sends a transaction designed to trigger multiple fraud rules:\n- Amount $15,000 exceeds suspicious threshold ($10,000) \u2192 +30 rule score\n- Country KP (North Korea) is in high-risk list \u2192 +25 rule score\n- Round amount heuristic \u2192 +5 rule score\nExpected: flagged=true in fraud-detection-service logs\n\nVerify result:\n  docker logs fraud-detection-service --tail 10\n\nOr consume scored topic:\n  docker exec -it kafka kafka-console-consumer --bootstrap-server kafka:9092 --topic transaction.scored --from-beginning"
+            "description": "Sends a transaction designed to trigger multiple fraud rules:\n- Amount $15,000 exceeds suspicious threshold ($10,000) \u2192 +30 rule score\n- Country KP (North Korea) is in high-risk list \u2192 +25 rule score\n- Round amount heuristic \u2192 +5 rule score\nExpected: flagged=true in fraud-detection-service logs, then FLAGGED decision in decision-engine-service output\n\nVerify result:\n  docker logs fraud-detection-service --tail 10\n  docker logs decision-engine-service --tail 10\n  docker logs transaction-service --tail 10\n\nOr consume topics:\n  docker exec -it kafka kafka-console-consumer --bootstrap-server kafka:9092 --topic transaction.scored --from-beginning\n  docker exec -it kafka kafka-console-consumer --bootstrap-server kafka:9092 --topic transaction.flagged --from-beginning"
           },
           "event": [
             {
@@ -839,7 +1002,7 @@
                   "if (json.success && json.data) {",
                   "  pm.collectionVariables.set('transactionId', json.data.transactionId);",
                   "  console.log('High-risk transaction created:', json.data.transactionId);",
-                  "  console.log('Check fraud-detection-service logs for flagged=true');",
+                  "  console.log('Check fraud-detection-service, decision-engine-service, and transaction-service logs for final decision processing');",
                   "}"
                 ],
                 "type": "text/javascript"

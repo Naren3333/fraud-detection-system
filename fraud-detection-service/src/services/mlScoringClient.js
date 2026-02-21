@@ -133,7 +133,7 @@ class MLScoringClient {
       score: mlData.score,
       modelVersion: mlData.modelVersion || 'unknown',
       features: mlData.features || {},
-      confidence: mlData.confidence || null,
+      confidence: mlData.confidence ?? null,
     };
   }
 

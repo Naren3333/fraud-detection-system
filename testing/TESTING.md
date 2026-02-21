@@ -1,852 +1,188 @@
-# Fraud Detection Platform — Testing Guide
+# Fraud Detection Platform - Testing Guide
 
-This document describes how to test the Fraud Detection Platform using the provided Postman collection:
+This guide matches the current Postman collection:
 
-```
-testing/test.json
-```
+`testing/test.json`
 
-The system must be running locally via Docker before executing any tests.
+## 1. Prerequisites
 
----
+- Docker Desktop
+- Docker Compose
+- Postman
 
-# 1. Setup
-
-<details open>
-<summary><strong>Prerequisites & System Startup</strong></summary>
-
-## Prerequisites
-
-Ensure the following are installed:
-
-* Docker Desktop
-* Docker Compose
-* Postman
-
-## Start the System
-
-From the project root:
+Start the platform from project root:
 
 ```bash
-docker-compose up --build
+docker compose up --build -d
 ```
 
-Wait until:
+## 2. Import Collection
 
-* PostgreSQL is healthy
-* Kafka and Zookeeper are running
-* Redis is ready
-* API Gateway is listening on port 3000
-* Transaction Service is listening on port 3001
-* Fraud Detection Service is listening on port 3003
-* ML Scoring Service is listening on port 3004
-* Decision Engine Service is listening on port 3005
+1. Open Postman.
+2. Import `testing/test.json`.
+3. Use collection variables (already embedded in the collection):
+   - `baseUrl = http://localhost:3000`
+   - direct service URLs for ports 3001-3006 are preconfigured.
 
-Verify the gateway is up:
+## 3. Collection Structure (Run Order)
 
-```
-GET http://localhost:3000/api/v1/health
-```
-
-Verify the fraud detection service is up:
-
-```
-GET http://localhost:3003/api/v1/health
-```
-
-Verify the ML scoring service is up:
-
-```
-GET http://localhost:3004/api/v1/health
-```
-
-Verify the decision engine service is up:
-
-```
-GET http://localhost:3005/api/v1/health
-```
-
-All should return HTTP 200 OK.
-
-</details>
-
-
-# 2. Postman Setup
-
-<details>
-<summary><strong>Import Collection & Configure Environment</strong></summary>
-
-## Import Collection
-
-1. Open Postman
-2. Click **Import**
-3. Select **File**
-4. Choose:
-
-```
-testing/test.json
-```
-
-The collection includes built-in variables:
-
-* `baseUrl`
-* `accessToken`
-* `refreshToken`
-* `transactionId`
-* `userId`
-
-## Create Environment
-
-Create a new environment:
-
-| Variable | Value                    |
-| -------- | ------------------------ |
-| baseUrl  | http://localhost:3000    |
-
-Select the environment from the top-right dropdown.
-
-The collection automatically manages `accessToken`, `refreshToken`, `transactionId`, and `userId` via Postman test scripts.
-
-> **Note:** Fraud Detection Service health and metrics endpoints hit `http://localhost:3003` directly — they are not proxied through the API Gateway.
-
-</details>
-
-
-# 3. Authentication Flow
-
-<details>
-<summary><strong>Register, Login, Token Validation, Refresh, Logout</strong></summary>
-
-## Register New User
-
-```
-POST /api/v1/auth/register
-```
-
-Expected:
-
-* HTTP 201 or 200
-* User created
-* `userId` stored automatically
-
-
-## Login
-
-```
-POST /api/v1/auth/login
-```
-
-Expected:
-
-* HTTP 200
-* accessToken returned
-* refreshToken returned
-* Tokens stored automatically
-
-
-## Validate Token
-
-```
-POST /api/v1/auth/validate
-```
-
-Headers:
-
-```
-Authorization: Bearer {{accessToken}}
-```
-
-Expected:
-
-* HTTP 200
-* Token validation success
-
-
-## Refresh Access Token
-
-```
-POST /api/v1/auth/refresh
-```
-
-Expected:
-
-* HTTP 200
-* New accessToken issued
-* accessToken updated
-
-
-## Logout
-
-```
-POST /api/v1/auth/logout
-```
-
-Expected:
-
-* HTTP 200
-* Tokens cleared
-
-</details>
-
-
-# 4. User Profile Management
-
-<details>
-<summary><strong>Profile Retrieval & Update</strong></summary>
-
-## Get My Profile
-
-```
-GET /api/v1/auth/profile
-```
-
-Expected:
-
-* HTTP 200
-* Authenticated user profile returned
-
-
-## Update Profile
-
-```
-PATCH /api/v1/auth/profile
-```
-
-Expected:
-
-* HTTP 200
-* Profile updated successfully
-
-
-## Change Password
-
-```
-POST /api/v1/auth/change-password
-```
-
-Expected:
-
-* HTTP 200
-* Tokens revoked
-* Must login again
-
-</details>
-
-
-# 5. Transaction Testing
-
-<details>
-<summary><strong>Create, Fetch & Idempotency Validation</strong></summary>
-
-Login first to obtain `accessToken`.
-
-
-## Create Transaction
-
-```
-POST /api/v1/transactions
-```
-
-Headers:
-
-```
-Authorization: Bearer {{accessToken}}
-X-Idempotency-Key: {{$guid}}
-X-Correlation-ID: corr-{{$timestamp}}
-```
-
-Expected:
-
-* HTTP 201
-* status = PENDING
-* transactionId returned and stored automatically
-
-Validation:
+Run folders in this order:
 
-* Full card number never returned
-* Only last four digits persisted
-* Correlation ID matches
+1. `01 - Health and Metrics`
+2. `02 - Auth Lifecycle`
+3. `03 - Transactions Core`
+4. `04 - Fraud and Decision Async Scenarios`
+5. `05 - ML Scoring Service Direct`
+6. `06 - Notification Service`
+7. `07 - Rate Limit and Error Probes`
+8. `08 - End-to-End Smoke Flow`
 
-Once created, the transaction is published to Kafka (`transaction.created`) and picked up by the Fraud Detection Service within milliseconds. Check fraud processing output:
+## 4. What Each Folder Validates
 
-```bash
-docker logs fraud-detection-service --tail 20
-```
-
-
-## Get Transaction by ID
-
-```
-GET /api/v1/transactions/{{transactionId}}
-```
-
-Expected:
-
-* HTTP 200
-* Correct transaction returned
-* No sensitive card data exposed
-
-
-## Get Transactions by Customer
-
-```
-GET /api/v1/transactions/customer/customer_123
-```
-
-Expected:
-
-* HTTP 200
-* Array of transactions
-
-
-## Idempotency Test
-
-Run **Test Idempotency (Duplicate Request)** twice with the same `X-Idempotency-Key: idempotent-test-key-001`.
-
-Expected:
-
-* First call → HTTP 201, new transaction
-* Second call → HTTP 200, `idempotent: true`, no duplicate database entry
-
-</details>
-
-
-# 6. Fraud Detection
-
-<details>
-<summary><strong>Pipeline Verification & High-Risk Transaction Testing</strong></summary>
-
-The fraud detection pipeline runs asynchronously. When a transaction is created via the API, it is published to Kafka and processed by the Fraud Detection Service in the background. There is no synchronous fraud response on the transaction creation endpoint — verification is done via logs or Kafka topic inspection.
-
-## Verify a Normal Transaction Was Scored
-
-After creating any transaction, run:
-
-```bash
-docker logs fraud-detection-service --tail 20
-```
-
-Expected log output (summarised):
-
-```
-"message": "Raw Kafka message received"
-"message": "Fraud rules evaluated"
-"message": "Fraud analysis completed", "flagged": false, "riskScore": <n>
-"message": "Transaction processed successfully"
-```
-
-Or consume the scored topic directly:
-
-```bash
-docker exec -it kafka kafka-console-consumer \
-  --bootstrap-server kafka:9092 \
-  --topic transaction.scored \
-  --from-beginning
-```
-
-## High-Risk Transaction (Fraud Flag Expected)
-
-Run the **High-Risk Transaction (Fraud Flag Expected)** request from the **Test Scenarios** folder.
-
-This sends:
-
-```json
-{
-  "amount": 15000.00,
-  "location": { "country": "KP" }
-}
-```
-
-Rules triggered:
-
-| Rule | Reason | Score contribution |
-|---|---|---|
-| Suspicious amount | $15,000 exceeds $10,000 threshold | +30 |
-| High-risk country | KP (North Korea) in blocklist | +25 |
-| Round amount | $15,000 is divisible by 100 | +5 |
-
-Expected fraud service log:
-
-```
-"message": "Fraud analysis completed", "flagged": true, "riskScore": <n>
-```
-
-## Fraud Detection Health Check
-
-The fraud detection service exposes its own health endpoint at port 3003 (not behind the API Gateway):
-
-```
-GET http://localhost:3003/api/v1/health
-```
-
-The response includes:
-
-* Redis connectivity
-* ML Scoring Service circuit breaker state (`CLOSED` / `OPEN` / `HALF_OPEN`)
-* Process uptime and memory
-
-```
-GET http://localhost:3003/api/v1/health/live    — liveness probe
-GET http://localhost:3003/api/v1/health/ready   — readiness probe (Redis check)
-```
-
-## Fraud Detection Metrics
+### 01 - Health and Metrics
 
-```
-GET http://localhost:3003/api/v1/metrics
-```
-
-Key metrics exposed:
-
-| Metric | Description |
-|---|---|
-| `fraud_detection_transactions_processed_total` | Transactions processed, by status and flagged |
-| `fraud_detection_transaction_processing_duration_ms` | End-to-end processing time histogram |
-| `fraud_detection_risk_score_distribution` | Risk score histogram by source (rules / ml / combined) |
-| `fraud_detection_rule_evaluations_total` | Individual rule evaluations, by rule and triggered |
-| `fraud_detection_ml_scoring_requests_total` | ML scoring requests by status (success / fallback / circuit_open) |
-| `fraud_detection_ml_circuit_breaker_state` | Circuit breaker state (0=closed, 1=open, 2=half-open) |
-| `fraud_detection_kafka_messages_consumed_total` | Kafka messages consumed by status |
-| `fraud_detection_kafka_dlq_messages_total` | Dead letter queue messages by reason |
-
-## Verify Decision Engine Output
-
-After a scored transaction is published, check the decision engine log:
-
-```bash
-docker logs decision-engine-service --tail 20
-```
-
-Expected log output (summarised):
-
-```
-"message": "Processing scored transaction"
-"message": "Decision made", "decision": "<APPROVED|DECLINED|FLAGGED>"
-"message": "Transaction decision completed"
-```
-
-Verify final decision topics:
-
-```bash
-docker exec -it kafka kafka-console-consumer \
-  --bootstrap-server kafka:9092 \
-  --topic transaction.finalised \
-  --from-beginning
-```
-
-```bash
-docker exec -it kafka kafka-console-consumer \
-  --bootstrap-server kafka:9092 \
-  --topic transaction.flagged \
-  --from-beginning
-```
-
-Verify transaction status sync in transaction service:
-
-```bash
-docker logs transaction-service --tail 20
-```
-
-Expected: status update logs from decision topic consumption (`APPROVED`, `REJECTED`, or `FLAGGED`).
-
-</details>
-
-
-# 7. ML Scoring Service
-
-<details>
-<summary><strong>Direct Scoring, Health, Metrics & Explainability</strong></summary>
-
-The ML Scoring Service runs on port 3004 and is called directly by the Fraud Detection Service via HTTP. It is not proxied through the API Gateway.
-
-## Health Check
-
-```
-GET http://localhost:3004/api/v1/health
-```
-
-Response includes:
-
-* Redis connectivity (result cache on db:4)
-* ML model load status and version
-* Cache hit rate and request counts
-
-```
-GET http://localhost:3004/api/v1/health/live    — liveness probe
-GET http://localhost:3004/api/v1/health/ready   — readiness probe (Redis + model check)
-```
-
-## Score a Transaction Directly
-
-```
-POST http://localhost:3004/api/v1/score
-Content-Type: application/json
-
-{
-  "transaction": {
-    "id": "txn_test_001",
-    "customerId": "customer_123",
-    "amount": 15000.00,
-    "currency": "USD",
-    "createdAt": "2026-02-20T01:00:00.000Z",
-    "location": { "country": "KP" }
-  },
-  "ruleResults": {
-    "flagged": true,
-    "ruleScore": 75,
-    "reasons": ["High-risk country", "Suspicious amount"],
-    "riskFactors": {
-      "velocity": {
-        "customerTransactionsLastHour": 5,
-        "customerAmountLastHour": 20000,
-        "customerTransactionsLastDay": 12
-      },
-      "amount": { "suspicious": true, "highAmount": true },
-      "geography": { "country": "KP" },
-      "time": { "unusualTime": false }
-    }
-  }
-}
-```
-
-Expected response:
-
-* `score` — 0–100 risk score
-* `probability` — raw model probability
-* `confidence` — feature coverage confidence
-* `explanation.topContributors` — ranked feature contributions with impact direction
-* `explanation.reasons` — human-readable risk reasons
-* `metadata.inferenceTimeMs` — model inference latency
-
-> **Note:** Repeated calls with the same transaction ID and rule hash return cached results from Redis. Check `metadata.inferenceTimeMs` — a cache hit will be sub-millisecond.
-
-## Model Information
+Checks health/live/ready/metrics endpoints for:
 
-```
-GET http://localhost:3004/api/v1/model/info
-```
-
-Returns model version, feature count, cache hit rate, and top feature importances.
-
-## Metrics
-
-```
-GET http://localhost:3004/api/v1/metrics
-```
+- API Gateway (`:3000`)
+- User service (`:3002`)
+- Transaction service (`:3001`)
+- Fraud detection service (`:3003`)
+- ML scoring service (`:3004`)
+- Decision engine service (`:3005`)
+- Notification service (`:3006`)
 
-Key metrics:
+Expected: HTTP `200` for healthy services.
 
-| Metric | Description |
-|---|---|
-| `ml_scoring_scoring_requests_total` | Total scoring requests by status |
-| `ml_scoring_scoring_duration_ms` | End-to-end scoring latency histogram, by cached |
-| `ml_scoring_score_distribution` | Distribution of output risk scores |
-| `ml_scoring_confidence_distribution` | Distribution of prediction confidence |
-| `ml_scoring_model_inference_duration_ms` | Raw model inference latency |
-| `ml_scoring_feature_extraction_duration_ms` | Feature engineering latency |
-| `ml_scoring_cache_hits_total` | Redis cache hits |
-| `ml_scoring_cache_misses_total` | Redis cache misses |
-| `ml_scoring_errors_total` | Errors by component and type |
+### 02 - Auth Lifecycle
 
-</details>
+Covers full auth path:
 
+- Register
+- Login
+- Validate token
+- Refresh token
+- Get/update profile
+- Change password
+- Login with new password
+- Logout
+- Forbidden admin route check (`401/403` expected for non-admin)
 
-# 8. Health & Monitoring
+The collection auto-saves:
 
-<details>
-<summary><strong>Health Endpoints & Prometheus Metrics</strong></summary>
+- `accessToken`
+- `refreshToken`
+- `userId`
+- `testEmail`
 
-## API Gateway Health
+### 03 - Transactions Core
 
-```
-GET /api/v1/health
-GET /api/v1/health/live
-GET /api/v1/health/ready
-```
+Covers transaction API behavior through gateway:
 
-Expected:
+- Create transaction (happy path)
+- Get by transaction ID
+- Get by customer ID
+- Idempotency replay scenario (same `X-Idempotency-Key`)
+- Validation failure scenario (`400/422` expected)
+- Unauthorized scenario (`401/403` expected)
 
-* HTTP 200
-* Dependency status visible
+The collection auto-saves:
 
-## Prometheus Metrics (API Gateway)
+- `transactionId`
+- `customerId`
 
-```
-GET /api/v1/metrics
-```
+### 04 - Fraud and Decision Async Scenarios
 
-Expected:
+Validates asynchronous pipeline behavior:
 
-* Plain text Prometheus metrics
-* HTTP request counters
-* Service metrics
+- Fetch decision by transaction ID
+- Fetch decision thresholds and stats
+- Submit high-risk transaction
+- Fetch decision for high-risk transaction
 
-## Fraud Detection Health & Metrics
+Important: decision endpoints may return `404` temporarily while Kafka processing is still in flight. Retry after 2-5 seconds.
 
-See **Section 6** above — the fraud detection service runs on port 3003 directly.
+### 05 - ML Scoring Service Direct
 
-## Decision Engine Health & Metrics
+Tests ML service directly:
 
-The decision engine service runs on port 3005 directly (not proxied through the API Gateway):
+- Single score request (`/api/v1/score`)
+- Batch score request (`/api/v1/score/batch`)
+- Model info (`/api/v1/model/info`)
 
-```
-GET http://localhost:3005/api/v1/health
-GET http://localhost:3005/api/v1/health/live
-GET http://localhost:3005/api/v1/health/ready
-GET http://localhost:3005/api/v1/metrics
-GET http://localhost:3005/api/v1/thresholds
-```
+Expected: HTTP `200` with score/model payloads.
 
-Key metrics exposed:
+### 06 - Notification Service
 
-| Metric | Description |
-|---|---|
-| `decision_engine_decisions_total` | Decisions made by decision type |
-| `decision_engine_decision_duration_ms` | End-to-end decision + persistence latency |
-| `decision_engine_risk_score_distribution` | Risk score distribution by decision |
-| `decision_engine_kafka_messages_consumed_total` | Consumed Kafka messages by status |
-| `decision_engine_kafka_messages_published_total` | Published Kafka decision events by topic |
-| `decision_engine_errors_total` | Error counts by component and type |
+Checks notification service operational endpoints:
 
-</details>
+- `health/live`
+- `health/ready`
+- `health`
 
+Expected: HTTP `200`.
 
-# 9. End-to-End Scenario
+### 07 - Rate Limit and Error Probes
 
-<details>
-<summary><strong>Full Flow — Register → Login → Create Transaction → Verify Decision</strong></summary>
+Includes:
 
-Navigate to:
+- Auth brute-force probe (run quickly multiple times): expect `401` initially and `429` when limited.
+- Login failure probe for invalid credentials.
 
-```
-Test Scenarios → Full Flow - Register → Login → Create Transaction → Verify Decision
-```
+### 08 - End-to-End Smoke Flow
 
-Run in order:
+Simple production-like smoke run:
 
-1. Register
+1. Register fresh user
 2. Login
-3. Create Transaction
+3. Create transaction
+4. Verify decision (retry if first call is `404`)
 
-This validates:
+Expected: transaction created and decision eventually persisted.
 
-* User creation
-* Authentication
-* Token issuance
-* Transaction creation
-* Kafka event publication → fraud detection pipeline
-* Decision engine processing and final decision publication
-* Transaction status update from decision topics
+## 5. Async and Reliability Notes
 
-After step 3, verify fraud processing:
+- Fraud scoring and decisioning are event-driven via Kafka and are not synchronous with transaction creation.
+- For decision verification, `404` on first check is normal under load.
+- Retry decision lookup after a short delay.
 
-```bash
-docker logs fraud-detection-service --tail 10
-```
+## 6. Useful Runtime Checks
 
-Then verify decision processing:
+Tail service logs when running async scenarios:
 
 ```bash
-docker logs decision-engine-service --tail 10
-docker logs transaction-service --tail 10
+docker logs fraud-detection-service --tail 50
+docker logs decision-engine-service --tail 50
+docker logs notification-service --tail 50
 ```
 
-</details>
-
-
-# 10. Rate Limiting
-
-<details>
-<summary><strong>Brute Force & Rate Limit Testing</strong></summary>
-
-Run:
-
-```
-Rate Limit Test (Run 6x quickly)
-```
-
-Expected:
-
-* Initial attempts → 401
-* After threshold → HTTP 429 Too Many Requests
-
-Validates:
-
-* Auth rate limiting
-* Brute force protection
-
-</details>
-
-
-# 11. Optional Advanced Verification
-
-<details>
-<summary><strong>Kafka & Database Verification</strong></summary>
-
-## Kafka: Incoming Transactions
+Check running containers:
 
 ```bash
-docker exec -it kafka kafka-console-consumer \
-  --bootstrap-server kafka:9092 \
-  --topic transaction.created \
-  --from-beginning
+docker compose ps
 ```
 
-Expected: transaction events appear when transactions are created.
+## 7. Full Reset
 
-## Kafka: Fraud Scored Transactions
+Stop and remove containers:
 
 ```bash
-docker exec -it kafka kafka-console-consumer \
-  --bootstrap-server kafka:9092 \
-  --topic transaction.scored \
-  --from-beginning
+docker compose down
 ```
 
-Expected: scored event per transaction with `riskScore`, `flagged`, full `ruleResults` and `mlResults` audit trail.
-
-## Kafka: Dead Letter Queue
+Stop and remove volumes (full data reset):
 
 ```bash
-docker exec -it kafka kafka-console-consumer \
-  --bootstrap-server kafka:9092 \
-  --topic transaction.dlq \
-  --from-beginning
+docker compose down -v
 ```
 
-Expected: empty under normal operation. Messages appear here if transaction payload fails validation or processing fails after retries.
+## 8. Success Criteria
 
-## Kafka: Finalised Decisions
+System is healthy when:
 
-```bash
-docker exec -it kafka kafka-console-consumer \
-  --bootstrap-server kafka:9092 \
-  --topic transaction.finalised \
-  --from-beginning
-```
-
-Expected: approved/declined decisions published by decision engine.
-
-## Kafka: Flagged Decisions
-
-```bash
-docker exec -it kafka kafka-console-consumer \
-  --bootstrap-server kafka:9092 \
-  --topic transaction.flagged \
-  --from-beginning
-```
-
-Expected: flagged decisions that require manual review.
-
-## Kafka: Decision DLQ
-
-```bash
-docker exec -it kafka kafka-console-consumer \
-  --bootstrap-server kafka:9092 \
-  --topic transaction.decision.dlq \
-  --from-beginning
-```
-
-Expected: empty under normal operation; contains failed decision-processing messages.
-
-## Database Verification
-
-```bash
-docker exec -it transaction-db psql -U postgres
-```
-
-Then:
-
-```sql
-SELECT id, customer_id, amount, currency, card_last_four, status FROM transactions;
-```
-
-Verify:
-
-* No full card numbers stored
-* Only last four digits present
-* No duplicate idempotency keys
-
-Decision DB verification:
-
-```bash
-docker exec -it decision-db psql -U decision_admin -d decision_db
-```
-
-```sql
-SELECT transaction_id, decision, risk_score, fraud_flagged, decided_at
-FROM decisions
-ORDER BY decided_at DESC
-LIMIT 20;
-```
-
-```sql
-SELECT transaction_id, decision, recorded_at
-FROM decision_history
-ORDER BY recorded_at DESC
-LIMIT 20;
-```
-
-</details>
-
-
-# 12. Full System Reset
-
-<details>
-<summary><strong>Reset Containers & Data</strong></summary>
-
-Stop containers:
-
-```bash
-docker-compose down
-```
-
-Remove all data:
-
-```bash
-docker-compose down -v
-```
-
-</details>
-
-
-# Test Coverage Summary
-
-This testing guide validates:
-
-* User registration and JWT authentication
-* Refresh token lifecycle and logout / token revocation
-* Profile management and password change
-* Authorization middleware and rate limiting
-* Idempotency control and duplicate prevention
-* Secure card masking and data persistence
-* Kafka event publication (`transaction.created`)
-* Fraud detection pipeline (rules engine, ML scoring, score combination)
-* Decision engine pipeline (decision logic, persistence, Kafka publication)
-* ML Scoring Service — direct scoring, feature engineering, explainability, result caching
-* Fraud risk scoring and flagging (`transaction.scored`)
-* Final decision publication (`transaction.finalised`, `transaction.flagged`)
-* Transaction status updates from decision topics
-* Dead letter queue behaviour
-* API Gateway routing
-* Health and readiness probes (API Gateway + Fraud Detection Service + Decision Engine)
-* Prometheus metrics (API Gateway + Fraud Detection Service + Decision Engine)
-
----
-
-# Conclusion
-
-The system is considered functioning correctly when:
-
-* All endpoints return expected HTTP status codes
-* Tokens are issued, refreshed, and revoked properly
-* Transactions are created and stored correctly with card data masked
-* Idempotency prevents duplicates
-* Rate limits are enforced
-* Kafka events are published to `transaction.created`
-* Fraud Detection Service consumes and scores every transaction
-* High-risk transactions are flagged (`flagged: true`) in fraud service logs
-* Results are published to `transaction.scored`
-* Decision Engine consumes `transaction.scored` and publishes `transaction.finalised` / `transaction.flagged`
-* Transaction Service updates statuses from decision topics
-* Health and metrics endpoints are accessible on gateway (`:3000`), fraud service (`:3003`), ML scoring service (`:3004`), and decision engine (`:3005`)
+- Health endpoints are green across all services.
+- Auth lifecycle works end-to-end (including password change).
+- Transaction create/read/idempotency behave correctly.
+- High-risk transaction reaches decision engine and is queryable.
+- ML scoring endpoints return valid responses.
+- Notification service health and metrics are reachable.
+- Rate limiting returns `429` under burst attempts.

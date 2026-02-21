@@ -165,6 +165,20 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
       overrideApplied: decisionResult.overrideApplied,
     });
 
+    const existingDecision = await decisionRepository.findByTransactionId(transactionId);
+    if (existingDecision && existingDecision.decision === decisionResult.decision) {
+      await commitOffset(partition, offset);
+      kafkaMessagesConsumed.inc({ topic, status: 'skipped' });
+      logger.warn('Duplicate scored event detected; skipping decision republish', {
+        transactionId,
+        decision: decisionResult.decision,
+        existingDecisionId: existingDecision.decision_id,
+        partition,
+        offset,
+      });
+      return;
+    }
+
     // ── Save to Database ─────────────────────────────────────────────────────
     const dbResult = await decisionRepository.saveDecision({
       transactionId,

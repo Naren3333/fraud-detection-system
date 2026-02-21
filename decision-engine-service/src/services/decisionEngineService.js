@@ -185,7 +185,7 @@ class DecisionEngineService {
   // ─── Confidence Adjustment ───────────────────────────────────────────────
 
   _applyConfidenceAdjustment(riskScore, confidence) {
-    if (!confidence || typeof confidence !== 'number') {
+    if (!Number.isFinite(confidence)) {
       // No confidence data → no adjustment
       return {
         adjustedScore: riskScore,

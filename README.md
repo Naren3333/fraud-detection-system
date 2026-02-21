@@ -77,7 +77,6 @@ Once running, the API is available at `http://localhost:3000`.
 ---
 
 ## Project Structure
-
 ```
 fraud-detection-system/
 ├── .gitignore
@@ -140,21 +139,36 @@ fraud-detection-system/
 │   ├── Dockerfile
 │   └── package.json
 │
-└── ml-scoring-service/
+├── ml-scoring-service/
+│   ├── src/
+│   │   ├── config/           # App config, logger, Redis client
+│   │   ├── controllers/      # Scoring HTTP handlers
+│   │   ├── middleware/       # Correlation ID, request logger, timeout, validation
+│   │   ├── models/           # Fraud model (XGBoost-simulated weighted scoring)
+│   │   ├── routes/           # Health, metrics, scoring endpoints
+│   │   ├── services/         # Feature engineering, ML scoring orchestration
+│   │   └── utils/            # Errors, metrics
+│   ├── .dockerignore
+│   ├── Dockerfile
+│   └── package.json
+│
+└── decision-engine-service/
     ├── src/
-    │   ├── config/           # App config, logger, Redis client
-    │   ├── controllers/      # Scoring HTTP handlers
-    │   ├── middleware/       # Correlation ID, request logger, timeout, validation
-    │   ├── models/           # Fraud model (XGBoost-simulated weighted scoring)
-    │   ├── routes/           # Health, metrics, scoring endpoints
-    │   ├── services/         # Feature engineering, ML scoring orchestration
-    │   └── utils/            # Errors, metrics
+    │   ├── config/           # App config, Kafka config, logger
+    │   ├── consumers/        # Kafka transaction consumer
+    │   ├── controllers/      # Decision HTTP handlers
+    │   ├── db/               # PostgreSQL pool, migrations
+    │   ├── repositories/     # Decision DB operations
+    │   ├── routes/           # Decision routes, health, metrics endpoints
+    │   ├── services/         # Decision engine orchestration
+    │   └── utils/            # Metrics
+    │   └── index.js
     ├── .dockerignore
+    ├── .env
     ├── Dockerfile
+    ├── package-lock.json
     └── package.json
 ```
-
-Additional service in this repo: `decision-engine-service/` (Kafka consumer, decision logic, audit persistence, and decision query APIs).
 
 ---
 

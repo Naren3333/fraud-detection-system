@@ -78,6 +78,7 @@ services:
       kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic transaction.reviewed --partitions 3 --replication-factor 1
       kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic transaction.reversed --partitions 3 --replication-factor 1
       kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic transaction.dlq      --partitions 3 --replication-factor 1
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic notification.dlq --partitions 3 --replication-factor 1
       echo 'Topics created successfully!'
       kafka-topics --bootstrap-server kafka:9092 --list
       "
@@ -450,3 +451,66 @@ services:
       start_period: 20s
     restart: unless-stopped
     command: sh -c "npm run migrate && npm start"
+  # Notification Service
+  notification-service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    container_name: notification-service
+    networks: [fraud-net]
+    ports:
+      - "3006:3006"
+      - "9096:9096"  # Prometheus metrics
+    depends_on:
+      kafka:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV:              production
+      PORT:                  3006
+      SERVICE_NAME:          notification-service
+      SERVICE_VERSION:       1.0.0
+      LOG_LEVEL:             info
+      # Kafka
+      KAFKA_BROKERS:         kafka:9092
+      KAFKA_CLIENT_ID:       notification-service
+      KAFKA_GROUP_ID:        notification-group
+      KAFKA_INPUT_TOPIC_FINALISED: transaction.finalised
+      KAFKA_INPUT_TOPIC_FLAGGED:   transaction.flagged
+      KAFKA_DLQ_TOPIC:       notification.dlq
+      # Retry
+      RETRY_MAX_ATTEMPTS:    3
+      RETRY_INITIAL_DELAY_MS: 1000
+      RETRY_BACKOFF_MULTIPLIER: 2
+      RETRY_MAX_DELAY_MS:    10000
+      # Email (Mock mode - logs only)
+      EMAIL_ENABLED:         true
+      EMAIL_PROVIDER:        mock
+      EMAIL_FROM_ADDRESS:    noreply@frauddetection.com
+      EMAIL_FROM_NAME:       Fraud Detection System
+      # SMS (Mock mode - logs only)
+      SMS_ENABLED:           true
+      SMS_PROVIDER:          mock
+      # Notification Rules
+      NOTIFY_ON_APPROVED:    false
+      NOTIFY_ON_DECLINED:    true
+      NOTIFY_ON_FLAGGED:     true
+      DECLINED_NOTIFY_CUSTOMER_EMAIL:  true
+      DECLINED_NOTIFY_CUSTOMER_SMS:    true
+      DECLINED_NOTIFY_FRAUD_TEAM_EMAIL: true
+      FLAGGED_NOTIFY_FRAUD_TEAM_EMAIL:  true
+      FLAGGED_NOTIFY_FRAUD_TEAM_SMS:    false
+      # Rate Limiting
+      RATE_LIMIT_EMAIL_PER_MINUTE: 60
+      RATE_LIMIT_SMS_PER_MINUTE:   30
+      # Metrics
+      METRICS_ENABLED:       true
+      METRICS_PORT:          9096
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3006/api/v1/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped

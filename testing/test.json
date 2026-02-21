@@ -1,262 +1,186 @@
 {
   "info": {
-    "name": "Fraud Detection Platform",
-    "_postman_id": "fdp-collection-002",
-    "description": "Complete Postman collection for Fraud Detection Platform - API Gateway, User Service, Transaction Service, Fraud Detection Service, ML Scoring Service, and Decision Engine Service",
+    "name": "Fraud Detection Platform - Comprehensive",
+    "_postman_id": "fdp-collection-003",
+    "description": "Comprehensive Postman collection covering API Gateway, User, Transaction, Fraud, ML Scoring, Decision Engine, and Notification Service scenarios.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    {
-      "key": "baseUrl",
-      "value": "http://localhost:3000",
-      "type": "string"
-    },
-    {
-      "key": "accessToken",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "refreshToken",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "transactionId",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "userId",
-      "value": "",
-      "type": "string"
-    }
+    { "key": "baseUrl", "value": "http://localhost:3000", "type": "string" },
+    { "key": "userServiceUrl", "value": "http://localhost:3002", "type": "string" },
+    { "key": "transactionServiceUrl", "value": "http://localhost:3001", "type": "string" },
+    { "key": "fraudServiceUrl", "value": "http://localhost:3003", "type": "string" },
+    { "key": "mlServiceUrl", "value": "http://localhost:3004", "type": "string" },
+    { "key": "decisionServiceUrl", "value": "http://localhost:3005", "type": "string" },
+    { "key": "notificationServiceUrl", "value": "http://localhost:3006", "type": "string" },
+    { "key": "accessToken", "value": "", "type": "string" },
+    { "key": "refreshToken", "value": "", "type": "string" },
+    { "key": "userId", "value": "", "type": "string" },
+    { "key": "transactionId", "value": "", "type": "string" },
+    { "key": "highRiskTransactionId", "value": "", "type": "string" },
+    { "key": "customerId", "value": "", "type": "string" },
+    { "key": "testEmail", "value": "", "type": "string" },
+    { "key": "testPassword", "value": "SecurePass123!", "type": "string" },
+    { "key": "newPassword", "value": "NewSecurePass456!", "type": "string" },
+    { "key": "idempotencyKey", "value": "idem-fixed-001", "type": "string" }
   ],
   "item": [
     {
-      "name": "Authentication",
+      "name": "01 - Health and Metrics",
       "item": [
         {
-          "name": "Register New User",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/auth/register",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "register"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"john.doe@example.com\",\n  \"password\": \"SecurePass123!\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"role\": \"user\",\n  \"phone\": \"+6512345678\",\n  \"metadata\": {\n    \"department\": \"Engineering\"\n  }\n}"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "let json = pm.response.json();",
-                  "if (json.success && json.data && json.data.user) {",
-                  "  pm.collectionVariables.set('userId', json.data.user.user_id);",
-                  "  console.log('User registered with ID:', json.data.user.user_id);",
-                  "}"
-                ]
-              }
-            }
-          ]
+          "name": "Gateway Health",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/health" },
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('status 200', function(){ pm.response.to.have.status(200); });"] } }]
         },
         {
-          "name": "Login",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/auth/login",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "login"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"john.doe@example.com\",\n  \"password\": \"SecurePass123!\"\n}"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "let json = pm.response.json();",
-                  "if (json.success && json.data) {",
-                  "  pm.collectionVariables.set('accessToken', json.data.accessToken);",
-                  "  pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
-                  "  pm.collectionVariables.set('userId', json.data.user.user_id);",
-                  "  console.log('Logged in successfully. Token expires in 24h.');",
-                  "}"
-                ]
-              }
-            }
-          ]
+          "name": "Gateway Live",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/health/live" }
         },
         {
-          "name": "Refresh Access Token",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/auth/refresh",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "refresh"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "let json = pm.response.json();",
-                  "if (json.success && json.data) {",
-                  "  pm.collectionVariables.set('accessToken', json.data.accessToken);",
-                  "  console.log('Access token refreshed successfully.');",
-                  "}"
-                ]
-              }
-            }
-          ]
+          "name": "Gateway Ready",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/health/ready" }
         },
         {
-          "name": "Logout",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/auth/logout",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "logout"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
-            }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "if (pm.response.json().success) {",
-                  "  pm.collectionVariables.set('accessToken', '');",
-                  "  pm.collectionVariables.set('refreshToken', '');",
-                  "  console.log('Logged out successfully.');",
-                  "}"
-                ]
-              }
-            }
-          ]
+          "name": "Gateway Metrics",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/metrics" }
         },
         {
-          "name": "Validate Token",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/auth/validate",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "validate"
-              ]
-            }
-          }
+          "name": "User Service Health",
+          "request": { "method": "GET", "url": "{{userServiceUrl}}/api/v1/health" }
+        },
+        {
+          "name": "Transaction Service Health",
+          "request": { "method": "GET", "url": "{{transactionServiceUrl}}/api/v1/health" }
+        },
+        {
+          "name": "Fraud Service Health",
+          "request": { "method": "GET", "url": "{{fraudServiceUrl}}/api/v1/health" }
+        },
+        {
+          "name": "Fraud Service Metrics",
+          "request": { "method": "GET", "url": "{{fraudServiceUrl}}/api/v1/metrics" }
+        },
+        {
+          "name": "ML Service Health",
+          "request": { "method": "GET", "url": "{{mlServiceUrl}}/api/v1/health" }
+        },
+        {
+          "name": "ML Service Metrics",
+          "request": { "method": "GET", "url": "{{mlServiceUrl}}/api/v1/metrics" }
+        },
+        {
+          "name": "Decision Service Health",
+          "request": { "method": "GET", "url": "{{decisionServiceUrl}}/api/v1/health" }
+        },
+        {
+          "name": "Decision Service Metrics",
+          "request": { "method": "GET", "url": "{{decisionServiceUrl}}/api/v1/metrics" }
+        },
+        {
+          "name": "Notification Service Health",
+          "request": { "method": "GET", "url": "{{notificationServiceUrl}}/api/v1/health" }
+        },
+        {
+          "name": "Notification Service Metrics",
+          "request": { "method": "GET", "url": "{{notificationServiceUrl}}/api/v1/metrics" }
         }
       ]
     },
     {
-      "name": "User Profile",
+      "name": "02 - Auth Lifecycle",
       "item": [
         {
-          "name": "Get My Profile",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
+          "name": "Register",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "if (!pm.collectionVariables.get('testEmail')) {",
+                  "  pm.collectionVariables.set('testEmail', 'user_' + Date.now() + '@example.com');",
+                  "}"
+                ]
               }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/auth/profile",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "profile"
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('register success', function(){ pm.expect([200,201]).to.include(pm.response.code); });",
+                  "const json = pm.response.json();",
+                  "if (json.success && json.data && json.data.user) {",
+                  "  pm.collectionVariables.set('userId', json.data.user.user_id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\",\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\",\n  \"role\": \"user\",\n  \"phone\": \"+6512345678\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('login 200', function(){ pm.response.to.have.status(200); });",
+                "const json = pm.response.json();",
+                "pm.test('tokens present', function(){ pm.expect(json.data.accessToken).to.be.a('string'); pm.expect(json.data.refreshToken).to.be.a('string'); });",
+                "pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                "pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
+                "pm.collectionVariables.set('userId', json.data.user.user_id);"
               ]
             }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}" }
+          }
+        },
+        {
+          "name": "Validate Access Token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/v1/auth/validate"
+          }
+        },
+        {
+          "name": "Refresh Access Token",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('refresh 200', function(){ pm.response.to.have.status(200); });",
+                "const json = pm.response.json();",
+                "if (json.success && json.data && json.data.accessToken) { pm.collectionVariables.set('accessToken', json.data.accessToken); }"
+              ]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/v1/auth/refresh",
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}" }
+          }
+        },
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/v1/auth/profile"
           }
         },
         {
@@ -264,751 +188,424 @@
           "request": {
             "method": "PATCH",
             "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
             ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/auth/profile",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "profile"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Smith\",\n  \"phone\": \"+6587654321\",\n  \"metadata\": {\n    \"department\": \"Product\",\n    \"location\": \"Singapore\"\n  }\n}"
-            }
+            "url": "{{baseUrl}}/api/v1/auth/profile",
+            "body": { "mode": "raw", "raw": "{\n  \"firstName\": \"Updated\",\n  \"lastName\": \"User\",\n  \"metadata\": {\n    \"team\": \"fraud\"\n  }\n}" }
           }
         },
         {
           "name": "Change Password",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('password change success', function(){ pm.response.to.have.status(200); });"
+              ]
+            }
+          }],
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
             ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/auth/change-password",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "change-password"
-              ]
-            },
+            "url": "{{baseUrl}}/api/v1/auth/change-password",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"currentPassword\": \"SecurePass123!\",\n  \"newPassword\": \"NewSecurePass456!\"\n}"
+              "raw": "{\n  \"currentPassword\": \"{{testPassword}}\",\n  \"newPassword\": \"{{newPassword}}\"\n}"
             }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "if (pm.response.json().success) {",
-                  "  pm.collectionVariables.set('accessToken', '');",
-                  "  pm.collectionVariables.set('refreshToken', '');",
-                  "  console.log('Password changed. All tokens revoked. Please log in again.');",
-                  "}"
-                ]
-              }
+          }
+        },
+        {
+          "name": "Login With New Password",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('new login success', function(){ pm.response.to.have.status(200); });",
+                "const json = pm.response.json();",
+                "if (json.success && json.data) {",
+                "  pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                "  pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
+                "  pm.collectionVariables.set('testPassword', pm.collectionVariables.get('newPassword'));",
+                "}"
+              ]
             }
-          ]
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{newPassword}}\"\n}" }
+          }
+        },
+        {
+          "name": "Logout",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('logout success', function(){ pm.response.to.have.status(200); });",
+                "pm.collectionVariables.set('accessToken', '');",
+                "pm.collectionVariables.set('refreshToken', '');"
+              ]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/v1/auth/logout",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Forbidden Admin Route (Expected 403)",
+          "event": [{
+            "listen": "test",
+            "script": { "exec": ["pm.test('forbidden or unauthorized', function(){ pm.expect([401,403]).to.include(pm.response.code); });"] }
+          }],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/v1/auth/users/{{userId}}"
+          }
         }
       ]
     },
     {
-      "name": "Transactions",
+      "name": "03 - Transactions Core",
       "item": [
         {
-          "name": "Create Transaction",
+          "name": "Create Transaction (Happy Path)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('created', function(){ pm.response.to.have.status(201); });",
+                "const json = pm.response.json();",
+                "pm.collectionVariables.set('transactionId', json.data.transactionId);",
+                "pm.collectionVariables.set('customerId', json.data.customerId || 'cust_' + Date.now());"
+              ]
+            }
+          }],
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "X-Idempotency-Key",
-                "value": "{{$guid}}"
-              },
-              {
-                "key": "X-Correlation-ID",
-                "value": "corr-{{$timestamp}}"
-              }
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Idempotency-Key", "value": "txn-{{$guid}}" },
+              { "key": "X-Correlation-ID", "value": "corr-{{$timestamp}}" }
             ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/transactions",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "transactions"
-              ]
-            },
+            "url": "{{baseUrl}}/api/v1/transactions",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"customerId\": \"customer_{{$randomInt}}\",\n  \"merchantId\": \"merchant_{{$randomInt}}\",\n  \"amount\": {{$randomInt}}.00,\n  \"currency\": \"USD\",\n  \"cardNumber\": \"4111111111111111\",\n  \"cardType\": \"visa\",\n  \"deviceId\": \"device_{{$guid}}\",\n  \"ipAddress\": \"192.168.1.{{$randomInt}}\",\n  \"location\": {\n    \"country\": \"SG\",\n    \"city\": \"Singapore\"\n  },\n  \"metadata\": {\n    \"channel\": \"mobile\",\n    \"app_version\": \"2.1.0\"\n  }\n}"
+              "raw": "{\n  \"customerId\": \"customer_{{$randomInt}}\",\n  \"merchantId\": \"merchant_{{$randomInt}}\",\n  \"amount\": 120.55,\n  \"currency\": \"USD\",\n  \"cardNumber\": \"4111111111111111\",\n  \"cardType\": \"visa\",\n  \"deviceId\": \"device_{{$guid}}\",\n  \"ipAddress\": \"192.168.1.10\",\n  \"location\": {\n    \"country\": \"SG\",\n    \"city\": \"Singapore\"\n  },\n  \"metadata\": {\n    \"channel\": \"mobile\"\n  }\n}"
             }
-          },
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "exec": [
-                  "let json = pm.response.json();",
-                  "if (json.success && json.data) {",
-                  "  pm.collectionVariables.set('transactionId', json.data.transactionId);",
-                  "  console.log('Transaction created:', json.data.transactionId);",
-                  "}"
-                ]
-              }
-            }
-          ]
+          }
         },
         {
           "name": "Get Transaction By ID",
           "request": {
             "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/transactions/{{transactionId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "transactions",
-                "{{transactionId}}"
-              ]
-            }
-          }
-        },
-        {
-          "name": "Decision Engine - Get Decision By Transaction ID",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "http://localhost:3005/api/v1/decisions/{{transactionId}}",
-              "protocol": "http",
-              "host": [
-                "localhost"
-              ],
-              "port": "3005",
-              "path": [
-                "api",
-                "v1",
-                "decisions",
-                "{{transactionId}}"
-              ]
-            },
-            "description": "Fetches the persisted decision record for the transaction from Decision Engine Service"
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/v1/transactions/{{transactionId}}"
           }
         },
         {
           "name": "Get Transactions By Customer",
           "request": {
             "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": "{{baseUrl}}/api/v1/transactions/customer/{{customerId}}?limit=20&offset=0"
+          }
+        },
+        {
+          "name": "Idempotency - First Request",
+          "request": {
+            "method": "POST",
             "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Idempotency-Key", "value": "{{idempotencyKey}}" },
+              { "key": "X-Correlation-ID", "value": "idem-corr-001" }
             ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/transactions/customer/customer_123",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "transactions",
-                "customer",
-                "customer_123"
-              ]
+            "url": "{{baseUrl}}/api/v1/transactions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"customer_idempotent\",\n  \"merchantId\": \"merchant_idempotent\",\n  \"amount\": 250.00,\n  \"currency\": \"USD\",\n  \"cardNumber\": \"4111111111111111\",\n  \"cardType\": \"visa\"\n}"
             }
           }
         },
         {
-          "name": "Test Idempotency (Duplicate Request)",
+          "name": "Idempotency - Replay Same Request",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('idempotent replay', function(){ pm.expect([200,201]).to.include(pm.response.code); });",
+                "const json = pm.response.json();",
+                "pm.test('response contains idempotent flag', function(){ pm.expect(json).to.have.property('idempotent'); });"
+              ]
+            }
+          }],
           "request": {
             "method": "POST",
             "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "X-Idempotency-Key",
-                "value": "idempotent-test-key-001"
-              },
-              {
-                "key": "X-Correlation-ID",
-                "value": "idempotent-corr-001"
-              }
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Idempotency-Key", "value": "{{idempotencyKey}}" },
+              { "key": "X-Correlation-ID", "value": "idem-corr-001" }
             ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/transactions",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "transactions"
-              ]
-            },
+            "url": "{{baseUrl}}/api/v1/transactions",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"customerId\": \"customer_idempotent_test\",\n  \"merchantId\": \"merchant_test\",\n  \"amount\": 999.99,\n  \"currency\": \"USD\",\n  \"cardNumber\": \"4111111111111111\",\n  \"cardType\": \"visa\",\n  \"deviceId\": \"device_test\",\n  \"ipAddress\": \"192.168.1.1\"\n}"
+              "raw": "{\n  \"customerId\": \"customer_idempotent\",\n  \"merchantId\": \"merchant_idempotent\",\n  \"amount\": 250.00,\n  \"currency\": \"USD\",\n  \"cardNumber\": \"4111111111111111\",\n  \"cardType\": \"visa\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Create Transaction - Validation Error (Expected 400)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('validation failure', function(){ pm.expect([400,422]).to.include(pm.response.code); });"] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/v1/transactions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"bad_customer\",\n  \"merchantId\": \"bad_merchant\",\n  \"currency\": \"USD\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Create Transaction - Unauthorized (Expected 401)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('unauthorized', function(){ pm.expect([401,403]).to.include(pm.response.code); });"] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/v1/transactions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"noauth_customer\",\n  \"merchantId\": \"noauth_merchant\",\n  \"amount\": 10.00,\n  \"currency\": \"USD\"\n}"
             }
           }
         }
       ]
     },
     {
-      "name": "Health & Monitoring",
+      "name": "04 - Fraud and Decision Async Scenarios",
       "item": [
         {
-          "name": "API Gateway - Health",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/health",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "health"
+          "name": "Get Decision By Transaction ID (Eventually Consistent)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('decision endpoint responds', function(){ pm.expect([200,404]).to.include(pm.response.code); });",
+                "if (pm.response.code === 404) { console.log('Decision not ready yet. Retry in 2-5 seconds.'); }"
               ]
+            }
+          }],
+          "request": { "method": "GET", "url": "{{decisionServiceUrl}}/api/v1/decisions/{{transactionId}}" }
+        },
+        {
+          "name": "Decision Thresholds",
+          "request": { "method": "GET", "url": "{{decisionServiceUrl}}/api/v1/thresholds" }
+        },
+        {
+          "name": "Decision Stats (Last 24h)",
+          "request": { "method": "GET", "url": "{{decisionServiceUrl}}/api/v1/decisions/stats?since=24h" }
+        },
+        {
+          "name": "Create High-Risk Transaction (Decline Candidate)",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('created', function(){ pm.response.to.have.status(201); });",
+                "const json = pm.response.json();",
+                "if (json.success && json.data && json.data.transactionId) {",
+                "  pm.collectionVariables.set('highRiskTransactionId', json.data.transactionId);",
+                "  console.log('High-risk tx id:', json.data.transactionId);",
+                "}"
+              ]
+            }
+          }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Idempotency-Key", "value": "highrisk-{{$guid}}" },
+              { "key": "X-Correlation-ID", "value": "highrisk-{{$timestamp}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/transactions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"customer_highrisk\",\n  \"merchantId\": \"merchant_highrisk\",\n  \"amount\": 15000.00,\n  \"currency\": \"USD\",\n  \"cardNumber\": \"4111111111111111\",\n  \"cardType\": \"visa\",\n  \"deviceId\": \"device_highrisk\",\n  \"ipAddress\": \"192.168.1.99\",\n  \"location\": {\n    \"country\": \"NG\",\n    \"city\": \"Lagos\"\n  }\n}"
             }
           }
         },
         {
-          "name": "API Gateway - Liveness",
-          "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/health/live",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "health",
-                "live"
+          "name": "Get Decision for High-Risk Transaction",
+          "event": [{
+            "listen": "test",
+            "script": {
+              "exec": [
+                "pm.test('decision available or pending', function(){ pm.expect([200,404]).to.include(pm.response.code); });",
+                "if (pm.response.code === 200) {",
+                "  const json = pm.response.json();",
+                "  if (json.success && json.data && json.data.decision) {",
+                "    console.log('High-risk decision:', json.data.decision);",
+                "  }",
+                "}"
               ]
+            }
+          }],
+          "request": { "method": "GET", "url": "{{decisionServiceUrl}}/api/v1/decisions/{{highRiskTransactionId}}" }
+        }
+      ]
+    },
+    {
+      "name": "05 - ML Scoring Service Direct",
+      "item": [
+        {
+          "name": "ML Score Single Transaction",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('ml score success', function(){ pm.response.to.have.status(200); });"] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{mlServiceUrl}}/api/v1/score",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction\": {\n    \"id\": \"txn_ml_{{$timestamp}}\",\n    \"customerId\": \"customer_ml_001\",\n    \"merchantId\": \"merchant_ml_001\",\n    \"amount\": 3200.45,\n    \"currency\": \"USD\",\n    \"createdAt\": \"2026-02-21T10:00:00.000Z\",\n    \"location\": {\n      \"country\": \"SG\",\n      \"city\": \"Singapore\"\n    },\n    \"cardType\": \"visa\"\n  },\n  \"ruleResults\": {\n    \"flagged\": false,\n    \"ruleScore\": 22,\n    \"reasons\": [\"high amount\"],\n    \"riskFactors\": {\n      \"amount\": {\n        \"highAmount\": true\n      }\n    }\n  }\n}"
             }
           }
         },
         {
-          "name": "API Gateway - Readiness",
+          "name": "ML Score Batch",
           "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/health/ready",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "health",
-                "ready"
-              ]
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{mlServiceUrl}}/api/v1/score/batch",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactions\": [\n    {\n      \"id\": \"batch_txn_1\",\n      \"customerId\": \"cust_1\",\n      \"merchantId\": \"m_1\",\n      \"amount\": 100,\n      \"currency\": \"USD\",\n      \"createdAt\": \"2026-02-21T10:00:00.000Z\"\n    },\n    {\n      \"id\": \"batch_txn_2\",\n      \"customerId\": \"cust_2\",\n      \"merchantId\": \"m_2\",\n      \"amount\": 9000,\n      \"currency\": \"USD\",\n      \"createdAt\": \"2026-02-21T10:05:00.000Z\"\n    }\n  ],\n  \"ruleResults\": [\n    { \"flagged\": false, \"ruleScore\": 10, \"reasons\": [], \"riskFactors\": {} },\n    { \"flagged\": true, \"ruleScore\": 70, \"reasons\": [\"suspicious amount\"], \"riskFactors\": {} }\n  ]\n}"
             }
           }
         },
         {
-          "name": "Metrics (Prometheus)",
+          "name": "ML Model Info",
+          "request": { "method": "GET", "url": "{{mlServiceUrl}}/api/v1/model/info" }
+        }
+      ]
+    },
+    {
+      "name": "06 - Notification Service",
+      "item": [
+        {
+          "name": "Notification Live",
+          "request": { "method": "GET", "url": "{{notificationServiceUrl}}/api/v1/health/live" }
+        },
+        {
+          "name": "Notification Ready",
+          "request": { "method": "GET", "url": "{{notificationServiceUrl}}/api/v1/health/ready" }
+        },
+        {
+          "name": "Notification Health",
+          "request": { "method": "GET", "url": "{{notificationServiceUrl}}/api/v1/health" }
+        }
+      ]
+    },
+    {
+      "name": "07 - Rate Limit and Error Probes",
+      "item": [
+        {
+          "name": "Auth Rate Limit Probe (Run 6x quickly)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('expect 401 or 429', function(){ pm.expect([401,429]).to.include(pm.response.code); });"] } }],
           "request": {
-            "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/metrics",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "metrics"
-              ]
-            }
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"does-not-exist@example.com\",\n  \"password\": \"WrongPassword!\"\n}" }
           }
         },
         {
-          "name": "Fraud Detection - Health",
+          "name": "Login with Old Password After Change (Expected 401)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('old password fails', function(){ pm.expect([400,401]).to.include(pm.response.code); });"] } }],
           "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "http://localhost:3003/api/v1/health",
-              "protocol": "http",
-              "host": [
-                "localhost"
-              ],
-              "port": "3003",
-              "path": [
-                "api",
-                "v1",
-                "health"
-              ]
-            },
-            "description": "Full health check for fraud detection service including Redis and ML scoring circuit breaker state"
-          }
-        },
-        {
-          "name": "Fraud Detection - Liveness",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "http://localhost:3003/api/v1/health/live",
-              "protocol": "http",
-              "host": [
-                "localhost"
-              ],
-              "port": "3003",
-              "path": [
-                "api",
-                "v1",
-                "health",
-                "live"
-              ]
-            },
-            "description": "Kubernetes liveness probe - confirms process is alive"
-          }
-        },
-        {
-          "name": "Fraud Detection - Readiness",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "http://localhost:3003/api/v1/health/ready",
-              "protocol": "http",
-              "host": [
-                "localhost"
-              ],
-              "port": "3003",
-              "path": [
-                "api",
-                "v1",
-                "health",
-                "ready"
-              ]
-            },
-            "description": "Kubernetes readiness probe - confirms Redis dependency is available"
-          }
-        },
-        {
-          "name": "Fraud Detection - Metrics (Prometheus)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "http://localhost:3003/api/v1/metrics",
-              "protocol": "http",
-              "host": [
-                "localhost"
-              ],
-              "port": "3003",
-              "path": [
-                "api",
-                "v1",
-                "metrics"
-              ]
-            },
-            "description": "Prometheus metrics: transaction processing duration, risk score distribution, rule evaluations, ML scoring requests, circuit breaker state, Kafka consumer stats"
-          }
-        },
-        {
-          "name": "Decision Engine - Health",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "http://localhost:3005/api/v1/health",
-              "protocol": "http",
-              "host": [
-                "localhost"
-              ],
-              "port": "3005",
-              "path": [
-                "api",
-                "v1",
-                "health"
-              ]
-            },
-            "description": "Full health check for decision engine service including database dependency status"
-          }
-        },
-        {
-          "name": "Decision Engine - Liveness",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "http://localhost:3005/api/v1/health/live",
-              "protocol": "http",
-              "host": [
-                "localhost"
-              ],
-              "port": "3005",
-              "path": [
-                "api",
-                "v1",
-                "health",
-                "live"
-              ]
-            },
-            "description": "Kubernetes liveness probe for decision engine service"
-          }
-        },
-        {
-          "name": "Decision Engine - Readiness",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "http://localhost:3005/api/v1/health/ready",
-              "protocol": "http",
-              "host": [
-                "localhost"
-              ],
-              "port": "3005",
-              "path": [
-                "api",
-                "v1",
-                "health",
-                "ready"
-              ]
-            },
-            "description": "Kubernetes readiness probe for decision engine service database connectivity"
-          }
-        },
-        {
-          "name": "Decision Engine - Metrics (Prometheus)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "http://localhost:3005/api/v1/metrics",
-              "protocol": "http",
-              "host": [
-                "localhost"
-              ],
-              "port": "3005",
-              "path": [
-                "api",
-                "v1",
-                "metrics"
-              ]
-            },
-            "description": "Prometheus metrics for decision throughput, latency, Kafka consumer/publisher activity, and errors"
-          }
-        },
-        {
-          "name": "Decision Engine - Thresholds",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "http://localhost:3005/api/v1/thresholds",
-              "protocol": "http",
-              "host": [
-                "localhost"
-              ],
-              "port": "3005",
-              "path": [
-                "api",
-                "v1",
-                "thresholds"
-              ]
-            },
-            "description": "Returns current decision thresholds and confidence settings used by decision engine"
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"invalid_old_password\"\n}" }
           }
         }
       ]
     },
     {
-      "name": "Test Scenarios",
+      "name": "08 - End-to-End Smoke Flow",
       "item": [
         {
-          "name": "Full Flow - Register \u2192 Login \u2192 Create Transaction \u2192 Verify Decision",
-          "item": [
-            {
-              "name": "1. Register",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/api/v1/auth/register",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "auth",
-                    "register"
-                  ]
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"email\": \"testuser_{{$timestamp}}@example.com\",\n  \"password\": \"TestPass123!\",\n  \"firstName\": \"Test\",\n  \"lastName\": \"User\"\n}"
-                }
-              }
-            },
-            {
-              "name": "2. Login",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/api/v1/auth/login",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "auth",
-                    "login"
-                  ]
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"email\": \"testuser_{{$timestamp}}@example.com\",\n  \"password\": \"TestPass123!\"\n}"
-                }
-              },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "exec": [
-                      "let json = pm.response.json();",
-                      "if (json.success) {",
-                      "  pm.collectionVariables.set('accessToken', json.data.accessToken);",
-                      "}"
-                    ]
-                  }
-                }
-              ]
-            },
-            {
-              "name": "3. Create Transaction",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{accessToken}}"
-                  },
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  },
-                  {
-                    "key": "X-Idempotency-Key",
-                    "value": "flow-test-{{$guid}}"
-                  }
-                ],
-                "url": {
-                  "raw": "{{baseUrl}}/api/v1/transactions",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "transactions"
-                  ]
-                },
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"customerId\": \"flow_test_customer\",\n  \"merchantId\": \"flow_test_merchant\",\n  \"amount\": 5000.00,\n  \"currency\": \"USD\",\n  \"cardNumber\": \"4111111111111111\",\n  \"cardType\": \"visa\"\n}"
-                }
-              },
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "exec": [
-                      "let json = pm.response.json();",
-                      "if (json.success && json.data && json.data.transactionId) {",
-                      "  pm.collectionVariables.set('transactionId', json.data.transactionId);",
-                      "  console.log('Flow transaction created:', json.data.transactionId);",
-                      "}"
-                    ]
-                  }
-                }
-              ]
-            },
-            {
-              "name": "4. Verify Decision By Transaction ID",
-              "request": {
-                "method": "GET",
-                "url": {
-                  "raw": "http://localhost:3005/api/v1/decisions/{{transactionId}}",
-                  "protocol": "http",
-                  "host": [
-                    "localhost"
-                  ],
-                  "port": "3005",
-                  "path": [
-                    "api",
-                    "v1",
-                    "decisions",
-                    "{{transactionId}}"
-                  ]
-                },
-                "description": "Checks if the decision record has been persisted for the transaction. If immediate 404, retry after a short delay because processing is asynchronous."
-              }
-            }
-          ]
-        },
-        {
-          "name": "Rate Limit Test (Run 6x quickly)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/auth/login",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "login"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"wrong@example.com\",\n  \"password\": \"WrongPassword\"\n}"
-            }
-          }
-        },
-        {
-          "name": "High-Risk Transaction (Fraud Flag Expected)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              },
-              {
-                "key": "X-Idempotency-Key",
-                "value": "fraud-test-{{$guid}}"
-              },
-              {
-                "key": "X-Correlation-ID",
-                "value": "fraud-corr-{{$timestamp}}"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"customerId\": \"customer_test\",\n  \"merchantId\": \"merchant_test\",\n  \"amount\": 15000.0,\n  \"currency\": \"USD\",\n  \"cardNumber\": \"4111111111111111\",\n  \"cardType\": \"visa\",\n  \"deviceId\": \"device_test\",\n  \"ipAddress\": \"192.168.1.1\",\n  \"location\": {\n    \"country\": \"KP\",\n    \"city\": \"Pyongyang\"\n  },\n  \"metadata\": {\n    \"channel\": \"web\"\n  }\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/v1/transactions",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "transactions"
-              ]
-            },
-            "description": "Sends a transaction designed to trigger multiple fraud rules:\n- Amount $15,000 exceeds suspicious threshold ($10,000) \u2192 +30 rule score\n- Country KP (North Korea) is in high-risk list \u2192 +25 rule score\n- Round amount heuristic \u2192 +5 rule score\nExpected: flagged=true in fraud-detection-service logs, then FLAGGED decision in decision-engine-service output\n\nVerify result:\n  docker logs fraud-detection-service --tail 10\n  docker logs decision-engine-service --tail 10\n  docker logs transaction-service --tail 10\n\nOr consume topics:\n  docker exec -it kafka kafka-console-consumer --bootstrap-server kafka:9092 --topic transaction.scored --from-beginning\n  docker exec -it kafka kafka-console-consumer --bootstrap-server kafka:9092 --topic transaction.flagged --from-beginning"
-          },
+          "name": "Step 1 - Register Fresh User",
           "event": [
             {
-              "listen": "test",
+              "listen": "prerequest",
               "script": {
                 "exec": [
-                  "let json = pm.response.json();",
-                  "if (json.success && json.data) {",
-                  "  pm.collectionVariables.set('transactionId', json.data.transactionId);",
-                  "  console.log('High-risk transaction created:', json.data.transactionId);",
-                  "  console.log('Check fraud-detection-service, decision-engine-service, and transaction-service logs for final decision processing');",
-                  "}"
-                ],
-                "type": "text/javascript"
+                  "pm.collectionVariables.set('testEmail', 'smoke_' + Date.now() + '@example.com');",
+                  "pm.collectionVariables.set('testPassword', 'SecurePass123!');"
+                ]
               }
             }
-          ]
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\",\n  \"firstName\": \"Smoke\",\n  \"lastName\": \"Test\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Step 2 - Login",
+          "event": [{ "listen": "test", "script": { "exec": ["const json = pm.response.json(); if (json.success) { pm.collectionVariables.set('accessToken', json.data.accessToken); }", "pm.test('login ok', function(){ pm.response.to.have.status(200); });"] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/api/v1/auth/login",
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}" }
+          }
+        },
+        {
+          "name": "Step 3 - Create Transaction",
+          "event": [{ "listen": "test", "script": { "exec": ["const json = pm.response.json(); if (json.success && json.data) { pm.collectionVariables.set('transactionId', json.data.transactionId); }", "pm.test('txn created', function(){ pm.response.to.have.status(201); });"] } }],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Idempotency-Key", "value": "smoke-{{$guid}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/transactions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerId\": \"smoke_customer\",\n  \"merchantId\": \"smoke_merchant\",\n  \"amount\": 500.00,\n  \"currency\": \"USD\",\n  \"cardNumber\": \"4111111111111111\",\n  \"cardType\": \"visa\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Step 4 - Verify Decision (Retry if 404)",
+          "event": [{ "listen": "test", "script": { "exec": ["pm.test('decision available or pending', function(){ pm.expect([200,404]).to.include(pm.response.code); });", "if (pm.response.code === 404) { console.log('Decision not persisted yet. Retry this request after a short delay.'); }"] } }],
+          "request": { "method": "GET", "url": "{{decisionServiceUrl}}/api/v1/decisions/{{transactionId}}" }
         }
       ]
     }

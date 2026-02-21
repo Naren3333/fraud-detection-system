@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fraud Detection Analytics</title>
+  <link rel="stylesheet" href="/css/dracula.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>Fraud Detection Analytics<span class="realtime-badge">● LIVE</span></h1>
+      <p>Real-time transaction monitoring and risk assessment dashboard</p>
+    </div>
+
+    <!-- Time Range Selector -->
+    <div class="time-selector">
+      <button class="time-btn" onclick="setTimeRange('1h')">Last Hour</button>
+      <button class="time-btn active" onclick="setTimeRange('24h')">Last 24 Hours</button>
+      <button class="time-btn" onclick="setTimeRange('7d')">Last 7 Days</button>
+      <button class="time-btn" onclick="setTimeRange('30d')">Last 30 Days</button>
+    </div>
+
+    <!-- Real-Time Stats (Updated every 5s) -->
+    <div class="stats-grid" id="realtime-stats">
+      <div class="stat-card cyan">
+        <div class="stat-label">Total Transactions</div>
+        <div class="stat-value cyan" id="rt-total">0</div>
+        <div class="stat-change">Last 5 minutes</div>
+      </div>
+
+      <div class="stat-card green">
+        <div class="stat-label">Approved</div>
+        <div class="stat-value green" id="rt-approved">0</div>
+        <div class="stat-change">Auto-approved</div>
+      </div>
+
+      <div class="stat-card red">
+        <div class="stat-label">Declined</div>
+        <div class="stat-value red" id="rt-declined">0</div>
+        <div class="stat-change">Fraud detected</div>
+      </div>
+
+      <div class="stat-card orange">
+        <div class="stat-label">Flagged</div>
+        <div class="stat-value orange" id="rt-flagged">0</div>
+        <div class="stat-change">Manual review</div>
+      </div>
+
+      <div class="stat-card purple">
+        <div class="stat-label">Avg Risk Score</div>
+        <div class="stat-value purple" id="rt-avg-score">0</div>
+        <div class="stat-change">Out of 100</div>
+      </div>
+    </div>
+
+    <!-- Overview Stats -->
+    <div class="stats-grid" id="overview-stats">
+      <div class="stat-card">
+        <div class="stat-label">Total Decisions</div>
+        <div class="stat-value" id="total-transactions">Loading...</div>
+        <div class="stat-change">Selected time range</div>
+      </div>
+
+      <div class="stat-card green">
+        <div class="stat-label">Approval Rate</div>
+        <div class="stat-value green" id="approval-rate">--%</div>
+        <div class="stat-change" id="approved-count">0 approved</div>
+      </div>
+
+      <div class="stat-card red">
+        <div class="stat-label">Decline Rate</div>
+        <div class="stat-value red" id="decline-rate">--%</div>
+        <div class="stat-change" id="declined-count">0 declined</div>
+      </div>
+
+      <div class="stat-card orange">
+        <div class="stat-label">Flag Rate</div>
+        <div class="stat-value orange" id="flag-rate">--%</div>
+        <div class="stat-change" id="flagged-count">0 flagged</div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-title">Decisions Over Time</div>
+        <div class="chart-container">
+          <canvas id="timeSeriesChart"></canvas>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">Decision Distribution</div>
+        <div class="chart-container">
+          <canvas id="decisionPieChart"></canvas>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">Risk Score Distribution</div>
+        <div class="chart-container">
+          <canvas id="riskScoreChart"></canvas>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">Processing Performance</div>
+        <div class="chart-container">
+          <canvas id="performanceChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top Customers Table -->
+    <div class="table-card">
+      <div class="chart-title">Top Customers by Transaction Volume</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Customer ID</th>
+            <th>Transactions</th>
+            <th>Declined</th>
+            <th>Flagged</th>
+            <th>Avg Risk Score</th>
+          </tr>
+        </thead>
+        <tbody id="top-customers-body">
+          <tr><td colspan="5" class="loading"><div class="spinner"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Top Merchants Table -->
+    <div class="table-card">
+      <div class="chart-title">Top Merchants by Transaction Volume</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Merchant ID</th>
+            <th>Transactions</th>
+            <th>Declined</th>
+            <th>Avg Risk Score</th>
+          </tr>
+        </thead>
+        <tbody id="top-merchants-body">
+          <tr><td colspan="4" class="loading"><div class="spinner"></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p>Fraud Detection Analytics Dashboard | Powered by Enterprise ML & Decision Engine</p>
+      <p>WebSocket Status: <span id="ws-status" style="color: #50fa7b;">Connected</span></p>
+    </div>
+  </div>
+
+  <script src="/js/dashboard.js"></script>
+</body>
+</html>

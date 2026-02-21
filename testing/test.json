@@ -2,7 +2,7 @@
   "info": {
     "name": "Fraud Detection Platform - Comprehensive",
     "_postman_id": "fdp-collection-003",
-    "description": "Comprehensive Postman collection covering API Gateway, User, Transaction, Fraud, ML Scoring, Decision Engine, and Notification Service scenarios.",
+    "description": "Comprehensive Postman collection covering API Gateway, User, Transaction, Fraud, ML Scoring, Decision Engine, Notification Service, and Analytics Dashboard scenarios.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -13,6 +13,7 @@
     { "key": "mlServiceUrl", "value": "http://localhost:3004", "type": "string" },
     { "key": "decisionServiceUrl", "value": "http://localhost:3005", "type": "string" },
     { "key": "notificationServiceUrl", "value": "http://localhost:3006", "type": "string" },
+    { "key": "analyticsServiceUrl", "value": "http://localhost:3008", "type": "string" },
     { "key": "accessToken", "value": "", "type": "string" },
     { "key": "refreshToken", "value": "", "type": "string" },
     { "key": "userId", "value": "", "type": "string" },
@@ -84,6 +85,18 @@
         {
           "name": "Notification Service Metrics",
           "request": { "method": "GET", "url": "{{notificationServiceUrl}}/api/v1/metrics" }
+        },
+        {
+          "name": "Analytics Service Health",
+          "request": { "method": "GET", "url": "{{analyticsServiceUrl}}/api/v1/health" }
+        },
+        {
+          "name": "Analytics Dashboard API",
+          "request": { "method": "GET", "url": "{{analyticsServiceUrl}}/api/v1/analytics/dashboard?timeRange=24h" }
+        },
+        {
+          "name": "Analytics Dashboard UI (Open in Browser)",
+          "request": { "method": "GET", "url": "{{analyticsServiceUrl}}/" }
         }
       ]
     },

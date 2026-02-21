@@ -22,7 +22,9 @@ docker compose up --build -d
 2. Import `testing/test.json`.
 3. Use collection variables (already embedded in the collection):
    - `baseUrl = http://localhost:3000`
-   - direct service URLs for ports 3001-3006 are preconfigured.
+   - direct service URLs for ports 3001-3006 and 3008 are preconfigured.
+4. Open Analytics Dashboard UI in browser:
+   - `http://localhost:3008`
 
 ## 3. Collection Structure (Run Order)
 
@@ -50,6 +52,7 @@ Checks health/live/ready/metrics endpoints for:
 - ML scoring service (`:3004`)
 - Decision engine service (`:3005`)
 - Notification service (`:3006`)
+- Analytics service (`:3008`)
 
 Expected: HTTP `200` for healthy services.
 
@@ -153,6 +156,7 @@ Tail service logs when running async scenarios:
 docker logs fraud-detection-service --tail 50
 docker logs decision-engine-service --tail 50
 docker logs notification-service --tail 50
+docker logs analytics-service --tail 50
 ```
 
 Check running containers:

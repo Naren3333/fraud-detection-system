@@ -2,7 +2,7 @@
   "info": {
     "name": "Fraud Detection Platform - Comprehensive",
     "_postman_id": "fdp-collection-003",
-    "description": "Comprehensive Postman collection covering API Gateway, User, Transaction, Fraud, ML Scoring, Decision Engine, Notification Service, and Analytics Dashboard scenarios.",
+    "description": "Comprehensive Postman collection covering API Gateway, User, Transaction, Fraud, ML Scoring, Decision Engine, Notification Service, Audit Service, and Analytics Dashboard scenarios.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -13,6 +13,7 @@
     { "key": "mlServiceUrl", "value": "http://localhost:3004", "type": "string" },
     { "key": "decisionServiceUrl", "value": "http://localhost:3005", "type": "string" },
     { "key": "notificationServiceUrl", "value": "http://localhost:3006", "type": "string" },
+    { "key": "auditServiceUrl", "value": "http://localhost:3007", "type": "string" },
     { "key": "analyticsServiceUrl", "value": "http://localhost:3008", "type": "string" },
     { "key": "accessToken", "value": "", "type": "string" },
     { "key": "refreshToken", "value": "", "type": "string" },
@@ -85,6 +86,18 @@
         {
           "name": "Notification Service Metrics",
           "request": { "method": "GET", "url": "{{notificationServiceUrl}}/api/v1/metrics" }
+        },
+        {
+          "name": "Audit Service Health",
+          "request": { "method": "GET", "url": "{{auditServiceUrl}}/api/v1/health" }
+        },
+        {
+          "name": "Audit Service Live",
+          "request": { "method": "GET", "url": "{{auditServiceUrl}}/api/v1/health/live" }
+        },
+        {
+          "name": "Audit Service Metrics",
+          "request": { "method": "GET", "url": "{{auditServiceUrl}}/api/v1/metrics" }
         },
         {
           "name": "Analytics Service Health",
@@ -563,7 +576,44 @@
       ]
     },
     {
-      "name": "08 - End-to-End Smoke Flow",
+      "name": "08 - Audit Service",
+      "item": [
+        {
+          "name": "Audit Stats (Last 24h)",
+          "request": { "method": "GET", "url": "{{auditServiceUrl}}/api/v1/audit/stats" }
+        },
+        {
+          "name": "Audit Trail By Transaction",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-User-Id", "value": "postman-tester" }],
+            "url": "{{auditServiceUrl}}/api/v1/audit/transaction/{{transactionId}}?includePayload=true&reason=postman-test"
+          }
+        },
+        {
+          "name": "Audit Trail By Customer",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-User-Id", "value": "postman-tester" }],
+            "url": "{{auditServiceUrl}}/api/v1/audit/customer/{{customerId}}?limit=50&reason=postman-test"
+          }
+        },
+        {
+          "name": "Verify Audit Chain (Event Range)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{auditServiceUrl}}/api/v1/audit/verify",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"startEventId\": 1,\n  \"endEventId\": 100\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 - End-to-End Smoke Flow",
       "item": [
         {
           "name": "Step 1 - Register Fresh User",

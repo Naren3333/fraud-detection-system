@@ -49,19 +49,27 @@ class FeatureEngineer {
 
     // ─── Rule-Based Features (from fraud detection service) ─────────────────
     features.rules_flagged = ruleResults.flagged ? 1 : 0;
-    features.rules_score = ruleResults.ruleScore || 0;
-    features.rules_reason_count = ruleResults.reasons?.length || 0;
+    const rawRuleScore = ruleResults.ruleScore || 0;
+    const rawRuleReasonCount = ruleResults.reasons?.length || 0;
+    // Keep rule-derived continuous features in bounded ranges for stable model output.
+    features.rules_score = Math.min(rawRuleScore / 100, 1);
+    features.rules_reason_count = Math.min(rawRuleReasonCount / 10, 1);
 
     // Velocity features from rules
     const velocityFactors = ruleResults.riskFactors?.velocity || {};
-    features.velocity_txn_hour = velocityFactors.customerTransactionsLastHour || 0;
-    features.velocity_amount_hour = velocityFactors.customerAmountLastHour || 0;
-    features.velocity_txn_day = velocityFactors.customerTransactionsLastDay || 0;
+    const rawVelocityTxnHour = velocityFactors.customerTransactionsLastHour || 0;
+    const rawVelocityAmountHour = velocityFactors.customerAmountLastHour || 0;
+    const rawVelocityTxnDay = velocityFactors.customerTransactionsLastDay || 0;
+
+    // Normalize raw velocity magnitudes to 0-1 to avoid overpowering the model logit.
+    features.velocity_txn_hour = Math.min(rawVelocityTxnHour / 10, 1);
+    features.velocity_amount_hour = Math.min(rawVelocityAmountHour / 10000, 1);
+    features.velocity_txn_day = Math.min(rawVelocityTxnDay / 50, 1);
 
     // Normalize velocity features with decay function
-    features.velocity_txn_hour_norm = this._normalizeVelocity(features.velocity_txn_hour, 10);
-    features.velocity_amount_hour_norm = this._normalizeVelocity(features.velocity_amount_hour, 10000);
-    features.velocity_txn_day_norm = this._normalizeVelocity(features.velocity_txn_day, 50);
+    features.velocity_txn_hour_norm = this._normalizeVelocity(rawVelocityTxnHour, 10);
+    features.velocity_amount_hour_norm = this._normalizeVelocity(rawVelocityAmountHour, 10000);
+    features.velocity_txn_day_norm = this._normalizeVelocity(rawVelocityTxnDay, 50);
 
     // Geography risk from rules
     const geoFactors = ruleResults.riskFactors?.geography || {};

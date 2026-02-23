@@ -1,5 +1,6 @@
 const logger = require('../config/logger');
 
+// Handles request logger.
 const requestLogger = (req, res, next) => {
   const startTime = Date.now();
 

@@ -4,10 +4,7 @@ const featureEngineer = require('./featureEngineer');
 const fraudModel = require('../models/fraudModel');
 const { getClient } = require('../config/redis');
 
-/**
- * Enterprise ML Scoring Service
- * Orchestrates feature engineering, model inference, and result caching
- */
+
 class MLScoringService {
   constructor() {
     this.requestCount = 0;
@@ -15,14 +12,8 @@ class MLScoringService {
     this.cacheMisses = 0;
   }
 
-  /**
-   * Score a transaction with full feature engineering and model inference.
-   * 
-   * @param {object} transaction - Raw transaction data
-   * @param {object} ruleResults - Results from fraud detection rules engine
-   * @param {object} childLogger - Optional correlation-aware logger
-   * @returns {object} - { score, probability, confidence, modelVersion, features, explanation }
-   */
+  
+  // Handles score.
   async score(transaction, ruleResults, childLogger = null) {
     const log = childLogger || logger;
     const startTime = Date.now();
@@ -32,7 +23,6 @@ class MLScoringService {
     const cacheKey = this._getCacheKey(transaction, ruleResults);
 
     try {
-      // ─── Cache Check ───────────────────────────────────────────────────────
       const cached = await this._getFromCache(cacheKey);
       if (cached) {
         this.cacheHits++;
@@ -45,8 +35,6 @@ class MLScoringService {
       }
 
       this.cacheMisses++;
-
-      // ─── Feature Engineering ───────────────────────────────────────────────
       log.debug('Extracting features', { transactionId });
       const featureData = featureEngineer.extract(transaction, ruleResults);
       featureEngineer.validate(featureData);
@@ -56,15 +44,9 @@ class MLScoringService {
         featureCount: featureData.featureCount,
         featureVersion: featureData.featureVersion,
       });
-
-      // ─── Model Inference ───────────────────────────────────────────────────
       log.debug('Running model inference', { transactionId });
       const prediction = fraudModel.predict(featureData.features);
-
-      // ─── Explainability ────────────────────────────────────────────────────
       const explanation = fraudModel.explain(featureData.features, prediction);
-
-      // ─── Build Response ────────────────────────────────────────────────────
       const result = {
         score: prediction.score,
         probability: prediction.probability,
@@ -82,8 +64,6 @@ class MLScoringService {
           matchedFeatures: prediction.matchedFeatures,
         },
       };
-
-      // ─── Cache Result ──────────────────────────────────────────────────────
       await this._saveToCache(cacheKey, result);
 
       const durationMs = Date.now() - startTime;
@@ -112,9 +92,8 @@ class MLScoringService {
     }
   }
 
-  /**
-   * Batch scoring for multiple transactions (future enhancement)
-   */
+  
+  // Handles score batch.
   async scoreBatch(transactions, ruleResultsArray) {
     if (transactions.length > config.performance.maxBatchSize) {
       throw new Error(`Batch size ${transactions.length} exceeds maximum ${config.performance.maxBatchSize}`);
@@ -132,9 +111,8 @@ class MLScoringService {
     return results;
   }
 
-  /**
-   * Get service statistics
-   */
+  
+  // Handles get stats.
   getStats() {
     return {
       requestCount: this.requestCount,
@@ -148,16 +126,14 @@ class MLScoringService {
     };
   }
 
-  // ─── Cache Helpers ───────────────────────────────────────────────────────
-
+  // Handles get cache key.
   _getCacheKey(transaction, ruleResults) {
-    // Hash of transaction ID + rules hash (for cache invalidation on rule changes)
     const rulesHash = this._hashRules(ruleResults);
     return `ml_score:${transaction.id}:${rulesHash}`;
   }
 
+  // Handles hash rules.
   _hashRules(ruleResults) {
-    // Simple hash of rule results for cache key
     const parts = [
       ruleResults.flagged ? '1' : '0',
       ruleResults.ruleScore || 0,
@@ -166,6 +142,7 @@ class MLScoringService {
     return parts.join(':');
   }
 
+  // Handles get from cache.
   async _getFromCache(key) {
     try {
       const redis = getClient();
@@ -179,6 +156,7 @@ class MLScoringService {
     return null;
   }
 
+  // Handles save to cache.
   async _saveToCache(key, result) {
     try {
       const redis = getClient();

@@ -1,13 +1,12 @@
 const winston = require('winston');
 const config = require('./index');
-
-// PII fields that should never appear in logs
 const REDACTED_FIELDS = new Set([
   'password', 'cardNumber', 'cvv', 'ssn', 'accountNumber',
   'authorization', 'token', 'secret', 'apiKey', 'privateKey',
   'cardLastFour', 'cardBin', 'deviceId',
 ]);
 
+// Handles redact.
 const redact = (obj, depth = 0) => {
   if (depth > 6 || obj === null || typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) return obj.map((item) => redact(item, depth + 1));

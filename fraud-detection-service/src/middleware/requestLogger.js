@@ -1,9 +1,7 @@
 const logger = require('../config/logger');
 
-/**
- * Structured HTTP access log middleware.
- * Logs method, path, status, duration, and correlation ID for every request.
- */
+
+// Handles request logger.
 const requestLogger = (req, res, next) => {
   const startTime = Date.now();
 

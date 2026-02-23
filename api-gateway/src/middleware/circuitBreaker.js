@@ -6,6 +6,7 @@ const { ServiceUnavailableError } = require('../utils/errors');
 
 const circuitBreakers = new Map();
 
+// Handles create circuit breaker.
 const createCircuitBreaker = (serviceName, action, options = {}) => {
   const defaultOptions = {
     timeout: config.circuitBreaker.timeout,
@@ -15,8 +16,6 @@ const createCircuitBreaker = (serviceName, action, options = {}) => {
   };
 
   const breaker = new CircuitBreaker(action, { ...defaultOptions, ...options });
-
-  // Event listeners
   breaker.on('open', () => {
     logger.warn(`Circuit breaker opened for ${serviceName}`);
     MetricsService.setCircuitBreakerState(serviceName, 'OPEN');
@@ -58,10 +57,12 @@ const createCircuitBreaker = (serviceName, action, options = {}) => {
   return breaker;
 };
 
+// Handles get circuit breaker.
 const getCircuitBreaker = (serviceName) => {
   return circuitBreakers.get(serviceName);
 };
 
+// Handles with circuit breaker.
 const withCircuitBreaker = (serviceName) => {
   return async (req, res, next) => {
     try {

@@ -4,8 +4,6 @@ const { Kafka } = require('kafkajs');
 const config = require('../config');
 const logger = require('../config/logger');
 const transactionRepository = require('../repositories/transactionRepository');
-
-// Maps decision engine decisions to transaction statuses
 const DECISION_TO_STATUS = {
   APPROVED: 'APPROVED',
   DECLINED: 'REJECTED',
@@ -16,6 +14,7 @@ let consumer = null;
 let isRunning = false;
 
 
+// Handles start.
 const start = async () => {
   if (isRunning) {
     logger.warn('Decision consumer already running');
@@ -69,6 +68,7 @@ const start = async () => {
 };
 
 
+// Handles stop.
 const stop = async () => {
   if (!isRunning || !consumer) return;
   isRunning = false;
@@ -78,6 +78,7 @@ const stop = async () => {
 };
 
 
+// Handles handle message.
 const handleMessage = async ({ topic, partition, message, heartbeat }) => {
   const offset = message.offset;
   let transactionId = null;
@@ -149,12 +150,12 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
       error: err.message,
       stack: err.stack,
     });
-    // Still commit - a bad message should not block the partition forever
     await commitOffset(topic, partition, offset);
   }
 };
 
 
+// Handles commit offset.
 const commitOffset = async (topic, partition, offset) => {
   if (!consumer) return;
   try {

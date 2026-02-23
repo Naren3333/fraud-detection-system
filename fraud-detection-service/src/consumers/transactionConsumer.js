@@ -13,6 +13,7 @@ let consumer = null;
 let producer = null;
 let isRunning = false;
 
+// Handles start.
 const start = async () => {
   if (isRunning) {
     logger.warn('Transaction consumer already running');
@@ -20,8 +21,6 @@ const start = async () => {
   }
 
   logger.info('Starting transaction consumer...');
-
-  // Producer must be ready before consumer starts so we can publish results
   producer = await createProducer();
   logger.info('Kafka producer ready');
 
@@ -34,7 +33,6 @@ const start = async () => {
   logger.info('Subscribed to input topic', { topic: config.kafka.inputTopic });
 
   await consumer.run({
-    // Manual offset commits - we only commit AFTER successfully publishing results
     autoCommit: false,
     eachMessage: async ({ topic, partition, message, heartbeat, commitOffsetsIfNecessary }) => {
       await handleMessage({ topic, partition, message, heartbeat, commitOffsetsIfNecessary });
@@ -49,6 +47,7 @@ const start = async () => {
   });
 };
 
+// Handles stop.
 const stop = async () => {
   if (!isRunning) return;
 
@@ -84,8 +83,7 @@ const stop = async () => {
   }
 };
 
-// ─── Message Handler ─────────────────────────────────────────────────────────
-
+// Handles handle message.
 const handleMessage = async ({ topic, partition, message, heartbeat }) => {
   const startTime = Date.now();
   const offset = message.offset;
@@ -93,7 +91,6 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
   let correlationId = null;
 
   try {
-    // ── Parse ────────────────────────────────────────────────────────────────
     const raw = message.value?.toString();
     if (!raw) {
       logger.warn('Received empty Kafka message - skipping', { partition, offset });
@@ -116,13 +113,7 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
       await commitOffset(partition, offset);
       return;
     }
-
-    // ── FIXED: Extract transaction correctly ────────────────────────────────
-    // Transaction service publishes with this structure:
-    // { data: { transactionId, customerId, ... }, correlationId: "..." }
     transaction = data.data || data.transaction || data;
-    
-    // Normalize transaction.id field
     if (!transaction.id && transaction.transactionId) {
       transaction.id = transaction.transactionId;
     }
@@ -137,8 +128,6 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
       transactionId: transaction?.id || transaction?.transactionId,
       correlationId,
     });
-
-    // ── Validate ─────────────────────────────────────────────────────────────
     const validationError = validateTransaction(transaction);
     if (validationError) {
       logger.error('Invalid transaction payload - sending to DLQ', {
@@ -160,8 +149,6 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
       kafkaMessagesConsumed.inc({ topic, status: 'dlq' });
       return;
     }
-
-    // Periodic heartbeat to prevent session timeout on slow ML calls
     await heartbeat();
 
     logger.info('Processing transaction', {
@@ -172,18 +159,12 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
       partition,
       offset,
     });
-
-    // ── Analyse ──────────────────────────────────────────────────────────────
     const fraudResults = await fraudDetectionService.analyzeTransaction(transaction, correlationId);
-
-    // Heartbeat again after analysis (can take seconds)
     await heartbeat();
-
-    // ── Publish Result ───────────────────────────────────────────────────────
     await publish(
       producer,
       config.kafka.outputTopic,
-      transaction.customerId, // Partition by customer to preserve ordering
+      transaction.customerId,
       {
         eventType: 'transaction.scored',
         transactionId: transaction.id,
@@ -198,9 +179,6 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
         'x-source-service': config.serviceName,
       }
     );
-
-    // ── Commit Offset ────────────────────────────────────────────────────────
-    // Only commit AFTER successfully publishing - guarantees at-least-once delivery
     await commitOffset(partition, offset);
 
     const durationMs = Date.now() - startTime;
@@ -249,13 +227,11 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
         offset,
       });
       errorsTotal.inc({ component: 'transaction_consumer', type: 'dlq_failure' });
-      // Do NOT commit - Kafka will redeliver this message on restart
     }
   }
 };
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
+// Handles commit offset.
 const commitOffset = async (partition, offset) => {
   if (!consumer) return;
   try {
@@ -277,6 +253,7 @@ const commitOffset = async (partition, offset) => {
   }
 };
 
+// Handles send to dlq.
 const sendToDlq = async ({ raw, transaction, correlationId, reason, error, partition, offset }) => {
   const dlqPayload = {
     eventType: 'transaction.fraud.dlq',
@@ -313,6 +290,7 @@ const sendToDlq = async ({ raw, transaction, correlationId, reason, error, parti
   });
 };
 
+// Handles validate transaction.
 const validateTransaction = (transaction) => {
   if (!transaction) return 'Transaction payload is null or undefined';
   if (!transaction.id) return 'Missing required field: id';
@@ -321,7 +299,7 @@ const validateTransaction = (transaction) => {
   if (transaction.amount < 0) return 'Field amount must be non-negative';
   if (!transaction.currency) return 'Missing required field: currency';
   if (!transaction.createdAt) return 'Missing required field: createdAt';
-  return null; // valid
+  return null;
 };
 
 module.exports = { start, stop };

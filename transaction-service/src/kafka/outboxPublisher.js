@@ -1,20 +1,4 @@
-/**
- Transactional Outbox Pattern relay.
 
-If we publish to Kafka directly inside the HTTP handler and Kafka is down,
-the transaction is saved to DB but the event is lost forever.
- 
-Solution:
-   1. The repository writes the Kafka event to the `outbox_events` table
-      IN THE SAME DB TRANSACTION as the transaction INSERT (atomic).
-   2. This background worker polls `outbox_events` every second and publishes
-      pending rows to Kafka.
-   3. On success → mark PUBLISHED. On failure → increment attempts.
-   4. After MAX_ATTEMPTS → mark FAILED (ops alert, manual intervention).
- 
-SKIP LOCKED ensures multiple instances of this service don't fight over
-the same rows (safe for horizontal scaling).
- */
 const { query }          = require('../db/pool');
 const { publish, isProducerReady } = require('./producer');
 const logger             = require('../config/logger');
@@ -26,6 +10,7 @@ const MAX_ATTEMPTS = 5;
 let timer = null;
 let inFlight = false;
 
+// Handles poll.
 const poll = async () => {
   if (inFlight || !isProducerReady()) return;
   inFlight = true;
@@ -66,11 +51,13 @@ const poll = async () => {
   }
 };
 
+// Handles start outbox publisher.
 const startOutboxPublisher = () => {
   logger.info('Outbox publisher started', { pollMs: POLL_MS });
   timer = setInterval(poll, POLL_MS);
 };
 
+// Handles stop outbox publisher.
 const stopOutboxPublisher = () => {
   if (timer) { clearInterval(timer); timer = null; logger.info('Outbox publisher stopped'); }
 };

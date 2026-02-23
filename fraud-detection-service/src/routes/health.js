@@ -2,8 +2,7 @@ const router = require('express').Router();
 const { getClient: getRedisClient } = require('../config/redis');
 const mlScoringClient = require('../services/mlScoringClient');
 const logger = require('../config/logger');
-
-// Full dependency check - used by load balancers and monitoring systems.
+// Handles GET /health.
 router.get('/health', async (req, res) => {
   const health = {
     status: 'healthy',
@@ -18,8 +17,6 @@ router.get('/health', async (req, res) => {
   };
 
   let degraded = false;
-
-  // Redis
   try {
     const redis = getRedisClient();
     const pong = await redis.ping();
@@ -32,8 +29,6 @@ router.get('/health', async (req, res) => {
     health.dependencies.redis = { status: 'unhealthy', error: err.message };
     degraded = true;
   }
-
-  // ML Scoring Service (circuit breaker state)
   try {
     const cbStats = mlScoringClient.getCircuitBreakerStats();
     health.dependencies.mlScoringService = {
@@ -44,8 +39,6 @@ router.get('/health', async (req, res) => {
   } catch (err) {
     health.dependencies.mlScoringService = { status: 'unknown', error: err.message };
   }
-
-  // Kafka - inferred from consumer running state
   health.dependencies.kafka = {
     status: 'healthy',
     note: 'Consumer crash triggers process restart via uncaughtException handler',
@@ -54,8 +47,7 @@ router.get('/health', async (req, res) => {
   health.status = degraded ? 'degraded' : 'healthy';
   res.status(degraded ? 503 : 200).json(health);
 });
-
-// Kubernetes readiness probe - fails until all dependencies are available.
+// Handles GET /health/ready.
 router.get('/health/ready', async (req, res) => {
   try {
     const redis = getRedisClient();
@@ -73,8 +65,7 @@ router.get('/health/ready', async (req, res) => {
     });
   }
 });
-
-// Kubernetes liveness probe - just confirms the process is alive.
+// Handles GET /health/live.
 router.get('/health/live', (_req, res) => {
   res.status(200).json({
     status: 'alive',
@@ -84,6 +75,7 @@ router.get('/health/live', (_req, res) => {
 });
 
 
+// Handles format uptime.
 const formatUptime = (seconds) => {
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
@@ -92,6 +84,7 @@ const formatUptime = (seconds) => {
   return `${d}d ${h}h ${m}m ${s}s`;
 };
 
+// Handles format memory.
 const formatMemory = (mem) => ({
   rss: `${(mem.rss / 1024 / 1024).toFixed(1)}MB`,
   heapUsed: `${(mem.heapUsed / 1024 / 1024).toFixed(1)}MB`,

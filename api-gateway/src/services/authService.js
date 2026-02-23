@@ -41,11 +41,7 @@ class AuthService {
   }
 
   static async validateCredentials(email, password) {
-    // This is a mock implementation
-    // In production, this would call the User Service API
     logger.info('Validating credentials', { email });
-
-    // Mock validation
     if (email === 'admin@example.com' && password === 'admin123') {
       return {
         userId: '550e8400-e29b-41d4-a716-446655440000',

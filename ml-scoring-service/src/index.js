@@ -82,6 +82,7 @@ app.use((err, req, res, next) => {
 let server;
 let isShuttingDown = false;
 
+// Handles shutdown.
 const shutdown = async (signal) => {
   if (isShuttingDown) return;
   isShuttingDown = true;
@@ -104,6 +105,7 @@ const shutdown = async (signal) => {
   process.exit(0);
 };
 
+// Handles force exit timer.
 const forceExitTimer = (signal) => {
   setTimeout(() => {
     logger.error(`Forced exit after 30s shutdown timeout (signal: ${signal})`);
@@ -163,4 +165,3 @@ const bootstrap = async () => {
 bootstrap();
 
 module.exports = app;
-

@@ -1,9 +1,7 @@
 const router = require('express').Router();
 const { register } = require('../metrics');
 const config = require('../config');
-
-// Prometheus scrape endpoint
-// In production, restrict access to this endpoint to your internal network / scraper only.
+// Handles GET /metrics.
 router.get('/metrics', async (req, res) => {
   if (!config.metrics.enabled) {
     return res.status(404).json({ error: 'Metrics disabled' });

@@ -6,10 +6,10 @@ let client = null;
 let isConnecting = false;
 let connectionAttempts = 0;
 
+// Handles create client.
 const createClient = async () => {
   if (client?.isReady) return client;
   if (isConnecting) {
-    // Wait for existing connection attempt
     await new Promise((resolve) => setTimeout(resolve, 500));
     return client;
   }
@@ -79,6 +79,7 @@ const createClient = async () => {
   return client;
 };
 
+// Handles get client.
 const getClient = () => {
   if (!client?.isReady) {
     throw new Error('Redis client not initialized or not ready');
@@ -86,6 +87,7 @@ const getClient = () => {
   return client;
 };
 
+// Handles close client.
 const closeClient = async () => {
   if (client) {
     try {
@@ -101,9 +103,8 @@ const closeClient = async () => {
   }
 };
 
-/**
- * Execute a Redis command with a per-command timeout
- */
+
+// Handles with timeout.
 const withTimeout = async (operation, timeoutMs = config.redis.commandTimeout) => {
   return Promise.race([
     operation(),

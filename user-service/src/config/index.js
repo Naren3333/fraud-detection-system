@@ -35,7 +35,7 @@ module.exports = {
   security: {
     bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS, 10) || 12,
     loginMaxAttempts: parseInt(process.env.LOGIN_MAX_ATTEMPTS, 10) || 5,
-    loginLockoutDuration: parseInt(process.env.LOGIN_LOCKOUT_DURATION, 10) || 900000, // 15 min
+    loginLockoutDuration: parseInt(process.env.LOGIN_LOCKOUT_DURATION, 10) || 900000,
   },
 
   cors: {

@@ -3,6 +3,7 @@ const { Pool } = require('pg');
 const config = require('../config');
 const logger = require('../config/logger');
 
+// Handles run migrations.
 const runMigrations = async () => {
   logger.info('Running database migrations...');
 
@@ -15,7 +16,6 @@ const runMigrations = async () => {
   });
 
   try {
-    // ─── Decisions table ──────────────────────────────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS decisions (
         decision_id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -51,8 +51,6 @@ const runMigrations = async () => {
         CONSTRAINT unique_transaction_decision UNIQUE (transaction_id)
       );
     `);
-
-    // ─── Decision history (for audit trail and ML training) ──────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS decision_history (
         history_id          BIGSERIAL PRIMARY KEY,
@@ -71,8 +69,6 @@ const runMigrations = async () => {
         recorded_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
-
-    // ─── Decision overrides (manual interventions) ────────────────────────────
     await pool.query(`
       CREATE TABLE IF NOT EXISTS decision_overrides (
         override_id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -89,8 +85,6 @@ const runMigrations = async () => {
         overridden_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
-
-    // ─── Indexes ──────────────────────────────────────────────────────────────
     await pool.query('CREATE INDEX IF NOT EXISTS idx_decisions_transaction_id ON decisions(transaction_id);');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_decisions_customer_id ON decisions(customer_id);');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_decisions_decision ON decisions(decision);');

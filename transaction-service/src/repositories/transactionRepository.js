@@ -5,10 +5,8 @@ const { DatabaseError } = require('../utils/errors');
 
 class TransactionRepository {
 
-  /**
-   * Create transaction + outbox event atomically.
-   * The outbox guarantees the Kafka event is published even if the broker is down.
-   */
+  
+  // Handles create with outbox.
   async createWithOutbox(transactionData, kafkaEventPayload) {
     try {
       return await withTransaction(async (client) => {
@@ -84,6 +82,7 @@ class TransactionRepository {
     }
   }
 
+  // Handles find idempotency key.
   async findIdempotencyKey(key) {
     try {
       const { rows } = await query(`
@@ -99,6 +98,7 @@ class TransactionRepository {
     }
   }
 
+  // Handles find by id.
   async findById(id) {
     try {
       const { rows } = await query('SELECT * FROM transactions WHERE id = $1', [id]);
@@ -108,6 +108,7 @@ class TransactionRepository {
     }
   }
 
+  // Handles find by customer id.
   async findByCustomerId(customerId, { limit = 20, offset = 0 } = {}) {
     try {
       const { rows } = await query(`
@@ -122,6 +123,7 @@ class TransactionRepository {
     }
   }
 
+  // Handles update status.
   async updateStatus(id, status, client = null) {
     const execute = client ? client.query.bind(client) : query;
     try {
@@ -137,6 +139,7 @@ class TransactionRepository {
     }
   }
 
+  // Handles map row.
   _mapRow(row) {
     return {
       id:             row.id,

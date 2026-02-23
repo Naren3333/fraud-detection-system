@@ -9,6 +9,7 @@ class EmailService {
     this._initialize();
   }
 
+  // Handles initialize.
   _initialize() {
     if (!config.email.enabled) {
       logger.info('Email notifications disabled');
@@ -39,8 +40,6 @@ class EmailService {
         port: config.email.smtp.port,
         secure: config.email.smtp.secure,
       };
-
-      // MailHog/local SMTP usually does not require auth.
       if (config.email.smtp.user && config.email.smtp.password) {
         transportOptions.auth = {
           user: config.email.smtp.user,
@@ -55,9 +54,8 @@ class EmailService {
     }
   }
 
-  /**
-   * Send email (with automatic retry handled by caller)
-   */
+  
+  // Handles send email.
   async sendEmail({ to, subject, text, html }) {
     if (!config.email.enabled) {
       throw new Error('Email service is disabled');
@@ -97,9 +95,8 @@ class EmailService {
     }
   }
 
-  /**
-   * Verify transporter connection (for health checks)
-   */
+  
+  // Handles verify connection.
   async verifyConnection() {
     if (!config.email.enabled || this.provider === 'mock') {
       return true;

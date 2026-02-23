@@ -12,6 +12,7 @@ const {
 let consumer = null;
 let isRunning = false;
 
+// Handles start.
 const start = async () => {
   if (isRunning) {
     logger.warn('Audit consumer already running');
@@ -21,8 +22,6 @@ const start = async () => {
   logger.info('Starting audit consumer...');
 
   consumer = await createConsumer();
-  
-  // Subscribe to ALL relevant topics
   await consumer.subscribe({
     topics: config.kafka.topics,
     fromBeginning: false,
@@ -41,6 +40,7 @@ const start = async () => {
   logger.info('Audit consumer running');
 };
 
+// Handles stop.
 const stop = async () => {
   if (!isRunning) return;
 
@@ -59,8 +59,7 @@ const stop = async () => {
   }
 };
 
-// ─── Message Handler ─────────────────────────────────────────────────────────
-
+// Handles handle message.
 const handleMessage = async ({ topic, partition, message, heartbeat }) => {
   const startTime = Date.now();
   const offset = message.offset;
@@ -68,7 +67,6 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
   let eventType = null;
 
   try {
-    // ── Parse ────────────────────────────────────────────────────────────────
     const raw = message.value?.toString();
     if (!raw) {
       logger.warn('Received empty Kafka message — skipping', { partition, offset });
@@ -88,17 +86,12 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
         error: parseErr.message,
         preview: raw.substring(0, 200),
       });
-      // Still store it (even malformed events should be audited)
       payload = { _raw: raw, _parseError: parseErr.message };
     }
-
-    // Extract metadata
     eventType = payload.eventType || `kafka.${topic}`;
     transactionId = payload.transactionId || payload.fraudAnalysis?.transactionId || null;
     const customerId = payload.customerId || payload.fraudAnalysis?.customerId || null;
     const correlationId = payload.correlationId || message.headers?.['x-correlation-id']?.toString() || null;
-
-    // Heartbeat to prevent session timeout
     await heartbeat();
 
     logger.debug('Processing audit event', {
@@ -108,8 +101,6 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
       eventType,
       transactionId,
     });
-
-    // ── Store Audit Event ────────────────────────────────────────────────────
     const auditData = {
       eventType,
       eventSource: message.headers?.['service-source']?.toString() || 'unknown',
@@ -125,17 +116,12 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
     };
 
     const result = await auditRepository.storeEvent(auditData);
-
-    // Heartbeat again after DB write
     await heartbeat();
-
-    // ── Commit Offset ────────────────────────────────────────────────────────
     await commitOffset(topic, partition, offset);
 
     const durationMs = Date.now() - startTime;
 
     if (result) {
-      // Metrics (only if not duplicate)
       auditEventsTotal.inc({ event_type: eventType, topic });
       auditDuration.observe({ topic }, durationMs);
       kafkaMessagesConsumed.inc({ topic, status: 'success' });
@@ -150,7 +136,6 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
         offset,
       });
     } else {
-      // Duplicate
       kafkaMessagesConsumed.inc({ topic, status: 'duplicate' });
     }
   } catch (error) {
@@ -168,15 +153,11 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
     });
 
     errorsTotal.inc({ component: 'audit_consumer', type: 'unhandled' });
-
-    // CRITICAL: For audit service, we MUST NOT lose events
-    // Do NOT commit offset on error - Kafka will redeliver
     kafkaMessagesConsumed.inc({ topic, status: 'error' });
   }
 };
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
+// Handles commit offset.
 const commitOffset = async (topic, partition, offset) => {
   if (!consumer) return;
   try {

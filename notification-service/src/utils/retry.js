@@ -1,14 +1,8 @@
 const config = require('../config');
 const logger = require('../config/logger');
 
-/**
- * Retry an async operation with exponential backoff
- * 
- * @param {Function} operation - Async function to retry
- * @param {Object} options - Retry options
- * @param {Object} context - Context for logging
- * @returns {Promise} - Result of successful operation
- */
+
+// Handles retry with backoff.
 async function retryWithBackoff(operation, options = {}, context = {}) {
   const {
     maxAttempts = config.retry.maxAttempts,
@@ -53,8 +47,6 @@ async function retryWithBackoff(operation, options = {}, context = {}) {
         });
         break;
       }
-
-      // Calculate delay with exponential backoff
       const delay = Math.min(
         initialDelayMs * Math.pow(backoffMultiplier, attempt - 1),
         maxDelayMs
@@ -77,6 +69,7 @@ async function retryWithBackoff(operation, options = {}, context = {}) {
   };
 }
 
+// Handles sleep.
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }

@@ -6,10 +6,7 @@ const REDACTED_FIELDS = new Set([
   'authorization', 'token', 'secret', 'apiKey', 'privateKey',
   'authToken', 'accountSid',
 ]);
-
-// Redact sensitive fields from nested objects.
-// Returns a new object - only call this on nested values, NOT on the
-// top-level Winston info object (which carries internal Symbol props).
+// Handles redact value.
 const redactValue = (obj, depth = 0) => {
   if (depth > 6 || obj === null || typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) return obj.map((item) => redactValue(item, depth + 1));
@@ -21,11 +18,6 @@ const redactValue = (obj, depth = 0) => {
     })
   );
 };
-
-// Mutate the Winston info object in place so Symbol properties are preserved.
-// If we replaced info with a new object (via Object.fromEntries), Winston would
-// lose its internal Symbol(level) / Symbol(splat) props and silently drop every
-// log entry - producing zero output.
 const redactFilter = winston.format((info) => {
   for (const key of Object.keys(info)) {
     if (REDACTED_FIELDS.has(key)) {

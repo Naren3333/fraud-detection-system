@@ -2,6 +2,7 @@ const router = require('express').Router();
 const { query } = require('../db/pool');
 const logger = require('../config/logger');
 
+// Handles GET /health.
 router.get('/health', async (req, res) => {
   const health = {
     status: 'healthy',
@@ -16,8 +17,6 @@ router.get('/health', async (req, res) => {
   };
 
   let degraded = false;
-
-  // Database check
   try {
     await query('SELECT 1');
     health.dependencies.database = { status: 'healthy' };
@@ -26,8 +25,6 @@ router.get('/health', async (req, res) => {
     health.dependencies.database = { status: 'unhealthy', error: err.message };
     degraded = true;
   }
-
-  // Kafka health (inferred from consumer state)
   health.dependencies.kafka = {
     status: 'healthy',
     note: 'Consumer crash triggers process restart',
@@ -37,6 +34,7 @@ router.get('/health', async (req, res) => {
   res.status(degraded ? 503 : 200).json(health);
 });
 
+// Handles GET /health/ready.
 router.get('/health/ready', async (req, res) => {
   try {
     await query('SELECT 1');
@@ -54,6 +52,7 @@ router.get('/health/ready', async (req, res) => {
   }
 });
 
+// Handles GET /health/live.
 router.get('/health/live', (_req, res) => {
   res.status(200).json({
     status: 'alive',
@@ -62,6 +61,7 @@ router.get('/health/live', (_req, res) => {
   });
 });
 
+// Handles format uptime.
 const formatUptime = (seconds) => {
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
@@ -70,6 +70,7 @@ const formatUptime = (seconds) => {
   return `${d}d ${h}h ${m}m ${s}s`;
 };
 
+// Handles format memory.
 const formatMemory = (mem) => ({
   rss: `${(mem.rss / 1024 / 1024).toFixed(1)}MB`,
   heapUsed: `${(mem.heapUsed / 1024 / 1024).toFixed(1)}MB`,

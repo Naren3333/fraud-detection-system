@@ -4,6 +4,7 @@ const logger = require('../config/logger');
 const { UnauthorizedError, ForbiddenError } = require('../utils/errors');
 const MetricsService = require('../utils/metrics');
 
+// Handles verify token.
 const verifyToken = (token) => {
   try {
     return jwt.verify(token, config.jwt.secret, {
@@ -20,6 +21,7 @@ const verifyToken = (token) => {
   }
 };
 
+// Handles authenticate.
 const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -37,8 +39,6 @@ const authenticate = async (req, res, next) => {
     }
 
     const decoded = verifyToken(token);
-
-    // Attach user information to request
     req.user = {
       userId: decoded.userId,
       email: decoded.email,
@@ -63,6 +63,7 @@ const authenticate = async (req, res, next) => {
   }
 };
 
+// Handles authorize.
 const authorize = (...allowedRoles) => {
   return (req, res, next) => {
     try {
@@ -88,6 +89,7 @@ const authorize = (...allowedRoles) => {
   };
 };
 
+// Handles optional auth.
 const optionalAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -112,7 +114,6 @@ const optionalAuth = async (req, res, next) => {
       };
       req.token = token;
     } catch (error) {
-      // Silently fail for optional auth
       logger.debug('Optional auth failed:', error.message);
     }
 

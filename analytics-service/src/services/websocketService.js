@@ -10,6 +10,7 @@ class WebSocketService {
     this.updateInterval = null;
   }
 
+  // Handles initialize.
   initialize(server) {
     if (!config.websocket.enabled) {
       logger.info('WebSocket disabled');
@@ -25,11 +26,7 @@ class WebSocketService {
       });
 
       this.clients.add(ws);
-
-      // Send initial data
       this._sendInitialData(ws);
-
-      // Setup heartbeat
       ws.isAlive = true;
       ws.on('pong', () => {
         ws.isAlive = true;
@@ -56,16 +53,13 @@ class WebSocketService {
         this.clients.delete(ws);
       });
     });
-
-    // Start heartbeat interval
     this._startHeartbeat();
-
-    // Start real-time updates
     this._startRealTimeUpdates();
 
     logger.info('WebSocket server initialized', { path: '/ws' });
   }
 
+  // Handles broadcast.
   broadcast(type, data) {
     const message = JSON.stringify({ type, data, timestamp: new Date().toISOString() });
 
@@ -86,6 +80,7 @@ class WebSocketService {
     }
   }
 
+  // Handles send initial data.
   async _sendInitialData(ws) {
     try {
       const realTimeStats = await analyticsService.getRealTimeStats();
@@ -99,6 +94,7 @@ class WebSocketService {
     }
   }
 
+  // Handles handle message.
   _handleMessage(ws, data) {
     logger.debug('WebSocket message received', { type: data.type });
 
@@ -107,13 +103,13 @@ class WebSocketService {
         ws.send(JSON.stringify({ type: 'pong', timestamp: new Date().toISOString() }));
         break;
       case 'subscribe':
-        // Handle subscription requests if needed
         break;
       default:
         logger.warn('Unknown WebSocket message type', { type: data.type });
     }
   }
 
+  // Handles start heartbeat.
   _startHeartbeat() {
     this.heartbeatInterval = setInterval(() => {
       for (const ws of this.clients) {
@@ -129,12 +125,11 @@ class WebSocketService {
     }, config.websocket.heartbeatInterval);
   }
 
+  // Handles start real time updates.
   _startRealTimeUpdates() {
     if (!config.analytics.enableRealTimeUpdates) {
       return;
     }
-
-    // Update every 5 seconds
     this.updateInterval = setInterval(async () => {
       if (this.clients.size === 0) return;
 
@@ -149,6 +144,7 @@ class WebSocketService {
     logger.info('Real-time updates started', { interval: '5s' });
   }
 
+  // Handles stop.
   stop() {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);

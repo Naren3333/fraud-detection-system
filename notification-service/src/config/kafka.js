@@ -12,6 +12,7 @@ const kafkaLogLevelMap = {
   [KafkaLogLevel.DEBUG]: 'debug',
 };
 
+// Handles create kafka.
 const createKafka = () => {
   if (kafka) return kafka;
 
@@ -33,6 +34,7 @@ const createKafka = () => {
   return kafka;
 };
 
+// Handles create consumer.
 const createConsumer = async () => {
   const k = createKafka();
 
@@ -65,6 +67,7 @@ const createConsumer = async () => {
   return consumer;
 };
 
+// Handles create producer.
 const createProducer = async () => {
   const k = createKafka();
 
@@ -88,6 +91,7 @@ const createProducer = async () => {
   return producer;
 };
 
+// Handles publish.
 const publish = async (producer, topic, partitionKey, payload, headers = {}) => {
   const messageHeaders = {
     'content-type': 'application/json',

@@ -9,22 +9,23 @@ const {
   validateChangePassword,
 } = require('../middleware/validate');
 const { USER_ROLES } = require('../utils/constants');
-
-// Public routes
+// Handles POST /register.
 router.post('/register', validateRegister, userController.register);
+// Handles POST /login.
 router.post('/login', validateLogin, userController.login);
+// Handles POST /refresh.
 router.post('/refresh', validateRefresh, userController.refresh);
+// Handles POST /logout.
 router.post('/logout', userController.logout);
-
-// Token validation (used by API Gateway)
+// Handles POST /validate.
 router.post('/validate', userController.validateToken);
-
-// Protected routes
+// Handles GET /profile.
 router.get('/profile', authenticate, userController.getProfile);
+// Handles PATCH /profile.
 router.patch('/profile', authenticate, validateUpdateProfile, userController.updateProfile);
+// Handles POST /change-password.
 router.post('/change-password', authenticate, validateChangePassword, userController.changePassword);
-
-// Admin only
+// Handles GET /users/:userId.
 router.get('/users/:userId', authenticate, authorize(USER_ROLES.ADMIN), userController.getProfile);
 
 module.exports = router;

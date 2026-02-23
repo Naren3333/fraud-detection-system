@@ -1,6 +1,4 @@
 const config = require('./index');
-
-// Service route mappings
 const serviceRoutes = {
   '/api/v1/transactions': {
     target: config.services.transaction,

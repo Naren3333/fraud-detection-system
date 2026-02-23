@@ -14,6 +14,7 @@ let consumer = null;
 let producer = null;
 let isRunning = false;
 
+// Handles start.
 const start = async () => {
   if (isRunning) {
     logger.warn('Transaction consumer already running');
@@ -21,8 +22,6 @@ const start = async () => {
   }
 
   logger.info('Starting transaction consumer...');
-
-  // Producer must be ready before consumer starts
   producer = await createProducer();
   logger.info('Kafka producer ready');
 
@@ -49,6 +48,7 @@ const start = async () => {
   });
 };
 
+// Handles stop.
 const stop = async () => {
   if (!isRunning) return;
 
@@ -84,8 +84,7 @@ const stop = async () => {
   }
 };
 
-// ─── Message Handler ─────────────────────────────────────────────────────────
-
+// Handles handle message.
 const handleMessage = async ({ topic, partition, message, heartbeat }) => {
   const startTime = Date.now();
   const offset = message.offset;
@@ -93,7 +92,6 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
   let correlationId = null;
 
   try {
-    // ── Parse ────────────────────────────────────────────────────────────────
     const raw = message.value?.toString();
     if (!raw) {
       logger.warn('Received empty Kafka message - skipping', { partition, offset });
@@ -142,8 +140,6 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
       kafkaMessagesConsumed.inc({ topic, status: 'dlq' });
       return;
     }
-
-    // Heartbeat to prevent session timeout
     await heartbeat();
 
     logger.info('Processing scored transaction', {
@@ -154,8 +150,6 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
       partition,
       offset,
     });
-
-    // ── Make Decision ────────────────────────────────────────────────────────
     const decisionResult = decisionEngineService.makeDecision(fraudAnalysis, originalTransaction);
 
     logger.info('Decision made', {
@@ -178,8 +172,6 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
       });
       return;
     }
-
-    // ── Save to Database ─────────────────────────────────────────────────────
     const dbResult = await decisionRepository.saveDecision({
       transactionId,
       customerId: fraudAnalysis.customerId,
@@ -205,34 +197,22 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
         kafkaOffset: offset,
       },
     });
-
-    // Heartbeat again after DB write
     await heartbeat();
-
-    // ── Publish Decision ─────────────────────────────────────────────────────
     const outputPayload = {
       eventType: decisionResult.decision === 'FLAGGED' ? 'transaction.flagged' : 'transaction.finalised',
       transactionId,
       customerId: fraudAnalysis.customerId,
       merchantId: fraudAnalysis.merchantId,
-      
-      // Decision details
       decision: decisionResult.decision,
       decisionReason: decisionResult.decisionReason,
       decisionFactors: decisionResult.decisionFactors,
       decisionId: dbResult.decisionId,
       decidedAt: dbResult.decidedAt,
-      
-      // Full context for downstream services
       originalTransaction,
       fraudAnalysis,
-      
-      // Metadata
       processedAt: new Date().toISOString(),
       correlationId,
     };
-
-    // Publish to appropriate topic
     const outputTopic = decisionResult.decision === 'FLAGGED'
       ? config.kafka.outputTopicFlagged
       : config.kafka.outputTopicApproved;
@@ -240,7 +220,7 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
     await publish(
       producer,
       outputTopic,
-      fraudAnalysis.customerId, // Partition by customer
+      fraudAnalysis.customerId,
       outputPayload,
       {
         'x-correlation-id': correlationId,
@@ -248,13 +228,9 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
         'x-source-service': config.serviceName,
       }
     );
-
-    // ── Commit Offset ────────────────────────────────────────────────────────
     await commitOffset(partition, offset);
 
     const durationMs = Date.now() - startTime;
-    
-    // Metrics
     decisionsTotal.inc({ decision: decisionResult.decision });
     decisionDuration.observe({ decision: decisionResult.decision }, durationMs);
     kafkaMessagesConsumed.inc({ topic, status: 'success' });
@@ -305,8 +281,7 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
   }
 };
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
+// Handles commit offset.
 const commitOffset = async (partition, offset) => {
   if (!consumer) return;
   try {
@@ -328,6 +303,7 @@ const commitOffset = async (partition, offset) => {
   }
 };
 
+// Handles send to dlq.
 const sendToDlq = async ({ raw, data, transactionId, correlationId, reason, error, partition, offset }) => {
   const dlqPayload = {
     eventType: 'transaction.decision.dlq',
@@ -364,4 +340,3 @@ const sendToDlq = async ({ raw, data, transactionId, correlationId, reason, erro
 };
 
 module.exports = { start, stop };
-

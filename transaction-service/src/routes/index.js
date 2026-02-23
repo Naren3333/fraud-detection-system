@@ -2,9 +2,9 @@ const router = require('express').Router();
 const { register } = require('../utils/metrics');
 
 router.use(require('./health'));
+// Handles USE /transactions.
 router.use('/transactions', require('./transactions'));
-
-// Prometheus scrape endpoint
+// Handles GET /metrics.
 router.get('/metrics', async (_req, res) => {
   res.set('Content-Type', register.contentType);
   res.end(await register.metrics());

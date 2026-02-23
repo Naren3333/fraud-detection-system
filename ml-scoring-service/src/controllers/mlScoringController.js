@@ -2,10 +2,8 @@ const mlScoringService = require('../services/mlScoringService');
 const logger = require('../config/logger');
 
 class MLScoringController {
-  /**
-   * POST /api/v1/score
-   * Score a single transaction
-   */
+  
+  // Handles score.
   async score(req, res) {
     const correlationId = req.correlationId || req.body.correlationId;
     const log = logger.child({ correlationId });
@@ -25,10 +23,8 @@ class MLScoringController {
     });
   }
 
-  /**
-   * POST /api/v1/score/batch
-   * Score multiple transactions (future enhancement)
-   */
+  
+  // Handles score batch.
   async scoreBatch(req, res) {
     const { transactions, ruleResults } = req.body;
 
@@ -45,10 +41,8 @@ class MLScoringController {
     });
   }
 
-  /**
-   * GET /api/v1/model/info
-   * Get model metadata
-   */
+  
+  // Handles get model info.
   async getModelInfo(req, res) {
     const stats = mlScoringService.getStats();
 

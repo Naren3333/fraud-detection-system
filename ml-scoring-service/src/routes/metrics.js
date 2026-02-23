@@ -2,6 +2,7 @@ const router = require('express').Router();
 const { register } = require('../utils/metrics');
 const config = require('../config');
 
+// Handles GET /metrics.
 router.get('/metrics', async (req, res) => {
   if (!config.metrics.enabled) {
     return res.status(404).json({ error: 'Metrics disabled' });

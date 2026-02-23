@@ -1,7 +1,5 @@
 const Joi = require('joi');
 const { ValidationError } = require('../utils/errors');
-
-// Transaction schema
 const transactionSchema = Joi.object({
   id: Joi.string().required(),
   customerId: Joi.string().required(),
@@ -17,29 +15,24 @@ const transactionSchema = Joi.object({
   }).optional(),
   metadata: Joi.object().optional(),
   createdAt: Joi.string().isoDate().required(),
-}).unknown(true); // Allow additional fields
-
-// Rule results schema
+}).unknown(true);
 const ruleResultsSchema = Joi.object({
   flagged: Joi.boolean().required(),
   ruleScore: Joi.number().min(0).max(100).optional(),
   reasons: Joi.array().items(Joi.string()).optional(),
   riskFactors: Joi.object().optional(),
 }).unknown(true);
-
-// Score request schema
 const scoreRequestSchema = Joi.object({
   transaction: transactionSchema.required(),
   ruleResults: ruleResultsSchema.required(),
   correlationId: Joi.string().optional(),
 });
-
-// Batch score request schema
 const batchScoreRequestSchema = Joi.object({
   transactions: Joi.array().items(transactionSchema).min(1).max(100).required(),
   ruleResults: Joi.array().items(ruleResultsSchema).min(1).max(100).required(),
 });
 
+// Handles validate.
 const validate = (schema) => {
   return (req, res, next) => {
     const { error, value } = schema.validate(req.body, {

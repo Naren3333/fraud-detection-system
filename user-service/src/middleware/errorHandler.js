@@ -1,6 +1,7 @@
 const logger = require('../config/logger');
 const { AppError } = require('../utils/errors');
 
+// Handles error handler.
 const errorHandler = (err, req, res, next) => {
   logger.error('Request error', {
     requestId: req.requestId,
@@ -25,8 +26,6 @@ const errorHandler = (err, req, res, next) => {
       timestamp: err.timestamp,
     });
   }
-
-  // Unknown errors
   res.status(500).json({
     success: false,
     code: 'INTERNAL_ERROR',
@@ -36,6 +35,7 @@ const errorHandler = (err, req, res, next) => {
   });
 };
 
+// Handles not found handler.
 const notFoundHandler = (req, res) => {
   res.status(404).json({
     success: false,

@@ -2,12 +2,11 @@ const logger = require('../config/logger');
 const { AppError } = require('../utils/errors');
 const { HTTP_STATUS } = require('../utils/constants');
 
+// Handles error handler.
 const errorHandler = (err, req, res, next) => {
   let error = { ...err };
   error.message = err.message;
   error.stack = err.stack;
-
-  // Log error
   logger.error('Error occurred:', {
     requestId: req.requestId,
     correlationId: req.correlationId,
@@ -17,8 +16,6 @@ const errorHandler = (err, req, res, next) => {
     stack: error.stack,
     userId: req.user?.userId,
   });
-
-  // Operational errors (expected)
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
       success: false,
@@ -31,8 +28,6 @@ const errorHandler = (err, req, res, next) => {
       },
     });
   }
-
-  // JWT errors
   if (err.name === 'JsonWebTokenError') {
     return res.status(HTTP_STATUS.UNAUTHORIZED).json({
       success: false,
@@ -56,8 +51,6 @@ const errorHandler = (err, req, res, next) => {
       },
     });
   }
-
-  // Validation errors
   if (err.name === 'ValidationError') {
     return res.status(HTTP_STATUS.BAD_REQUEST).json({
       success: false,
@@ -70,8 +63,6 @@ const errorHandler = (err, req, res, next) => {
       },
     });
   }
-
-  // Default to 500 internal server error
   res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
     success: false,
     error: {
@@ -86,6 +77,7 @@ const errorHandler = (err, req, res, next) => {
   });
 };
 
+// Handles not found handler.
 const notFoundHandler = (req, res, next) => {
   res.status(HTTP_STATUS.NOT_FOUND).json({
     success: false,

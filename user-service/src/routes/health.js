@@ -3,6 +3,7 @@ const { query } = require('../db/pool');
 const { getClient: getRedisClient } = require('../config/redis');
 const logger = require('../config/logger');
 
+// Handles GET /health.
 router.get('/health', async (req, res) => {
   const health = {
     status: 'healthy',
@@ -13,7 +14,6 @@ router.get('/health', async (req, res) => {
   };
 
   try {
-    // Check PostgreSQL
     await query('SELECT 1');
     health.dependencies.postgres = { status: 'healthy' };
   } catch (err) {
@@ -23,7 +23,6 @@ router.get('/health', async (req, res) => {
   }
 
   try {
-    // Check Redis
     const redis = getRedisClient();
     await redis.ping();
     health.dependencies.redis = { status: 'healthy' };
@@ -37,6 +36,7 @@ router.get('/health', async (req, res) => {
   res.status(statusCode).json(health);
 });
 
+// Handles GET /health/ready.
 router.get('/health/ready', async (req, res) => {
   try {
     await query('SELECT 1');
@@ -56,6 +56,7 @@ router.get('/health/ready', async (req, res) => {
   }
 });
 
+// Handles GET /health/live.
 router.get('/health/live', (req, res) => {
   res.status(200).json({
     status: 'alive',

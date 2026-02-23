@@ -3,8 +3,7 @@ const logger = require('../config/logger');
 
 class UserRepository {
   
-// Create a new user
-  
+  // Handles create.
   async create({ email, passwordHash, firstName, lastName, role, phone, metadata = {} }) {
     const sql = `
       INSERT INTO users (email, password_hash, first_name, last_name, role, phone, metadata)
@@ -20,16 +19,14 @@ class UserRepository {
       logger.info('User created', { userId: result.rows[0].user_id, email });
       return result.rows[0];
     } catch (err) {
-      if (err.code === '23505') { // Unique violation
+      if (err.code === '23505') {
         throw new Error('EMAIL_ALREADY_EXISTS');
       }
       throw err;
     }
   }
-
   
-// Find user by email (includes password hash for login)
-  
+  // Handles find by email.
   async findByEmail(email) {
     const sql = `
       SELECT 
@@ -41,10 +38,8 @@ class UserRepository {
     const result = await query(sql, [email]);
     return result.rows[0] || null;
   }
-
   
-// Find user by ID (no password hash)
-  
+  // Handles find by id.
   async findById(userId) {
     const sql = `
       SELECT 
@@ -56,10 +51,8 @@ class UserRepository {
     const result = await query(sql, [userId]);
     return result.rows[0] || null;
   }
-
   
-// Update user fields
-  
+  // Handles update.
   async update(userId, updates) {
     const allowedFields = ['first_name', 'last_name', 'phone', 'status', 'metadata', 'email_verified', 'phone_verified'];
     const setFields = [];
@@ -93,18 +86,14 @@ class UserRepository {
     logger.info('User updated', { userId });
     return result.rows[0];
   }
-
   
-// Update last login timestamp
-  
+  // Handles update last login.
   async updateLastLogin(userId) {
     const sql = `UPDATE users SET last_login_at = NOW() WHERE user_id = $1`;
     await query(sql, [userId]);
   }
-
   
-// Change password
-  
+  // Handles update password.
   async updatePassword(userId, newPasswordHash) {
     const sql = `
       UPDATE users
@@ -114,10 +103,8 @@ class UserRepository {
     await query(sql, [newPasswordHash, userId]);
     logger.info('Password updated', { userId });
   }
-
   
-// Delete user (soft delete by setting status)
-  
+  // Handles soft delete.
   async softDelete(userId) {
     const sql = `
       UPDATE users
@@ -128,8 +115,7 @@ class UserRepository {
     logger.info('User soft deleted', { userId });
   }
 
-  // ─── Login Attempts ───────────────────────────────────────────────────────
-
+  // Handles record login attempt.
   async recordLoginAttempt({ email, ipAddress, success, userAgent }) {
     const sql = `
       INSERT INTO login_attempts (email, ip_address, success, user_agent)
@@ -138,6 +124,7 @@ class UserRepository {
     await query(sql, [email, ipAddress, success, userAgent]);
   }
 
+  // Handles get recent failed attempts.
   async getRecentFailedAttempts(email, windowMs) {
     const sql = `
       SELECT COUNT(*) as count
@@ -150,13 +137,13 @@ class UserRepository {
     return parseInt(result.rows[0].count, 10);
   }
 
+  // Handles clear login attempts.
   async clearLoginAttempts(email) {
     const sql = `DELETE FROM login_attempts WHERE email = $1`;
     await query(sql, [email]);
   }
 
-  // ─── Refresh Tokens ───────────────────────────────────────────────────────
-
+  // Handles save refresh token.
   async saveRefreshToken({ userId, tokenHash, expiresAt, ipAddress, userAgent }) {
     const sql = `
       INSERT INTO refresh_tokens (user_id, token_hash, expires_at, ip_address, user_agent)
@@ -167,6 +154,7 @@ class UserRepository {
     return result.rows[0].token_id;
   }
 
+  // Handles find refresh token.
   async findRefreshToken(tokenHash) {
     const sql = `
       SELECT token_id, user_id, expires_at, revoked_at
@@ -177,6 +165,7 @@ class UserRepository {
     return result.rows[0] || null;
   }
 
+  // Handles revoke refresh token.
   async revokeRefreshToken(tokenHash) {
     const sql = `
       UPDATE refresh_tokens
@@ -186,6 +175,7 @@ class UserRepository {
     await query(sql, [tokenHash]);
   }
 
+  // Handles revoke all user tokens.
   async revokeAllUserTokens(userId) {
     const sql = `
       UPDATE refresh_tokens

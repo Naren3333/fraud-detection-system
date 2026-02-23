@@ -13,6 +13,7 @@ let consumer = null;
 let producer = null;
 let isRunning = false;
 
+// Handles start.
 const start = async () => {
   if (isRunning) {
     logger.warn('Decision consumer already running');
@@ -49,6 +50,7 @@ const start = async () => {
   logger.info('Decision consumer running');
 };
 
+// Handles stop.
 const stop = async () => {
   if (!isRunning) return;
 
@@ -84,6 +86,7 @@ const stop = async () => {
   }
 };
 
+// Handles handle message.
 const handleMessage = async ({ topic, partition, message, heartbeat }) => {
   const startTime = Date.now();
   const offset = message.offset;
@@ -223,6 +226,7 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
   }
 };
 
+// Handles commit offset.
 const commitOffset = async (topic, partition, offset) => {
   if (!consumer) return;
   try {
@@ -245,6 +249,7 @@ const commitOffset = async (topic, partition, offset) => {
   }
 };
 
+// Handles send to dlq.
 const sendToDlq = async ({ raw, data, transactionId, decision, correlationId, reason, error, partition, offset }) => {
   const dlqPayload = {
     eventType: 'notification.dlq',
@@ -282,4 +287,3 @@ const sendToDlq = async ({ raw, data, transactionId, decision, correlationId, re
 };
 
 module.exports = { start, stop };
-

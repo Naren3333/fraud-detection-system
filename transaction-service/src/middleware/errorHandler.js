@@ -1,6 +1,7 @@
 const logger      = require('../config/logger');
 const { AppError } = require('../utils/errors');
 
+// Handles error handler.
 const errorHandler = (err, req, res, next) => {
   logger.error('Request error', {
     requestId: req.requestId, method: req.method, path: req.path,
@@ -25,6 +26,7 @@ const errorHandler = (err, req, res, next) => {
   });
 };
 
+// Handles not found handler.
 const notFoundHandler = (req, res) =>
   res.status(404).json({ success: false, code: 'NOT_FOUND',
     error: `${req.method} ${req.path} not found`, requestId: req.requestId });

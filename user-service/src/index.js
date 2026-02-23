@@ -32,6 +32,7 @@ app.use(errorHandler);
 let server;
 let isShuttingDown = false;
 
+// Handles shutdown.
 const shutdown = async (signal) => {
   if (isShuttingDown) return;
   isShuttingDown = true;
@@ -74,6 +75,7 @@ process.on('unhandledRejection', (reason) => {
   shutdown('unhandledRejection');
 });
 
+// Handles bootstrap.
 const bootstrap = async () => {
   try {
     logger.info('Bootstrapping User Service...');

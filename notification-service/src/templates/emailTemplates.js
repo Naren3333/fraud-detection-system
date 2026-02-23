@@ -1049,6 +1049,7 @@ const flaggedFraudTeamTemplate = Handlebars.compile(`
 `);
 
 
+// Handles render declined customer email.
 function renderDeclinedCustomerEmail(data) {
   return {
     subject: `Transaction Declined - Reference ${data.transactionId.substring(0, 8).toUpperCase()}`,
@@ -1057,6 +1058,7 @@ function renderDeclinedCustomerEmail(data) {
   };
 }
 
+// Handles render declined fraud team email.
 function renderDeclinedFraudTeamEmail(data) {
   return {
     subject: `DECLINED - ${data.customerId} - ${data.amount} ${data.currency} - Score ${data.riskScore}/100`,
@@ -1068,6 +1070,7 @@ function renderDeclinedFraudTeamEmail(data) {
   };
 }
 
+// Handles render flagged fraud team email.
 function renderFlaggedFraudTeamEmail(data) {
   return {
     subject: `REVIEW REQUIRED - ${data.customerId} - ${data.amount} ${data.currency} - Score ${data.riskScore}/100`,

@@ -1,7 +1,5 @@
 const winston = require('winston');
 const config = require('./index');
-
-// Fields that should never appear in logs (PII / sensitive data)
 const REDACTED_FIELDS = new Set([
   'password', 'cardNumber', 'cvv', 'ssn', 'accountNumber',
   'authorization', 'token', 'secret', 'apiKey', 'privateKey',
@@ -11,6 +9,7 @@ const LEVEL_SYMBOL = Symbol.for('level');
 const MESSAGE_SYMBOL = Symbol.for('message');
 const SPLAT_SYMBOL = Symbol.for('splat');
 
+// Handles redact.
 const redact = (obj, depth = 0) => {
   if (depth > 6 || obj === null || typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) return obj.map((item) => redact(item, depth + 1));
@@ -22,15 +21,8 @@ const redact = (obj, depth = 0) => {
     })
   );
 };
-
-// FIX: Preserve Winston's internal Symbol properties after redaction.
-// Object.fromEntries(Object.entries()) strips Symbols - Winston needs
-// Symbol.for('level') and Symbol.for('message') to route and output logs.
-// Without them, colorize() silently fails and Console transport writes nothing.
 const redactFilter = winston.format((info) => {
   const redacted = redact(info);
-
-  // Re-attach Winston's internal Symbols that Object.fromEntries strips
   if (info[LEVEL_SYMBOL] !== undefined) redacted[LEVEL_SYMBOL] = info[LEVEL_SYMBOL];
   if (info[MESSAGE_SYMBOL] !== undefined) redacted[MESSAGE_SYMBOL] = info[MESSAGE_SYMBOL];
   if (info[SPLAT_SYMBOL] !== undefined) redacted[SPLAT_SYMBOL] = info[SPLAT_SYMBOL];
@@ -60,12 +52,6 @@ const devFormat = winston.format.combine(
     return msg;
   })
 );
-
-// FIX: Do NOT set format at the logger level - only set it on the transport.
-// When format is specified at BOTH createLogger and transport level, Winston
-// chains them: logger-level format runs first, then transport-level format.
-// This caused: json() serializing the info object BEFORE devFormat's printf
-// could run, double-stamping timestamps, and redactFilter stripping Symbols twice.
 const transports = [
   new winston.transports.Console({
     format: config.env === 'production' ? jsonFormat : devFormat,
@@ -74,7 +60,6 @@ const transports = [
 
 const logger = winston.createLogger({
   level: config.logLevel,
-  // No format here - format is handled entirely by each transport above
   defaultMeta: {
     service: config.serviceName,
     version: config.serviceVersion,
@@ -84,10 +69,7 @@ const logger = winston.createLogger({
   exitOnError: false,
 });
 
-/**
- * Returns a child logger bound to a specific correlation ID and context.
- * Use this per-request or per-message to trace execution across logs.
- */
+
 logger.child = (meta) => {
   const child = Object.create(logger);
   const baseMeta = { ...meta };

@@ -5,6 +5,7 @@ const logger = require('./logger');
 let client = null;
 let isConnecting = false;
 
+// Handles create client.
 const createClient = async () => {
   if (client?.isReady) return client;
   if (isConnecting) {
@@ -67,6 +68,7 @@ const createClient = async () => {
   return client;
 };
 
+// Handles get client.
 const getClient = () => {
   if (!client?.isReady) {
     throw new Error('Redis client not initialized or not ready');
@@ -74,6 +76,7 @@ const getClient = () => {
   return client;
 };
 
+// Handles close client.
 const closeClient = async () => {
   if (client) {
     try {

@@ -1,13 +1,7 @@
 const config = require('../config');
 const logger = require('../config/logger');
 
-/**
- * Enterprise ML Model: Gradient-Boosted Decision Tree (simulated via weighted logistic regression)
- * 
- * In production, this would load a serialized XGBoost/LightGBM model from disk.
- * For this implementation, we use a sophisticated weighted scoring system that mimics
- * ensemble model behavior with calibrated feature importance weights.
- */
+
 class FraudModel {
   constructor() {
     this.modelVersion = config.model.version;
@@ -19,75 +13,51 @@ class FraudModel {
     this._loadModel();
   }
 
-  /**
-   * Load pre-trained model weights.
-   * In production: load from .pkl/.json file or model registry (MLflow, SageMaker, etc.)
-   */
+  
+  // Handles load model.
   _loadModel() {
     try {
-      // Simulated XGBoost-calibrated weights (derived from historical fraud data analysis)
-      // These weights are tuned to match typical fraud patterns in payment transactions
       this.weights = {
-        // Amount features (high importance)
         amount_log: 0.35,
         amount_bin: 0.12,
         amount_suspicious: 0.42,
         amount_high: 0.18,
         amount_is_round: 0.08,
         amount_x_velocity: 0.28,
-
-        // Velocity features (critical importance)
         velocity_txn_hour_norm: 0.48,
         velocity_amount_hour_norm: 0.52,
         velocity_txn_day_norm: 0.31,
         velocity_txn_hour: 0.22,
         velocity_amount_hour: 0.25,
         velocity_txn_day: 0.15,
-
-        // Rule-based features (high trust signals)
         rules_flagged: 0.55,
         rules_score: 0.38,
         rules_reason_count: 0.29,
         rules_x_velocity: 0.33,
-
-        // Geographic features (medium-high importance)
         country_risk: 0.41,
         geo_high_risk: 0.47,
-        country_sg: -0.15, // Negative weight = lower risk
+        country_sg: -0.15,
         country_us: -0.10,
         country_gb: -0.12,
-
-        // Temporal features (medium importance)
         hour_of_day: 0.05,
         hour_bin: 0.09,
         is_night: 0.21,
         is_weekend: 0.07,
         time_unusual: 0.16,
         night_x_high_amount: 0.24,
-
-        // Card features (low-medium importance)
         card_type_visa: -0.05,
         card_type_mastercard: -0.03,
         card_type_amex: 0.08,
-
-        // Currency features (low importance)
         currency_usd: -0.04,
         currency_eur: -0.02,
         currency_gbp: -0.03,
-
-        // Day of week (minimal importance)
         day_of_week: 0.02,
       };
-
-      // Intercept (baseline log-odds for fraud)
-      // Calibrated to ~5% base fraud rate: logit(0.05) ≈ -2.94
       this.intercept = -2.94;
-
-      // Feature importance scores (for explainability)
       this.featureImportance = Object.entries(this.weights)
         .map(([feature, weight]) => ({ feature, importance: Math.abs(weight) }))
         .sort((a, b) => b.importance - a.importance)
-        .slice(0, 10); // Top 10 features
+        .slice(0, 10);
 
       this.isLoaded = true;
       
@@ -102,17 +72,14 @@ class FraudModel {
     }
   }
 
-  /**
-   * Predict fraud probability for a feature set.
-   * Returns: { score: 0-100, probability: 0-1, confidence: 0-1 }
-   */
+  
+  // Handles predict.
   predict(features) {
     if (!this.isLoaded) {
       throw new Error('Model not loaded');
     }
 
     try {
-      // Calculate weighted sum (logit)
       let logit = this.intercept;
       let totalWeight = 0;
       let matchedFeatures = 0;
@@ -125,15 +92,9 @@ class FraudModel {
           matchedFeatures++;
         }
       }
-
-      // Apply sigmoid to get probability
       const probability = this._sigmoid(logit);
-
-      // Calculate confidence based on feature coverage
       const featureCoverage = matchedFeatures / Object.keys(this.weights).length;
       const confidence = Math.min(featureCoverage * 1.2, 1.0);
-
-      // Convert probability to 0-100 score
       const score = Math.round(probability * 100);
 
       return {
@@ -149,9 +110,8 @@ class FraudModel {
     }
   }
 
-  /**
-   * Explain prediction by ranking feature contributions.
-   */
+  
+  // Handles explain.
   explain(features, prediction) {
     const contributions = [];
 
@@ -169,8 +129,6 @@ class FraudModel {
         });
       }
     }
-
-    // Sort by absolute contribution (most impactful first)
     contributions.sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution));
 
     return {
@@ -180,9 +138,8 @@ class FraudModel {
     };
   }
 
-  /**
-   * Get model metadata for audit trails.
-   */
+  
+  // Handles get metadata.
   getMetadata() {
     return {
       modelVersion: this.modelVersion,
@@ -194,10 +151,8 @@ class FraudModel {
     };
   }
 
-  // ─── Private Helpers ─────────────────────────────────────────────────────
-
+  // Handles sigmoid.
   _sigmoid(x) {
-    // Numerically stable sigmoid
     if (x >= 0) {
       const z = Math.exp(-x);
       return 1 / (1 + z);
@@ -207,6 +162,7 @@ class FraudModel {
     }
   }
 
+  // Handles generate explanation.
   _generateExplanation(topContributions) {
     const reasons = [];
 

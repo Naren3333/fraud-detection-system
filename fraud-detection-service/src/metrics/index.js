@@ -2,8 +2,6 @@ const client = require('prom-client');
 const config = require('../config');
 
 const register = new client.Registry();
-
-// Add default Node.js metrics (event loop lag, heap, GC, etc.)
 client.collectDefaultMetrics({
   register,
   prefix: `${config.metrics.prefix}_`,
@@ -49,7 +47,7 @@ const ruleEvaluationDuration = new client.Histogram({
 const mlScoringRequestsTotal = new client.Counter({
   name: `${config.metrics.prefix}_ml_scoring_requests_total`,
   help: 'Total ML scoring service requests',
-  labelNames: ['status'], // success | fallback | circuit_open
+  labelNames: ['status'],
   registers: [register],
 });
 
@@ -71,7 +69,7 @@ const mlCircuitBreakerState = new client.Gauge({
 const riskScoreDistribution = new client.Histogram({
   name: `${config.metrics.prefix}_risk_score_distribution`,
   help: 'Distribution of final risk scores',
-  labelNames: ['source'], // rules | ml | combined
+  labelNames: ['source'],
   buckets: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
   registers: [register],
 });
@@ -80,7 +78,7 @@ const riskScoreDistribution = new client.Histogram({
 const kafkaMessagesConsumed = new client.Counter({
   name: `${config.metrics.prefix}_kafka_messages_consumed_total`,
   help: 'Total Kafka messages consumed',
-  labelNames: ['topic', 'status'], // success | error | dlq
+  labelNames: ['topic', 'status'],
   registers: [register],
 });
 

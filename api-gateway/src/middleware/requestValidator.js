@@ -3,6 +3,7 @@ const { v4: uuidv4 } = require('uuid');
 const { BadRequestError } = require('../utils/errors');
 const { REQUEST_ID_HEADER, CORRELATION_ID_HEADER, IDEMPOTENCY_KEY_HEADER } = require('../utils/constants');
 
+// Handles validate request.
 const validateRequest = (schema) => {
   return (req, res, next) => {
     const { error, value } = schema.validate(req.body, {
@@ -24,6 +25,7 @@ const validateRequest = (schema) => {
   };
 };
 
+// Handles validate query params.
 const validateQueryParams = (schema) => {
   return (req, res, next) => {
     const { error, value } = schema.validate(req.query, {
@@ -45,22 +47,16 @@ const validateQueryParams = (schema) => {
   };
 };
 
+// Handles attach request metadata.
 const attachRequestMetadata = (req, res, next) => {
-  // Generate or use existing request ID
   req.requestId = req.headers[REQUEST_ID_HEADER.toLowerCase()] || uuidv4();
   res.setHeader(REQUEST_ID_HEADER, req.requestId);
-
-  // Handle correlation ID for distributed tracing
   req.correlationId = req.headers[CORRELATION_ID_HEADER.toLowerCase()] || req.requestId;
   res.setHeader(CORRELATION_ID_HEADER, req.correlationId);
-
-  // Extract idempotency key if present
   req.idempotencyKey = req.headers[IDEMPOTENCY_KEY_HEADER.toLowerCase()];
   if (req.idempotencyKey) {
     res.setHeader(IDEMPOTENCY_KEY_HEADER, req.idempotencyKey);
   }
-
-  // Attach timestamp
   req.timestamp = new Date().toISOString();
 
   next();

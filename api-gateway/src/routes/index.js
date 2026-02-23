@@ -6,19 +6,13 @@ const MetricsService = require('../utils/metrics');
 const { authLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
-
-// Health check routes (no auth required)
 router.use(healthRoutes);
-
-// Metrics endpoint
+// Handles GET /metrics.
 router.get('/metrics', async (req, res) => {
   res.set('Content-Type', MetricsService.getContentType());
   res.end(await MetricsService.getMetrics());
 });
-
-// Auth Routes Proxy
-// All /auth/* requests are proxied to user-service:3002
-// No more mock authService - real authentication via user service
+// Handles USE /auth.
 router.use('/auth', authLimiter, async (req, res) => {
   const targetUrl = `http://user-service:3002/api/v1/auth${req.path}`;
 
@@ -36,7 +30,7 @@ router.use('/auth', authLimiter, async (req, res) => {
         'X-Forwarded-For': req.ip || '',
       },
       timeout: 30000,
-      validateStatus: () => true, // Pass through all status codes
+      validateStatus: () => true,
     });
 
     res.status(response.status).json(response.data);
@@ -60,8 +54,6 @@ router.use('/auth', authLimiter, async (req, res) => {
     });
   }
 });
-
-// Proxied routes (auth required for transactions, audit, analytics)
 router.use(proxyRoutes);
 
 module.exports = router;

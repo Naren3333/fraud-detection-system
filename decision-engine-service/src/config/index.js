@@ -41,13 +41,9 @@ module.exports = {
     flagMin: parseInt(process.env.THRESHOLD_FLAG_MIN, 10) || 50,
     flagMax: parseInt(process.env.THRESHOLD_FLAG_MAX, 10) || 79,
     declineMin: parseInt(process.env.THRESHOLD_DECLINE_MIN, 10) || 80,
-    
-    // Override conditions
     rulesFlaggedAutoDecline: process.env.THRESHOLD_RULES_FLAGGED_AUTO_DECLINE === 'true',
     highConfidenceApprove: parseFloat(process.env.THRESHOLD_HIGH_CONFIDENCE_APPROVE) || 0.95,
     lowConfidenceFlag: parseFloat(process.env.THRESHOLD_LOW_CONFIDENCE_FLAG) || 0.60,
-    
-    // Amount thresholds
     highValueAmount: parseFloat(process.env.THRESHOLD_HIGH_VALUE_AMOUNT) || 10000,
     highValueAutoFlag: process.env.THRESHOLD_HIGH_VALUE_AUTO_FLAG === 'true',
   },

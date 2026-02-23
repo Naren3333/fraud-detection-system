@@ -71,6 +71,7 @@ app.use((err, req, res, next) => {
 let server;
 let isShuttingDown = false;
 
+// Handles shutdown.
 const shutdown = async (signal) => {
   if (isShuttingDown) return;
   isShuttingDown = true;

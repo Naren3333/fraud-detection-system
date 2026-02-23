@@ -78,6 +78,7 @@ process.on('unhandledRejection', (reason, promise) => {
 // Start server
 let server;
 
+// Handles start server.
 const startServer = async () => {
   try {
     // Initialize Redis connection

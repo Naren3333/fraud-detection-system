@@ -26,7 +26,7 @@ class ProxyService {
           'X-Forwarded-Proto': 'https',
         },
         timeout: config.proxy.timeout,
-        validateStatus: () => true, // Don't throw on any status
+        validateStatus: () => true,
       });
 
       const duration = (Date.now() - startTime) / 1000;
@@ -94,8 +94,6 @@ class ProxyService {
           serviceName: options.serviceName,
           error: error.message,
         });
-
-        // Exponential backoff
         await new Promise((resolve) => 
           setTimeout(resolve, retryDelay * Math.pow(2, attempt - 1))
         );

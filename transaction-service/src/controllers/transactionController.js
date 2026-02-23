@@ -3,6 +3,7 @@ const { NotFoundError } = require('../utils/errors');
 
 class TransactionController {
 
+  // Handles create.
   async create(req, res, next) {
     try {
       const result = await service.createTransaction(req.body, {
@@ -19,6 +20,7 @@ class TransactionController {
     } catch (err) { next(err); }
   }
 
+  // Handles get by id.
   async getById(req, res, next) {
     try {
       const txn = await service.getById(req.params.id);
@@ -27,6 +29,7 @@ class TransactionController {
     } catch (err) { next(err); }
   }
 
+  // Handles get by customer.
   async getByCustomer(req, res, next) {
     try {
       const limit  = Math.min(parseInt(req.query.limit,  10) || 20, 100);

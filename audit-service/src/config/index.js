@@ -35,7 +35,7 @@ module.exports = {
 
   audit: {
     enableHashVerification: process.env.ENABLE_HASH_VERIFICATION !== 'false',
-    retentionDays: parseInt(process.env.AUDIT_RETENTION_DAYS, 10) || 2555, // ~7 years
+    retentionDays: parseInt(process.env.AUDIT_RETENTION_DAYS, 10) || 2555,
     enableChainValidation: process.env.ENABLE_CHAIN_VALIDATION !== 'false',
   },
 

@@ -1,9 +1,8 @@
 const config = require('../config');
 const logger = require('../config/logger');
 
-/**
- * Enforce request timeout to prevent long-running inference from blocking the service.
- */
+
+// Handles request timeout.
 const requestTimeout = (req, res, next) => {
   const timeout = setTimeout(() => {
     if (!res.headersSent) {

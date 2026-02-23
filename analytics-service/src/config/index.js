@@ -36,7 +36,7 @@ module.exports = {
   },
 
   analytics: {
-    retentionHours: parseInt(process.env.METRICS_RETENTION_HOURS, 10) || 168, // 7 days
+    retentionHours: parseInt(process.env.METRICS_RETENTION_HOURS, 10) || 168,
     aggregationIntervalSeconds: parseInt(process.env.METRICS_AGGREGATION_INTERVAL_SECONDS, 10) || 60,
     enableRealTimeUpdates: process.env.ENABLE_REAL_TIME_UPDATES !== 'false',
   },

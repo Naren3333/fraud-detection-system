@@ -7,7 +7,7 @@ const createTransactionSchema = Joi.object({
   merchantId:  Joi.string().min(1).max(255).required(),
   amount:      Joi.number().positive().precision(2).max(1_000_000).required(),
   currency:    Joi.string().valid(...CURRENCIES).default('USD'),
-  cardNumber:  Joi.string().creditCard().optional(),   // Joi validates Luhn checksum
+  cardNumber:  Joi.string().creditCard().optional(),
   cardType:    Joi.string().valid('visa','mastercard','amex','discover','other').optional(),
   deviceId:    Joi.string().max(255).optional(),
   ipAddress:   Joi.string().ip().optional(),
@@ -20,6 +20,7 @@ const createTransactionSchema = Joi.object({
   metadata: Joi.object().optional().default({}),
 });
 
+// Handles validate create transaction.
 const validateCreateTransaction = (req, res, next) => {
   const { error, value } = createTransactionSchema.validate(req.body, {
     abortEarly:   false,

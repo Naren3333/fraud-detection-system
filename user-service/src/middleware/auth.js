@@ -2,6 +2,7 @@ const userService = require('../services/userService');
 const { UnauthorizedError, ForbiddenError } = require('../utils/errors');
 const logger = require('../config/logger');
 
+// Handles authenticate.
 const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -16,8 +17,6 @@ const authenticate = async (req, res, next) => {
     }
 
     const decoded = userService.validateAccessToken(token);
-
-    // Attach user info to request
     req.userId = decoded.userId;
     req.userEmail = decoded.email;
     req.userRole = decoded.role;
@@ -30,6 +29,7 @@ const authenticate = async (req, res, next) => {
   }
 };
 
+// Handles authorize.
 const authorize = (...allowedRoles) => {
   return (req, res, next) => {
     try {

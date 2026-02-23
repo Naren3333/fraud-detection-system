@@ -2,6 +2,7 @@ const analyticsService = require('../services/analyticsService');
 const logger = require('../config/logger');
 
 class AnalyticsController {
+  // Handles get dashboard.
   async getDashboard(req, res) {
     const timeRange = req.query.timeRange || '24h';
     
@@ -15,6 +16,7 @@ class AnalyticsController {
     });
   }
 
+  // Handles get real time.
   async getRealTime(req, res) {
     const stats = await analyticsService.getRealTimeStats();
 

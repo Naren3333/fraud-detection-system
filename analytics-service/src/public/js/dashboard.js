@@ -1,4 +1,3 @@
-// Dracula Theme Colors
 const colors = {
   bg: '#282a36',
   currentLine: '#44475a',
@@ -16,15 +15,12 @@ const colors = {
 let currentTimeRange = '24h';
 let charts = {};
 let ws = null;
-
-// Initialize
 document.addEventListener('DOMContentLoaded', () => {
   initWebSocket();
   loadDashboard();
-  setInterval(() => loadDashboard(), 60000); // Refresh every minute
+  setInterval(() => loadDashboard(), 60000);
 });
-
-// WebSocket Connection
+// Handles init web socket.
 function initWebSocket() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${protocol}//${window.location.host}/ws`;
@@ -52,12 +48,8 @@ function initWebSocket() {
     console.log('WebSocket disconnected');
     document.getElementById('ws-status').textContent = 'Disconnected';
     document.getElementById('ws-status').style.color = colors.orange;
-    
-    // Reconnect after 5 seconds
     setTimeout(initWebSocket, 5000);
   };
-
-  // Send ping every 30 seconds
   setInterval(() => {
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'ping' }));
@@ -65,6 +57,7 @@ function initWebSocket() {
   }, 30000);
 }
 
+// Handles handle web socket message.
 function handleWebSocketMessage(message) {
   switch (message.type) {
     case 'init':
@@ -74,13 +67,13 @@ function handleWebSocketMessage(message) {
       updateRealTimeStats(message.data);
       break;
     case 'pong':
-      // Heartbeat response
       break;
     default:
       console.log('Unknown message type:', message.type);
   }
 }
 
+// Handles update real time stats.
 function updateRealTimeStats(stats) {
   document.getElementById('rt-total').textContent = stats.totalDecisions || 0;
   document.getElementById('rt-approved').textContent = stats.approved || 0;
@@ -88,8 +81,7 @@ function updateRealTimeStats(stats) {
   document.getElementById('rt-flagged').textContent = stats.flagged || 0;
   document.getElementById('rt-avg-score').textContent = stats.avgRiskScore || 0;
 }
-
-// Load Dashboard Data
+// Handles load dashboard.
 async function loadDashboard() {
   try {
     const response = await fetch(`/api/v1/analytics/dashboard?timeRange=${currentTimeRange}`);
@@ -108,6 +100,7 @@ async function loadDashboard() {
   }
 }
 
+// Handles update overview stats.
 function updateOverviewStats(stats) {
   document.getElementById('total-transactions').textContent = stats.totalTransactions.toLocaleString();
   document.getElementById('approval-rate').textContent = stats.approvalRate + '%';
@@ -119,12 +112,11 @@ function updateOverviewStats(stats) {
   document.getElementById('flagged-count').textContent = `${stats.flagged.toLocaleString()} flagged`;
 }
 
+// Handles update decision breakdown.
 function updateDecisionBreakdown(decisions) {
   const approved = decisions.find(d => d.decision === 'APPROVED');
   const declined = decisions.find(d => d.decision === 'DECLINED');
   const flagged = decisions.find(d => d.decision === 'FLAGGED');
-
-  // Update Pie Chart
   if (charts.decisionPie) {
     charts.decisionPie.destroy();
   }
@@ -158,6 +150,7 @@ function updateDecisionBreakdown(decisions) {
   });
 }
 
+// Handles update time series chart.
 function updateTimeSeriesChart(timeSeries) {
   if (charts.timeSeries) {
     charts.timeSeries.destroy();
@@ -223,6 +216,7 @@ function updateTimeSeriesChart(timeSeries) {
   });
 }
 
+// Handles update risk score chart.
 function updateRiskScoreChart(riskScores) {
   if (charts.riskScore) {
     charts.riskScore.destroy();
@@ -279,8 +273,6 @@ function updateRiskScoreChart(riskScores) {
       },
     },
   });
-
-  // Performance Chart (placeholder)
   if (charts.performance) {
     charts.performance.destroy();
   }
@@ -322,6 +314,7 @@ function updateRiskScoreChart(riskScores) {
   });
 }
 
+// Handles update top customers.
 function updateTopCustomers(customers) {
   const tbody = document.getElementById('top-customers-body');
   if (customers.length === 0) {
@@ -340,6 +333,7 @@ function updateTopCustomers(customers) {
   `).join('');
 }
 
+// Handles update top merchants.
 function updateTopMerchants(merchants) {
   const tbody = document.getElementById('top-merchants-body');
   if (merchants.length === 0) {
@@ -356,17 +350,12 @@ function updateTopMerchants(merchants) {
     </tr>
   `).join('');
 }
-
-// Time Range Selector
+// Handles set time range.
 function setTimeRange(range) {
   currentTimeRange = range;
-  
-  // Update button states
   document.querySelectorAll('.time-btn').forEach(btn => {
     btn.classList.remove('active');
   });
   event.target.classList.add('active');
-  
-  // Reload dashboard
   loadDashboard();
 }

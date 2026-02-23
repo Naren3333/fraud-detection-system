@@ -1,11 +1,11 @@
-/* Dracula Theme - Enterprise Fraud Detection Dashboard */
+
 :root {
   --bg: #282a36;
   --current-line: #44475a;
   --foreground: #f8f8f2;
   --comment: #6272a4;
 
-  /* Official Dracula Accents */
+  
   --cyan: #8be9fd;
   --green: #50fa7b;
   --orange: #ffb86c;
@@ -14,7 +14,7 @@
   --red: #ff5555;
   --yellow: #f1fa8c;
 
-  /* Softer UI variants (important for dashboards) */
+  
   --green-soft: #3ae374;
   --red-soft: #ff6b6b;
   --yellow-soft: #e6f77b;
@@ -40,7 +40,7 @@ body {
   padding: 20px;
 }
 
-/* Header */
+
 .header {
   position: relative;
   background: var(--current-line);
@@ -91,7 +91,7 @@ body {
   50% { opacity: 0.7; }
 }
 
-/* Time Range Selector */
+
 .time-selector {
   display: flex;
   gap: 10px;
@@ -123,7 +123,7 @@ body {
   color: var(--bg);
 }
 
-/* Stats Grid */
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -185,7 +185,7 @@ body {
   color: var(--comment);
 }
 
-/* Charts Grid */
+
 .charts-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
@@ -212,7 +212,7 @@ body {
   position: relative;
 }
 
-/* Tables */
+
 .table-card {
   background: var(--current-line);
   padding: 25px;
@@ -273,7 +273,7 @@ tr:hover {
   border: 1px solid var(--yellow);
 }
 
-/* Loading Spinner */
+
 .loading {
   display: flex;
   justify-content: center;
@@ -295,7 +295,7 @@ tr:hover {
   100% { transform: rotate(360deg); }
 }
 
-/* Footer */
+
 .footer {
   text-align: center;
   padding: 30px;
@@ -305,7 +305,7 @@ tr:hover {
   border-top: 1px solid var(--current-line);
 }
 
-/* Responsive */
+
 @media (max-width: 768px) {
   .charts-grid {
     grid-template-columns: 1fr;

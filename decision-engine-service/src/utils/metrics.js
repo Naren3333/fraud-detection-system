@@ -2,8 +2,6 @@ const client = require('prom-client');
 const config = require('../config');
 
 const register = new client.Registry();
-
-// Default Node.js metrics
 client.collectDefaultMetrics({
   register,
   prefix: `${config.metrics.prefix}_`,
@@ -14,12 +12,10 @@ client.collectDefaultMetrics({
   },
 });
 
-// ─── Decision Metrics ────────────────────────────────────────────────────────
-
 const decisionsTotal = new client.Counter({
   name: `${config.metrics.prefix}_decisions_total`,
   help: 'Total number of decisions made',
-  labelNames: ['decision'], // APPROVED | DECLINED | FLAGGED
+  labelNames: ['decision'],
   registers: [register],
 });
 
@@ -34,7 +30,7 @@ const decisionDuration = new client.Histogram({
 const overridesTotal = new client.Counter({
   name: `${config.metrics.prefix}_overrides_total`,
   help: 'Total number of override decisions',
-  labelNames: ['override_type'], // WHITELIST | BLACKLIST | HIGH_VALUE | GEOGRAPHIC_RISK
+  labelNames: ['override_type'],
   registers: [register],
 });
 
@@ -46,22 +42,18 @@ const riskScoreDistribution = new client.Histogram({
   registers: [register],
 });
 
-// ─── Database Metrics ────────────────────────────────────────────────────────
-
 const dbOperationDuration = new client.Histogram({
   name: `${config.metrics.prefix}_db_operation_duration_ms`,
   help: 'Database operation duration (ms)',
-  labelNames: ['operation'], // save_decision | find_by_transaction | get_stats
+  labelNames: ['operation'],
   buckets: [1, 5, 10, 25, 50, 100, 250, 500],
   registers: [register],
 });
 
-// ─── Kafka Metrics ───────────────────────────────────────────────────────────
-
 const kafkaMessagesConsumed = new client.Counter({
   name: `${config.metrics.prefix}_kafka_messages_consumed_total`,
   help: 'Total Kafka messages consumed',
-  labelNames: ['topic', 'status'], // success | error | dlq
+  labelNames: ['topic', 'status'],
   registers: [register],
 });
 
@@ -71,8 +63,6 @@ const kafkaMessagesPublished = new client.Counter({
   labelNames: ['topic', 'decision'],
   registers: [register],
 });
-
-// ─── Error Metrics ───────────────────────────────────────────────────────────
 
 const errorsTotal = new client.Counter({
   name: `${config.metrics.prefix}_errors_total`,

@@ -1,5 +1,6 @@
 require('dotenv').config();
 
+// Handles required.
 const required = (key) => {
   const value = process.env[key];
   if (!value && process.env.NODE_ENV === 'production') {
@@ -30,7 +31,6 @@ module.exports = {
       multiplier: 2,
       maxRetryTime: 30000,
     },
-    // Manual commit settings
     autoCommit: false,
     maxBatchSize: parseInt(process.env.KAFKA_MAX_BATCH_SIZE, 10) || 10,
   },
@@ -49,11 +49,10 @@ module.exports = {
   mlScoring: {
     url: process.env.ML_SCORING_SERVICE_URL || 'http://localhost:3004',
     timeout: parseInt(process.env.ML_SCORING_TIMEOUT, 10) || 3000,
-    // Circuit breaker settings
     circuitBreaker: {
       failureThreshold: parseInt(process.env.ML_CB_FAILURE_THRESHOLD, 10) || 5,
       successThreshold: parseInt(process.env.ML_CB_SUCCESS_THRESHOLD, 10) || 2,
-      timeout: parseInt(process.env.ML_CB_TIMEOUT, 10) || 30000, // 30s open before half-open
+      timeout: parseInt(process.env.ML_CB_TIMEOUT, 10) || 30000,
     },
   },
 
@@ -73,7 +72,6 @@ module.exports = {
     cards: {
       binBlacklist: (process.env.BIN_BLACKLIST || '').split(',').filter(Boolean),
     },
-    // Risk scoring weights for rule factors
     scoring: {
       velocityCountHourWeight: parseFloat(process.env.SCORING_VELOCITY_COUNT_HOUR) || 15,
       velocityAmountHourWeight: parseFloat(process.env.SCORING_VELOCITY_AMOUNT_HOUR) || 20,
@@ -85,7 +83,6 @@ module.exports = {
       roundAmountWeight: parseFloat(process.env.SCORING_ROUND_AMOUNT) || 5,
       binBlacklistWeight: parseFloat(process.env.SCORING_BIN_BLACKLIST) || 40,
     },
-    // Final combination weights
     combination: {
       rulesWeight: parseFloat(process.env.COMBINATION_RULES_WEIGHT) || 0.4,
       mlWeight: parseFloat(process.env.COMBINATION_ML_WEIGHT) || 0.6,

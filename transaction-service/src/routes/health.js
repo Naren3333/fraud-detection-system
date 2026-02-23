@@ -2,6 +2,7 @@ const router = require('express').Router();
 const { getPool }         = require('../db/pool');
 const { isProducerReady } = require('../kafka/producer');
 
+// Handles GET /health.
 router.get('/health', async (req, res) => {
   const checks = {};
   let ok = true;
@@ -20,8 +21,10 @@ router.get('/health', async (req, res) => {
   });
 });
 
+// Handles GET /health/live.
 router.get('/health/live',  (_req, res) => res.json({ status: 'alive' }));
 
+// Handles GET /health/ready.
 router.get('/health/ready', async (_req, res) => {
   try   { await getPool().query('SELECT 1'); res.json({ status: 'ready' }); }
   catch { res.status(503).json({ status: 'not_ready' }); }

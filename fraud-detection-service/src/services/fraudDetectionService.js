@@ -12,16 +12,10 @@ const {
 const ANALYSIS_VERSION = '2.0.0';
 
 class FraudDetectionService {
-  /**
-   * Main fraud detection pipeline:
-   *  1. Rule-based evaluation (parallel rules, graduated scores)
-   *  2. ML risk scoring (with circuit breaker + fallback)
-   *  3. Weighted combination with configurable thresholds
-   */
+  
+  // Handles analyze transaction.
   async analyzeTransaction(transaction, correlationId) {
     const startTime = Date.now();
-
-    // Per-transaction child logger carries correlationId through all downstream calls
     const log = logger.child({
       transactionId: transaction.id,
       customerId: transaction.customerId,
@@ -35,18 +29,11 @@ class FraudDetectionService {
     });
 
     try {
-      // Step 1: Rule-based detection (runs all rules in parallel internally)
       const ruleResults = await fraudRulesEngine.evaluate(transaction, log);
-
-      // Step 2: ML risk scoring (circuit-breaker protected, falls back gracefully)
       const mlResults = await mlScoringClient.getScore(transaction, ruleResults, log);
-
-      // Step 3: Combine into final assessment
       const combined = this._combineResults(transaction, ruleResults, mlResults);
 
       const durationMs = Date.now() - startTime;
-
-      // Metrics
       transactionsProcessedTotal.inc({
         status: 'success',
         flagged: combined.flagged ? 'true' : 'false',
@@ -78,27 +65,13 @@ class FraudDetectionService {
         stack: error.stack,
         durationMs,
       });
-
-      // Safe defaults: neutral score, not flagged, so we don't block the transaction
       return this._safeDefault(transaction, error.message);
     }
   }
 
-  // Result Combination
-
-  /**
-   * Weighted combination of rule and ML scores.
-   *
-   * Formula:  combinedScore = (ruleScore * rulesWeight) + (mlScore * mlWeight)
-   *
-   * Flagged if:
-   *   - Rules engine hard-flagged the transaction, OR
-   *   - ML score exceeds mlFlagThreshold
-   */
+  
+  // Handles combine results.
   _combineResults(transaction, ruleResults, mlResults) {
-    // FIX: config is now a direct require at the top of the file.
-    // Previously it was a lazy function `const config = () => require('../config')`
-    // defined AFTER the class body - confusing, unnecessary, and fragile.
     const { rulesWeight, mlWeight, mlFlagThreshold } = config.fraudRules.combination;
 
     const combinedScore = Math.round(
@@ -106,27 +79,20 @@ class FraudDetectionService {
     );
 
     const finalFlagged = ruleResults.flagged || mlResults.score > mlFlagThreshold;
-
-    // Merge rule reasons and any ML-provided reasons
     const allReasons = [...ruleResults.reasons];
     if (mlResults.score > mlFlagThreshold) {
       allReasons.push(`ML model score ${mlResults.score} exceeds threshold (${mlFlagThreshold})`);
     }
 
     return {
-      // Identity
       transactionId: transaction.id,
       customerId: transaction.customerId,
       merchantId: transaction.merchantId,
       amount: transaction.amount,
       currency: transaction.currency,
-
-      // Risk assessment
       riskScore: combinedScore,
       flagged: finalFlagged,
       reasons: allReasons,
-
-      // Full audit trail for downstream consumers / compliance
       ruleResults: {
         flagged: ruleResults.flagged,
         ruleScore: ruleResults.ruleScore,
@@ -140,13 +106,12 @@ class FraudDetectionService {
         features: mlResults.features,
         isFallback: mlResults.modelVersion === 'fallback-v1',
       },
-
-      // Metadata
       analyzedAt: new Date().toISOString(),
       analysisVersion: ANALYSIS_VERSION,
     };
   }
 
+  // Handles safe default.
   _safeDefault(transaction, errorMessage) {
     return {
       transactionId: transaction.id,

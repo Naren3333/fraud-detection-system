@@ -1,24 +1,14 @@
 const config = require('../config');
 const logger = require('../config/logger');
 
-/**
- * Enterprise Decision Engine
- * 
- * Applies multi-layered decision logic:
- * 1. Blacklist/whitelist overrides
- * 2. Threshold-based scoring
- * 3. Confidence-based adjustments
- * 4. Business rule overrides (high-value, geography, etc.)
- */
+
 class DecisionEngineService {
   constructor() {
     this.decisionVersion = '1.0.0';
   }
 
-  /**
-   * Main decision pipeline
-   * Returns: { decision, reason, factors, override }
-   */
+  
+  // Handles make decision.
   makeDecision(fraudAnalysis, originalTransaction) {
     const log = logger.child({
       transactionId: fraudAnalysis.transactionId,
@@ -34,8 +24,6 @@ class DecisionEngineService {
     let decision = null;
     let reasons = [];
     let override = null;
-
-    // ─── Step 1: Blacklist/Whitelist Overrides ──────────────────────────────
     const listOverride = this._checkLists(fraudAnalysis.customerId);
     if (listOverride) {
       decision = listOverride.decision;
@@ -50,8 +38,6 @@ class DecisionEngineService {
 
       return this._buildDecisionResult(decision, reasons, decisionFactors, override);
     }
-
-    // ─── Step 2: Rules Engine Hard Flags ────────────────────────────────────
     if (config.thresholds.rulesFlaggedAutoDecline && fraudAnalysis.ruleResults?.flagged) {
       decision = 'DECLINED';
       reasons.push('Rules engine flagged transaction');
@@ -63,8 +49,6 @@ class DecisionEngineService {
 
       return this._buildDecisionResult(decision, reasons, decisionFactors, null);
     }
-
-    // ─── Step 3: High-Value Transaction Override ─────────────────────────────
     const highValueOverride = this._checkHighValue(originalTransaction);
     if (highValueOverride) {
       decision = highValueOverride.decision;
@@ -78,8 +62,6 @@ class DecisionEngineService {
 
       return this._buildDecisionResult(decision, reasons, decisionFactors, highValueOverride);
     }
-
-    // ─── Step 4: Geographic Risk Override ────────────────────────────────────
     const geoOverride = this._checkGeography(originalTransaction);
     if (geoOverride) {
       decision = geoOverride.decision;
@@ -93,8 +75,6 @@ class DecisionEngineService {
 
       return this._buildDecisionResult(decision, reasons, decisionFactors, geoOverride);
     }
-
-    // ─── Step 5: Confidence-Based Adjustments ────────────────────────────────
     const confidenceAdjustment = this._applyConfidenceAdjustment(
       fraudAnalysis.riskScore,
       fraudAnalysis.mlResults?.confidence
@@ -102,8 +82,6 @@ class DecisionEngineService {
 
     const adjustedScore = confidenceAdjustment.adjustedScore;
     decisionFactors.confidenceAdjustment = confidenceAdjustment;
-
-    // ─── Step 6: Threshold-Based Decision ────────────────────────────────────
     if (adjustedScore <= config.thresholds.approveMax) {
       decision = 'APPROVED';
       reasons.push(`Risk score ${adjustedScore} below approval threshold (${config.thresholds.approveMax})`);
@@ -129,10 +107,8 @@ class DecisionEngineService {
     return this._buildDecisionResult(decision, reasons, decisionFactors, override);
   }
 
-  // ─── Override Checks ─────────────────────────────────────────────────────
-
+  // Handles check lists.
   _checkLists(customerId) {
-    // Whitelist (auto-approve)
     if (config.businessRules.autoApproveWhitelist.includes(customerId)) {
       return {
         decision: 'APPROVED',
@@ -140,8 +116,6 @@ class DecisionEngineService {
         type: 'WHITELIST',
       };
     }
-
-    // Blacklist (auto-decline)
     if (config.businessRules.autoDeclineBlacklist.includes(customerId)) {
       return {
         decision: 'DECLINED',
@@ -153,6 +127,7 @@ class DecisionEngineService {
     return null;
   }
 
+  // Handles check high value.
   _checkHighValue(transaction) {
     if (
       config.thresholds.highValueAutoFlag &&
@@ -168,6 +143,7 @@ class DecisionEngineService {
     return null;
   }
 
+  // Handles check geography.
   _checkGeography(transaction) {
     const country = transaction.location?.country?.toUpperCase();
 
@@ -182,11 +158,9 @@ class DecisionEngineService {
     return null;
   }
 
-  // ─── Confidence Adjustment ───────────────────────────────────────────────
-
+  // Handles apply confidence adjustment.
   _applyConfidenceAdjustment(riskScore, confidence) {
     if (!Number.isFinite(confidence)) {
-      // No confidence data → no adjustment
       return {
         adjustedScore: riskScore,
         confidenceUsed: false,
@@ -195,15 +169,11 @@ class DecisionEngineService {
     }
 
     let adjustment = 0;
-
-    // High confidence (>= 0.95) in a low score → approve more aggressively
     if (confidence >= config.thresholds.highConfidenceApprove && riskScore <= 60) {
-      adjustment = -5; // Reduce score by 5 points
+      adjustment = -5;
     }
-
-    // Low confidence (< 0.60) → escalate to manual review
     if (confidence < config.thresholds.lowConfidenceFlag && riskScore >= 40) {
-      adjustment = +10; // Increase score by 10 points
+      adjustment = +10;
     }
 
     const adjustedScore = Math.max(0, Math.min(100, riskScore + adjustment));
@@ -216,8 +186,7 @@ class DecisionEngineService {
     };
   }
 
-  // ─── Result Builder ──────────────────────────────────────────────────────
-
+  // Handles build decision result.
   _buildDecisionResult(decision, reasons, decisionFactors, override) {
     return {
       decision,
@@ -230,9 +199,8 @@ class DecisionEngineService {
     };
   }
 
-  /**
-   * Get decision thresholds (for transparency/debugging)
-   */
+  
+  // Handles get thresholds.
   getThresholds() {
     return {
       approve: { max: config.thresholds.approveMax },

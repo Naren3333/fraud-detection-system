@@ -33,7 +33,7 @@ module.exports = {
 
   email: {
     enabled: process.env.EMAIL_ENABLED === 'true',
-    provider: process.env.EMAIL_PROVIDER || 'mock', // mock | smtp
+    provider: process.env.EMAIL_PROVIDER || 'mock',
     smtp: {
       host: process.env.EMAIL_SMTP_HOST || 'smtp.gmail.com',
       port: parseInt(process.env.EMAIL_SMTP_PORT, 10) || 587,
@@ -49,7 +49,7 @@ module.exports = {
 
   sms: {
     enabled: process.env.SMS_ENABLED === 'true',
-    provider: process.env.SMS_PROVIDER || 'mock', // mock | twilio
+    provider: process.env.SMS_PROVIDER || 'mock',
     twilio: {
       accountSid: process.env.TWILIO_ACCOUNT_SID,
       authToken: process.env.TWILIO_AUTH_TOKEN,
@@ -84,8 +84,6 @@ module.exports = {
     port: parseInt(process.env.METRICS_PORT, 10) || 9096,
     prefix: 'notification',
   },
-
-  // Mock recipient addresses for testing
   mock: {
     fraudTeamEmail: 'fraud-team@frauddetection.com',
     fraudTeamSms: '+1234567890',

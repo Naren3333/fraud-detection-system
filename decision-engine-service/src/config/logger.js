@@ -6,6 +6,7 @@ const REDACTED_FIELDS = new Set([
   'authorization', 'token', 'secret', 'apiKey', 'privateKey',
 ]);
 
+// Handles redact.
 const redact = (obj, depth = 0) => {
   if (depth > 6 || obj === null || typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) return obj.map((item) => redact(item, depth + 1));

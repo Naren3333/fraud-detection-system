@@ -2,9 +2,9 @@ const logger = require('../config/logger');
 const { mlCircuitBreakerState } = require('../metrics');
 
 const STATE = {
-  CLOSED: 'CLOSED',       // Normal operation - requests flow through
-  OPEN: 'OPEN',           // Failing - requests short-circuit immediately
-  HALF_OPEN: 'HALF_OPEN', // Testing - limited requests allowed through
+  CLOSED: 'CLOSED',
+  OPEN: 'OPEN',
+  HALF_OPEN: 'HALF_OPEN',
 };
 
 const STATE_METRICS = {
@@ -14,13 +14,7 @@ const STATE_METRICS = {
 };
 
 class CircuitBreaker {
-  /**
-   * @param {string} name - Human-readable name for logging/metrics
-   * @param {object} options
-   * @param {number} options.failureThreshold  - Consecutive failures before opening
-   * @param {number} options.successThreshold  - Consecutive successes in HALF_OPEN before closing
-   * @param {number} options.timeout           - Milliseconds to stay OPEN before trying HALF_OPEN
-   */
+  
   constructor(name, { failureThreshold = 5, successThreshold = 2, timeout = 30000 } = {}) {
     this.name = name;
     this.failureThreshold = failureThreshold;
@@ -36,12 +30,8 @@ class CircuitBreaker {
     this._updateMetric();
   }
 
-  /**
-   * Execute a function through the circuit breaker.
-   * @param {Function} fn - Async function to protect
-   * @returns {Promise<*>} Result of fn()
-   * @throws Will throw if circuit is OPEN or fn() throws and threshold is exceeded
-   */
+  
+  // Handles execute.
   async execute(fn) {
     if (this.state === STATE.OPEN) {
       if (Date.now() < this.nextAttemptTime) {
@@ -62,6 +52,7 @@ class CircuitBreaker {
     }
   }
 
+  // Handles is open.
   isOpen() {
     if (this.state === STATE.OPEN && Date.now() >= this.nextAttemptTime) {
       this._transitionTo(STATE.HALF_OPEN);
@@ -69,10 +60,12 @@ class CircuitBreaker {
     return this.state === STATE.OPEN;
   }
 
+  // Handles get state.
   getState() {
     return this.state;
   }
 
+  // Handles get stats.
   getStats() {
     return {
       state: this.state,
@@ -83,6 +76,7 @@ class CircuitBreaker {
     };
   }
 
+  // Handles on success.
   _onSuccess() {
     if (this.state === STATE.HALF_OPEN) {
       this.successCount++;
@@ -94,6 +88,7 @@ class CircuitBreaker {
     }
   }
 
+  // Handles on failure.
   _onFailure(err) {
     this.failureCount++;
     this.successCount = 0;
@@ -111,6 +106,7 @@ class CircuitBreaker {
     }
   }
 
+  // Handles transition to.
   _transitionTo(newState) {
     const prevState = this.state;
     this.state = newState;
@@ -134,6 +130,7 @@ class CircuitBreaker {
     });
   }
 
+  // Handles update metric.
   _updateMetric() {
     mlCircuitBreakerState.set(STATE_METRICS[this.state] ?? 0);
   }

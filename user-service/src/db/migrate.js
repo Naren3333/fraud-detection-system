@@ -3,6 +3,7 @@ const { Pool } = require('pg');
 const config = require('../config');
 const logger = require('../config/logger');
 
+// Handles run migrations.
 const runMigrations = async () => {
   logger.info('Running database migrations...');
 
@@ -15,7 +16,6 @@ const runMigrations = async () => {
   });
 
   try {
-    // Users table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         user_id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -34,8 +34,6 @@ const runMigrations = async () => {
         last_login_at   TIMESTAMPTZ
       );
     `);
-
-    // Login attempts tracking (for rate limiting & lockout)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS login_attempts (
         id              BIGSERIAL PRIMARY KEY,
@@ -46,8 +44,6 @@ const runMigrations = async () => {
         user_agent      TEXT
       );
     `);
-
-    // Refresh tokens (for JWT refresh flow)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS refresh_tokens (
         token_id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -60,8 +56,6 @@ const runMigrations = async () => {
         user_agent      TEXT
       );
     `);
-
-    // Indexes
     await pool.query('CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_login_attempts_email ON login_attempts(email);');
@@ -78,8 +72,6 @@ const runMigrations = async () => {
     logger.info('DB pool closed');
   }
 };
-
-// Run if called directly
 if (require.main === module) {
   runMigrations()
     .then(() => process.exit(0))

@@ -1,15 +1,10 @@
-# Builder 
 FROM node:18-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --only=production && npm cache clean --force
 COPY . .
-
-# Production image
 FROM node:18-alpine
 RUN apk add --no-cache dumb-init
-
-# Non-root user
 RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 
 WORKDIR /app

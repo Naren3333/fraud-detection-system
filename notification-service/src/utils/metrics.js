@@ -2,8 +2,6 @@ const client = require('prom-client');
 const config = require('../config');
 
 const register = new client.Registry();
-
-// Default Node.js metrics
 client.collectDefaultMetrics({
   register,
   prefix: `${config.metrics.prefix}_`,
@@ -14,12 +12,10 @@ client.collectDefaultMetrics({
   },
 });
 
-// ─── Notification Metrics ────────────────────────────────────────────────────
-
 const notificationsTotal = new client.Counter({
   name: `${config.metrics.prefix}_notifications_total`,
   help: 'Total number of notification batches processed',
-  labelNames: ['decision', 'status'], // APPROVED|DECLINED|FLAGGED, success|partial|failed
+  labelNames: ['decision', 'status'],
   registers: [register],
 });
 
@@ -34,23 +30,21 @@ const notificationDuration = new client.Histogram({
 const notificationsSentTotal = new client.Counter({
   name: `${config.metrics.prefix}_notifications_sent_total`,
   help: 'Total notifications sent by type and status',
-  labelNames: ['type', 'recipient', 'status'], // email|sms, customer|fraud_team, success|failed
+  labelNames: ['type', 'recipient', 'status'],
   registers: [register],
 });
 
 const notificationRetries = new client.Counter({
   name: `${config.metrics.prefix}_notification_retries_total`,
   help: 'Total notification retry attempts',
-  labelNames: ['type', 'attempt'], // email|sms, 1|2|3
+  labelNames: ['type', 'attempt'],
   registers: [register],
 });
-
-// ─── Kafka Metrics ───────────────────────────────────────────────────────────
 
 const kafkaMessagesConsumed = new client.Counter({
   name: `${config.metrics.prefix}_kafka_messages_consumed_total`,
   help: 'Total Kafka messages consumed',
-  labelNames: ['topic', 'status'], // success|error|dlq|skipped
+  labelNames: ['topic', 'status'],
   registers: [register],
 });
 
@@ -60,8 +54,6 @@ const kafkaDlqTotal = new client.Counter({
   labelNames: ['reason'],
   registers: [register],
 });
-
-// ─── Error Metrics ───────────────────────────────────────────────────────────
 
 const errorsTotal = new client.Counter({
   name: `${config.metrics.prefix}_errors_total`,

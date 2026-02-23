@@ -5,6 +5,7 @@ const logger = require('../config/logger');
 let producer = null;
 let ready    = false;
 
+// Handles create producer.
 const createProducer = async () => {
   if (producer && ready) return producer;
 
@@ -18,9 +19,9 @@ const createProducer = async () => {
 
   producer = kafka.producer({
     createPartitioner: Partitioners.DefaultPartitioner,
-    allowAutoTopicCreation: true,   // safety net if kafka-init hasn't finished
-    idempotent: true,               // exactly-once delivery within Kafka
-    maxInFlightRequests: 1,         // REQUIRED: idempotent producers must use 1
+    allowAutoTopicCreation: true,
+    idempotent: true,
+    maxInFlightRequests: 1,
   });
 
   producer.on(producer.events.CONNECT,    () => { ready = true;  logger.info('Kafka producer connected'); });
@@ -30,13 +31,8 @@ const createProducer = async () => {
   return producer;
 };
 
-/**
- * Publish one message to a topic.
- * @param {string} topic
- * @param {string} partitionKey  - customerId keeps messages ordered per customer
- * @param {object} payload       - will be JSON-serialised
- * @param {object} headers       - optional tracing headers
- */
+
+// Handles publish.
 const publish = async (topic, partitionKey, payload, headers = {}) => {
   if (!producer || !ready) {
     logger.warn('Producer not ready - reconnecting');
@@ -69,6 +65,7 @@ const publish = async (topic, partitionKey, payload, headers = {}) => {
   return meta;
 };
 
+// Handles disconnect producer.
 const disconnectProducer = async () => {
   if (producer) {
     await producer.disconnect();
@@ -78,6 +75,7 @@ const disconnectProducer = async () => {
   }
 };
 
+// Handles is producer ready.
 const isProducerReady = () => ready;
 
 module.exports = { createProducer, publish, disconnectProducer, isProducerReady };

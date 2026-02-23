@@ -1,16 +1,12 @@
 const router = require('express').Router();
 const auditController = require('../controllers/auditController');
-
-// Get transaction audit trail
+// Handles GET /audit/transaction/:transactionId.
 router.get('/audit/transaction/:transactionId', auditController.getTransactionAudit);
-
-// Get customer audit trail
+// Handles GET /audit/customer/:customerId.
 router.get('/audit/customer/:customerId', auditController.getCustomerAudit);
-
-// Verify chain integrity
+// Handles POST /audit/verify.
 router.post('/audit/verify', auditController.verifyIntegrity);
-
-// Get audit statistics
+// Handles GET /audit/stats.
 router.get('/audit/stats', auditController.getStats);
 
 module.exports = router;

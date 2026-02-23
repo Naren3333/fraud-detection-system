@@ -2,8 +2,6 @@ const client = require('prom-client');
 const config = require('../config');
 
 const register = new client.Registry();
-
-// Default Node.js metrics
 client.collectDefaultMetrics({
   register,
   prefix: `${config.metrics.prefix}_`,
@@ -14,12 +12,10 @@ client.collectDefaultMetrics({
   },
 });
 
-// ─── Scoring Metrics ─────────────────────────────────────────────────────────
-
 const scoringRequestsTotal = new client.Counter({
   name: `${config.metrics.prefix}_scoring_requests_total`,
   help: 'Total number of scoring requests',
-  labelNames: ['status'], // success | error
+  labelNames: ['status'],
   registers: [register],
 });
 
@@ -45,8 +41,6 @@ const confidenceDistribution = new client.Histogram({
   registers: [register],
 });
 
-// ─── Feature Engineering Metrics ─────────────────────────────────────────────
-
 const featureExtractionDuration = new client.Histogram({
   name: `${config.metrics.prefix}_feature_extraction_duration_ms`,
   help: 'Feature extraction duration (ms)',
@@ -59,8 +53,6 @@ const featureCount = new client.Gauge({
   help: 'Number of features extracted per request',
   registers: [register],
 });
-
-// ─── Model Metrics ───────────────────────────────────────────────────────────
 
 const modelInferenceDuration = new client.Histogram({
   name: `${config.metrics.prefix}_model_inference_duration_ms`,
@@ -76,8 +68,6 @@ const modelVersion = new client.Gauge({
   registers: [register],
 });
 
-// ─── Cache Metrics ───────────────────────────────────────────────────────────
-
 const cacheHits = new client.Counter({
   name: `${config.metrics.prefix}_cache_hits_total`,
   help: 'Total cache hits',
@@ -89,8 +79,6 @@ const cacheMisses = new client.Counter({
   help: 'Total cache misses',
   registers: [register],
 });
-
-// ─── Error Metrics ───────────────────────────────────────────────────────────
 
 const errorsTotal = new client.Counter({
   name: `${config.metrics.prefix}_errors_total`,

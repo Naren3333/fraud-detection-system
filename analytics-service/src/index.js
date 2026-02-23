@@ -68,6 +68,7 @@ app.use((err, req, res, next) => {
 // Graceful Shutdown
 let isShuttingDown = false;
 
+// Handles shutdown.
 const shutdown = async (signal) => {
   if (isShuttingDown) return;
   isShuttingDown = true;
@@ -148,4 +149,3 @@ const bootstrap = async () => {
 bootstrap();
 
 module.exports = app;
-

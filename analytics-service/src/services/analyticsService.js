@@ -3,19 +3,15 @@ const { getClient: getRedis } = require('../config/redis');
 const logger = require('../config/logger');
 const config = require('../config');
 
-/**
- * Enterprise Analytics Service
- * Aggregates fraud detection metrics from PostgreSQL and caches in Redis
- */
+
 class AnalyticsService {
   constructor() {
     this.metricsCache = new Map();
     this.lastAggregation = null;
   }
 
-  /**
-   * Get comprehensive dashboard metrics
-   */
+  
+  // Handles get dashboard metrics.
   async getDashboardMetrics(timeRange = '24h') {
     const now = new Date();
     const since = this._getTimeRangeDate(timeRange);
@@ -54,9 +50,8 @@ class AnalyticsService {
     };
   }
 
-  /**
-   * Get real-time stats (last 5 minutes)
-   */
+  
+  // Handles get real time stats.
   async getRealTimeStats() {
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 
@@ -88,8 +83,7 @@ class AnalyticsService {
     };
   }
 
-  // ─── Private Methods ─────────────────────────────────────────────────────
-
+  // Handles get overview stats.
   async _getOverviewStats(since) {
     const sql = `
       SELECT 
@@ -134,6 +128,7 @@ class AnalyticsService {
     };
   }
 
+  // Handles get decision breakdown.
   async _getDecisionBreakdown(since) {
     const sql = `
       SELECT 
@@ -158,6 +153,7 @@ class AnalyticsService {
     }));
   }
 
+  // Handles get risk score distribution.
   async _getRiskScoreDistribution(since) {
     const sql = `
       SELECT 
@@ -177,8 +173,6 @@ class AnalyticsService {
     `;
 
     const result = await query(sql, [since]);
-    
-    // Group by score range
     const distribution = {};
     for (const row of result.rows) {
       if (!distribution[row.score_range]) {
@@ -191,6 +185,7 @@ class AnalyticsService {
     return Object.values(distribution);
   }
 
+  // Handles get time series data.
   async _getTimeSeriesData(timeRange) {
     const bucketSeconds = timeRange === '1h' ? 5 * 60 :
       timeRange === '24h' ? 60 * 60 :
@@ -212,8 +207,6 @@ class AnalyticsService {
     `;
 
     const result = await query(sql, [bucketSeconds, since]);
-    
-    // Group by time bucket
     const timeSeries = {};
     for (const row of result.rows) {
       const bucket = new Date(row.time_bucket).toISOString();
@@ -228,6 +221,7 @@ class AnalyticsService {
     return Object.values(timeSeries);
   }
 
+  // Handles get top customers.
   async _getTopCustomers(since, limit) {
     const sql = `
       SELECT 
@@ -254,6 +248,7 @@ class AnalyticsService {
     }));
   }
 
+  // Handles get top merchants.
   async _getTopMerchants(since, limit) {
     const sql = `
       SELECT 
@@ -278,9 +273,8 @@ class AnalyticsService {
     }));
   }
 
+  // Handles get geographic distribution.
   async _getGeographicDistribution(since) {
-    // This would require extracting country from decision_history.original_transaction JSONB
-    // Simplified version for now
     return [
       { country: 'US', count: 0, declined: 0 },
       { country: 'GB', count: 0, declined: 0 },
@@ -288,6 +282,7 @@ class AnalyticsService {
     ];
   }
 
+  // Handles get time range date.
   _getTimeRangeDate(timeRange) {
     const now = new Date();
     switch (timeRange) {

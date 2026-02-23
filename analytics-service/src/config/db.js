@@ -4,6 +4,7 @@ const logger = require('../config/logger');
 
 let pool = null;
 
+// Handles create pool.
 const createPool = () => {
   if (pool) return pool;
 
@@ -30,6 +31,7 @@ const createPool = () => {
   return pool;
 };
 
+// Handles query.
 const query = async (text, params) => {
   const start = Date.now();
   try {
@@ -43,10 +45,12 @@ const query = async (text, params) => {
   }
 };
 
+// Handles get client.
 const getClient = async () => {
   return pool.connect();
 };
 
+// Handles close pool.
 const closePool = async () => {
   if (pool) {
     await pool.end();

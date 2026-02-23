@@ -3,10 +3,8 @@ const decisionEngineService = require('../services/decisionEngineService');
 const logger = require('../config/logger');
 
 class DecisionController {
-  /**
-   * GET /api/v1/decisions/:transactionId
-   * Get decision for a specific transaction
-   */
+  
+  // Handles get decision by transaction.
   async getDecisionByTransaction(req, res) {
     const { transactionId } = req.params;
 
@@ -28,14 +26,12 @@ class DecisionController {
     });
   }
 
-  /**
-   * GET /api/v1/decisions/stats
-   * Get decision statistics
-   */
+  
+  // Handles get stats.
   async getStats(req, res) {
     const since = req.query.since
       ? new Date(req.query.since)
-      : new Date(Date.now() - 3600000); // Last hour
+      : new Date(Date.now() - 3600000);
 
     logger.info('Fetching decision stats', { since });
 
@@ -51,10 +47,8 @@ class DecisionController {
     });
   }
 
-  /**
-   * GET /api/v1/decisions/thresholds
-   * Get current decision thresholds
-   */
+  
+  // Handles get thresholds.
   getThresholds(req, res) {
     const thresholds = decisionEngineService.getThresholds();
 

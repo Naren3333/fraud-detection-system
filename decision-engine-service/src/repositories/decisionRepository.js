@@ -2,16 +2,13 @@ const { query, getClient } = require('../db/pool');
 const logger = require('../config/logger');
 
 class DecisionRepository {
-  /**
-   * Save a decision to the database with full audit trail
-   */
+  
+  // Handles save decision.
   async saveDecision(decisionData) {
     const client = await getClient();
 
     try {
       await client.query('BEGIN');
-
-      // Insert decision
       const decisionSql = `
         INSERT INTO decisions (
           transaction_id, customer_id, merchant_id,
@@ -49,8 +46,6 @@ class DecisionRepository {
 
       const decisionResult = await client.query(decisionSql, decisionValues);
       const { decision_id, decided_at } = decisionResult.rows[0];
-
-      // Insert history record
       const historySql = `
         INSERT INTO decision_history (
           decision_id, transaction_id,
@@ -90,9 +85,8 @@ class DecisionRepository {
     }
   }
 
-  /**
-   * Get decision by transaction ID
-   */
+  
+  // Handles find by transaction id.
   async findByTransactionId(transactionId) {
     const sql = `
       SELECT 
@@ -109,9 +103,8 @@ class DecisionRepository {
     return result.rows[0] || null;
   }
 
-  /**
-   * Get decision statistics (for monitoring)
-   */
+  
+  // Handles get stats.
   async getStats(since) {
     const sql = `
       SELECT 

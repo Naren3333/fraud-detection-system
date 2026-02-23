@@ -4,11 +4,11 @@ const { USER_ROLES } = require('../utils/constants');
 
 const registerSchema = Joi.object({
   email: Joi.string().email().required(),
-  password: Joi.string().min(8).max(72).required(), // bcrypt max 72 bytes
+  password: Joi.string().min(8).max(72).required(),
   firstName: Joi.string().min(1).max(100).optional(),
   lastName: Joi.string().min(1).max(100).optional(),
   role: Joi.string().valid(...Object.values(USER_ROLES)).optional(),
-  phone: Joi.string().pattern(/^\+?[1-9]\d{1,14}$/).optional(), // E.164 format
+  phone: Joi.string().pattern(/^\+?[1-9]\d{1,14}$/).optional(),
   metadata: Joi.object().optional(),
 });
 
@@ -33,6 +33,7 @@ const changePasswordSchema = Joi.object({
   newPassword: Joi.string().min(8).max(72).required(),
 });
 
+// Handles validate.
 const validate = (schema) => {
   return (req, res, next) => {
     const { error, value } = schema.validate(req.body, {

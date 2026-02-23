@@ -2,6 +2,7 @@ const userService = require('../services/userService');
 const logger = require('../config/logger');
 
 class UserController {
+  // Handles register.
   async register(req, res) {
     const { email, password, firstName, lastName, role, phone, metadata } = req.body;
 
@@ -22,6 +23,7 @@ class UserController {
     });
   }
 
+  // Handles login.
   async login(req, res) {
     const { email, password } = req.body;
     const ipAddress = req.ip;
@@ -35,6 +37,7 @@ class UserController {
     });
   }
 
+  // Handles refresh.
   async refresh(req, res) {
     const { refreshToken } = req.body;
 
@@ -46,6 +49,7 @@ class UserController {
     });
   }
 
+  // Handles logout.
   async logout(req, res) {
     const { refreshToken } = req.body;
 
@@ -57,8 +61,9 @@ class UserController {
     });
   }
 
+  // Handles get profile.
   async getProfile(req, res) {
-    const userId = req.params.userId || req.userId; // from auth middleware
+    const userId = req.params.userId || req.userId;
 
     const user = await userService.getProfile(userId);
 
@@ -68,8 +73,9 @@ class UserController {
     });
   }
 
+  // Handles update profile.
   async updateProfile(req, res) {
-    const userId = req.userId; // from auth middleware
+    const userId = req.userId;
     const updates = req.body;
 
     const user = await userService.updateProfile(userId, updates);
@@ -81,8 +87,9 @@ class UserController {
     });
   }
 
+  // Handles change password.
   async changePassword(req, res) {
-    const userId = req.userId; // from auth middleware
+    const userId = req.userId;
     const { currentPassword, newPassword } = req.body;
 
     await userService.changePassword(userId, currentPassword, newPassword);
@@ -93,6 +100,7 @@ class UserController {
     });
   }
 
+  // Handles validate token.
   async validateToken(req, res) {
     const token = req.headers.authorization?.replace('Bearer ', '');
 

@@ -6,8 +6,6 @@ COPY package*.json ./
 RUN npm ci --only=production && npm cache clean --force
 
 COPY . .
-
-# Production stage
 FROM node:18-alpine
 
 RUN apk add --no-cache dumb-init && \

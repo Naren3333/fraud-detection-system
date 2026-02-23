@@ -6,9 +6,8 @@ const { renderDeclinedCustomerEmail, renderDeclinedFraudTeamEmail, renderFlagged
 const { retryWithBackoff } = require('../utils/retry');
 
 class NotificationService {
-  /**
-   * Process a transaction decision and send appropriate notifications
-   */
+  
+  // Handles process decision.
   async processDecision(decisionEvent) {
     const { decision, transactionId, customerId } = decisionEvent;
 
@@ -19,8 +18,6 @@ class NotificationService {
     });
 
     const notifications = [];
-
-    // Determine which notifications to send based on decision type
     if (decision === 'DECLINED' && config.notificationRules.notifyOnDeclined) {
       notifications.push(...this._getDeclinedNotifications(decisionEvent));
     } else if (decision === 'FLAGGED' && config.notificationRules.notifyOnFlagged) {
@@ -28,13 +25,9 @@ class NotificationService {
     } else if (decision === 'APPROVED' && config.notificationRules.notifyOnApproved) {
       notifications.push(...this._getApprovedNotifications(decisionEvent));
     }
-
-    // Send all notifications in parallel with retry
     const results = await Promise.allSettled(
       notifications.map(notification => this._sendWithRetry(notification))
     );
-
-    // Collect results
     const successful = results.filter(r => r.status === 'fulfilled' && r.value.success);
     const failed = results.filter(r => r.status === 'rejected' || !r.value.success);
 
@@ -53,17 +46,12 @@ class NotificationService {
     };
   }
 
-  // ─── Notification Builders ───────────────────────────────────────────────
-
+  // Handles get declined notifications.
   _getDeclinedNotifications(event) {
     const notifications = [];
     const { transactionId, customerId, originalTransaction, fraudAnalysis, decision, decisionReason, decisionFactors } = event;
-
-    // Extract customer contact info (in real system, fetch from user service)
     const customerEmail = `${customerId}@customer.com`;
     const customerPhone = '+1234567890';
-
-    // Prepare template data
     const templateData = {
       transactionId,
       customerId,
@@ -79,8 +67,6 @@ class NotificationService {
       decisionReason,
       decisionFactors: decisionFactors || {},
     };
-
-    // Customer email
     if (config.notificationRules.declined.notifyCustomerEmail) {
       const emailContent = renderDeclinedCustomerEmail(templateData);
       notifications.push({
@@ -93,8 +79,6 @@ class NotificationService {
         metadata: { transactionId, decision },
       });
     }
-
-    // Customer SMS
     if (config.notificationRules.declined.notifyCustomerSms) {
       notifications.push({
         type: 'sms',
@@ -104,8 +88,6 @@ class NotificationService {
         metadata: { transactionId, decision },
       });
     }
-
-    // Fraud team email
     if (config.notificationRules.declined.notifyFraudTeamEmail) {
       const emailContent = renderDeclinedFraudTeamEmail(templateData);
       notifications.push({
@@ -122,6 +104,7 @@ class NotificationService {
     return notifications;
   }
 
+  // Handles get flagged notifications.
   _getFlaggedNotifications(event) {
     const notifications = [];
     const { transactionId, customerId, originalTransaction, fraudAnalysis, decision, decisionReason, decisionFactors } = event;
@@ -137,8 +120,6 @@ class NotificationService {
       decisionReason,
       decisionFactors: decisionFactors || {},
     };
-
-    // Fraud team email (always send for flagged)
     if (config.notificationRules.flagged.notifyFraudTeamEmail) {
       const emailContent = renderFlaggedFraudTeamEmail(templateData);
       notifications.push({
@@ -151,8 +132,6 @@ class NotificationService {
         metadata: { transactionId, decision },
       });
     }
-
-    // Fraud team SMS (optional)
     if (config.notificationRules.flagged.notifyFraudTeamSms) {
       notifications.push({
         type: 'sms',
@@ -166,14 +145,12 @@ class NotificationService {
     return notifications;
   }
 
+  // Handles get approved notifications.
   _getApprovedNotifications(event) {
-    // Typically don't notify on approved transactions
-    // But can be configured if needed
     return [];
   }
 
-  // ─── Notification Sending with Retry ─────────────────────────────────────
-
+  // Handles send with retry.
   async _sendWithRetry(notification) {
     const { type, to, metadata } = notification;
 
@@ -184,6 +161,7 @@ class NotificationService {
       transactionId: metadata.transactionId,
     });
 
+    // Handles operation.
     const operation = async () => {
       if (type === 'email') {
         return await emailService.sendEmail({
@@ -204,7 +182,7 @@ class NotificationService {
 
     const result = await retryWithBackoff(
       operation,
-      {}, // Use default retry config
+      {},
       {
         type,
         recipient: notification.recipient,

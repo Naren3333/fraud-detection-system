@@ -8,6 +8,7 @@ const { TRANSACTION_STATUS, EVENT_TYPES } = require('../utils/constants');
 
 class TransactionService {
 
+  // Handles create transaction.
   async createTransaction(body, ctx) {
     const timer = metrics.httpDuration.startTimer({ method: 'POST', route: '/transactions' });
 
@@ -111,10 +112,12 @@ class TransactionService {
     };
   }
 
+  // Handles get by id.
   async getById(id) {
     return repo.findById(id);
   }
 
+  // Handles get by customer.
   async getByCustomer(customerId, pagination) {
     return repo.findByCustomerId(customerId, pagination);
   }

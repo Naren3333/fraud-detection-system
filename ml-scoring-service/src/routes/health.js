@@ -4,6 +4,7 @@ const fraudModel = require('../models/fraudModel');
 const mlScoringService = require('../services/mlScoringService');
 const logger = require('../config/logger');
 
+// Handles GET /health.
 router.get('/health', async (req, res) => {
   const health = {
     status: 'healthy',
@@ -18,8 +19,6 @@ router.get('/health', async (req, res) => {
   };
 
   let degraded = false;
-
-  // Redis cache
   try {
     const redis = getRedisClient();
     const pong = await redis.ping();
@@ -32,8 +31,6 @@ router.get('/health', async (req, res) => {
     health.dependencies.redis = { status: 'unhealthy', error: err.message };
     degraded = true;
   }
-
-  // ML model
   try {
     const modelMetadata = fraudModel.getMetadata();
     health.dependencies.mlModel = {
@@ -46,14 +43,13 @@ router.get('/health', async (req, res) => {
     health.dependencies.mlModel = { status: 'unhealthy', error: err.message };
     degraded = true;
   }
-
-  // Service stats
   health.stats = mlScoringService.getStats();
 
   health.status = degraded ? 'degraded' : 'healthy';
   res.status(degraded ? 503 : 200).json(health);
 });
 
+// Handles GET /health/ready.
 router.get('/health/ready', async (req, res) => {
   try {
     const redis = getRedisClient();
@@ -76,6 +72,7 @@ router.get('/health/ready', async (req, res) => {
   }
 });
 
+// Handles GET /health/live.
 router.get('/health/live', (_req, res) => {
   res.status(200).json({
     status: 'alive',
@@ -84,6 +81,7 @@ router.get('/health/live', (_req, res) => {
   });
 });
 
+// Handles format uptime.
 const formatUptime = (seconds) => {
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
@@ -92,6 +90,7 @@ const formatUptime = (seconds) => {
   return `${d}d ${h}h ${m}m ${s}s`;
 };
 
+// Handles format memory.
 const formatMemory = (mem) => ({
   rss: `${(mem.rss / 1024 / 1024).toFixed(1)}MB`,
   heapUsed: `${(mem.heapUsed / 1024 / 1024).toFixed(1)}MB`,

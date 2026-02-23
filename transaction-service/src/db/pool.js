@@ -4,6 +4,7 @@ const logger   = require('../config/logger');
 
 let pool = null;
 
+// Handles create pool.
 const createPool = () => {
   if (pool) return pool;
   pool = new Pool({
@@ -22,15 +23,18 @@ const createPool = () => {
   return pool;
 };
 
+// Handles get pool.
 const getPool = () => {
   if (!pool) throw new Error('DB pool not initialised');
   return pool;
 };
 
+// Handles close pool.
 const closePool = async () => {
   if (pool) { await pool.end(); pool = null; logger.info('DB pool closed'); }
 };
 
+// Handles query.
 const query = async (text, params) => {
   const client = await getPool().connect();
   try {
@@ -41,6 +45,7 @@ const query = async (text, params) => {
   }
 };
 
+// Handles with transaction.
 const withTransaction = async (fn) => {
   const client = await getPool().connect();
   try {

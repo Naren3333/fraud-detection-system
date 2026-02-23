@@ -8,6 +8,7 @@ class SmsService {
     this._initialize();
   }
 
+  // Handles initialize.
   _initialize() {
     if (!config.sms.enabled) {
       logger.info('SMS notifications disabled');
@@ -46,9 +47,8 @@ class SmsService {
     }
   }
 
-  /**
-   * Send SMS (with automatic retry handled by caller)
-   */
+  
+  // Handles send sms.
   async sendSms({ to, body }) {
     if (!config.sms.enabled) {
       throw new Error('SMS service is disabled');
@@ -84,17 +84,14 @@ class SmsService {
     }
   }
 
-  /**
-   * Verify connection (for health checks)
-   */
+  
+  // Handles verify connection.
   async verifyConnection() {
     if (!config.sms.enabled || this.provider === 'mock') {
       return true;
     }
 
     try {
-      // For Twilio, we can check if credentials are valid
-      // by fetching account details
       if (this.client && this.client.api) {
         await this.client.api.accounts(config.sms.twilio.accountSid).fetch();
       }

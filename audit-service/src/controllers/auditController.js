@@ -2,10 +2,8 @@ const auditRepository = require('../repositories/auditRepository');
 const logger = require('../config/logger');
 
 class AuditController {
-  /**
-   * GET /api/v1/audit/transaction/:transactionId
-   * Get full audit trail for a transaction
-   */
+
+  // Handles get transaction audit.
   async getTransactionAudit(req, res) {
     const { transactionId } = req.params;
     const includePayload = req.query.includePayload !== 'false';
@@ -18,8 +16,6 @@ class AuditController {
     const trail = await auditRepository.getAuditTrail(transactionId, { includePayload });
 
     const executionTime = Date.now() - startTime;
-
-    // Log the audit query (audit the auditors!)
     await auditRepository.logQuery(
       'transaction_audit',
       { transactionId, includePayload },
@@ -43,10 +39,8 @@ class AuditController {
     });
   }
 
-  /**
-   * GET /api/v1/audit/customer/:customerId
-   * Get audit trail for a customer
-   */
+
+  // Handles get customer audit.
   async getCustomerAudit(req, res) {
     const { customerId } = req.params;
     const { since, until, eventTypes, limit } = req.query;
@@ -88,10 +82,8 @@ class AuditController {
     });
   }
 
-  /**
-   * POST /api/v1/audit/verify
-   * Verify chain integrity (detect tampering)
-   */
+
+  // Handles verify integrity.
   async verifyIntegrity(req, res) {
     const { startEventId, endEventId } = req.body;
 
@@ -105,14 +97,12 @@ class AuditController {
     });
   }
 
-  /**
-   * GET /api/v1/audit/stats
-   * Get audit statistics
-   */
+
+  // Handles get stats.
   async getStats(req, res) {
     const since = req.query.since
       ? new Date(req.query.since)
-      : new Date(Date.now() - 24 * 60 * 60 * 1000); // Last 24h
+      : new Date(Date.now() - 24 * 60 * 60 * 1000);
 
     const stats = await auditRepository.getStats(since);
 

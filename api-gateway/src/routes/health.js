@@ -4,6 +4,7 @@ const logger = require('../config/logger');
 
 const router = express.Router();
 
+// Handles GET /health.
 router.get('/health', async (req, res) => {
   const health = {
     status: 'healthy',
@@ -15,7 +16,6 @@ router.get('/health', async (req, res) => {
   };
 
   try {
-    // Check Redis connection
     const redisClient = getRedisClient();
     await redisClient.ping();
     health.dependencies.redis = { status: 'healthy' };
@@ -29,6 +29,7 @@ router.get('/health', async (req, res) => {
   res.status(statusCode).json(health);
 });
 
+// Handles GET /health/ready.
 router.get('/health/ready', async (req, res) => {
   try {
     const redisClient = getRedisClient();
@@ -47,6 +48,7 @@ router.get('/health/ready', async (req, res) => {
   }
 });
 
+// Handles GET /health/live.
 router.get('/health/live', (req, res) => {
   res.status(200).json({
     status: 'alive',

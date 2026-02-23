@@ -8,15 +8,8 @@ const {
 } = require('../metrics');
 
 class FraudRulesEngine {
-  /**
-   * Run all fraud detection rules against a transaction.
-   *
-   * Returns:
-   *   flagged     {boolean}   - true if any hard-flag rule triggered
-   *   ruleScore   {number}    - graduated 0-100 risk contribution from rules
-   *   reasons     {string[]}  - human-readable descriptions of triggered rules
-   *   riskFactors {object}    - raw factor data per rule for audit trail
-   */
+  
+  // Handles evaluate.
   async evaluate(transaction, childLogger) {
     const log = childLogger || logger;
     const startTime = Date.now();
@@ -68,8 +61,6 @@ class FraudRulesEngine {
 
         totalRuleScore += r.score || 0;
       }
-
-      // Normalise rule score to 0-100
       const ruleScore = Math.min(Math.round(totalRuleScore), 100);
       const durationMs = Date.now() - startTime;
 
@@ -91,14 +82,11 @@ class FraudRulesEngine {
         stack: error.stack,
       });
       errorsTotal.inc({ component: 'rules_engine', type: 'critical' });
-
-      // Fail open - do not block legitimate transactions on evaluation error
       return { flagged: false, ruleScore: 0, reasons: ['evaluation_error'], riskFactors: {} };
     }
   }
 
-  // Velocity Check
-
+  // Handles check velocity.
   async _checkVelocity(transaction, log) {
     const redis = getClient();
     const { customerId, amount } = transaction;
@@ -112,8 +100,6 @@ class FraudRulesEngine {
     const factors = {};
     let flagged = false;
     let score = 0;
-
-    // Hourly count
     const customerHourKey = `velocity:customer:${customerId}:hour`;
     await redis.zRemRangeByScore(customerHourKey, 0, oneHourAgo);
     await redis.zAdd(customerHourKey, { score: now, value: transaction.id });
@@ -125,15 +111,12 @@ class FraudRulesEngine {
     if (customerHourCount > maxCountPerHour) {
       flagged = true;
       score += weights.velocityCountHourWeight;
-      // Scale up proportionally the further over threshold we are
       const overage = (customerHourCount - maxCountPerHour) / maxCountPerHour;
       score += Math.min(weights.velocityCountHourWeight * overage, weights.velocityCountHourWeight);
       reasons.push(
         `Exceeded hourly transaction count (${customerHourCount}/${maxCountPerHour})`
       );
     }
-
-    // Hourly amount
     const customerAmountKey = `velocity:customer:${customerId}:amount:hour`;
     const currentAmount = parseFloat((await redis.get(customerAmountKey)) || '0');
     const newAmount = currentAmount + amount;
@@ -148,8 +131,6 @@ class FraudRulesEngine {
         `Exceeded hourly spend limit ($${newAmount.toFixed(2)}/$${maxAmountPerHour})`
       );
     }
-
-    // Daily count
     const customerDayKey = `velocity:customer:${customerId}:day`;
     await redis.zRemRangeByScore(customerDayKey, 0, oneDayAgo);
     await redis.zAdd(customerDayKey, { score: now, value: transaction.id });
@@ -169,8 +150,7 @@ class FraudRulesEngine {
     return { flagged, score, reasons, factors };
   }
 
-  // Geography Check
-
+  // Handles check geography.
   _checkGeography(transaction) {
     const { location } = transaction;
     const reasons = [];
@@ -194,8 +174,7 @@ class FraudRulesEngine {
     return { flagged, score, reasons, factors };
   }
 
-  // Amount Check 
-
+  // Handles check amount.
   _checkAmount(transaction) {
     const { amount, currency } = transaction;
     const reasons = [];
@@ -213,10 +192,7 @@ class FraudRulesEngine {
     } else if (amount >= highAmountThreshold) {
       score += weights.highAmountWeight;
       factors.highAmount = true;
-      // Not a hard flag - contributes to score but doesn't flag alone
     }
-
-    // Round-number heuristic (e.g. $1000.00, $5000.00)
     if (amount >= 100 && amount % 100 === 0) {
       score += weights.roundAmountWeight;
       factors.roundAmount = true;
@@ -225,8 +201,7 @@ class FraudRulesEngine {
     return { flagged, score, reasons, factors };
   }
 
-  // Card Check 
-
+  // Handles check card.
   _checkCard(transaction) {
     const { cardBin, cardLastFour, cardType } = transaction;
     const reasons = [];
@@ -248,6 +223,7 @@ class FraudRulesEngine {
   }
 
 
+  // Handles check time.
   _checkTime(transaction) {
     const { createdAt } = transaction;
     const reasons = [];
@@ -257,12 +233,9 @@ class FraudRulesEngine {
 
     const hour = new Date(createdAt).getUTCHours();
     factors.transactionHourUTC = hour;
-
-    // 02:00-05:00 UTC - elevated risk window
     if (hour >= 2 && hour < 5) {
       score += config.fraudRules.scoring.unusualTimeWeight;
       factors.unusualTime = true;
-      // Soft signal - contributes to score but does not hard-flag alone
     }
 
     return { flagged, score, reasons, factors };
@@ -270,4 +243,3 @@ class FraudRulesEngine {
 }
 
 module.exports = new FraudRulesEngine();
-

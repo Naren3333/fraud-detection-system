@@ -4,16 +4,13 @@ const config = require('../config');
 const logger = require('../config/logger');
 
 class AuditRepository {
-  /**
-   * Store an immutable audit event with tamper detection
-   */
+
+  // Handles store event.
   async storeEvent(eventData) {
     const client = await getClient();
 
     try {
       await client.query('BEGIN');
-
-      // Get previous event hash for chain validation
       let previousHash = null;
       if (config.audit.enableChainValidation) {
         const lastEventResult = await client.query(
@@ -23,11 +20,7 @@ class AuditRepository {
           previousHash = lastEventResult.rows[0].event_hash;
         }
       }
-
-      // Calculate event hash (SHA-256 of payload + previous hash)
       const eventHash = this._calculateHash(eventData.payload, previousHash);
-
-      // Insert event (APPEND-ONLY)
       const sql = `
         INSERT INTO audit_events (
           event_type, event_source, event_timestamp,
@@ -61,7 +54,6 @@ class AuditRepository {
       const result = await client.query(sql, values);
 
       if (result.rows.length === 0) {
-        // Duplicate event (already stored)
         await client.query('ROLLBACK');
         logger.debug('Duplicate event skipped', {
           topic: eventData.kafkaTopic,
@@ -101,9 +93,8 @@ class AuditRepository {
     }
   }
 
-  /**
-   * Get audit trail for a transaction
-   */
+
+  // Handles get audit trail.
   async getAuditTrail(transactionId, options = {}) {
     const { includePayload = true, limit = 100 } = options;
 
@@ -137,9 +128,8 @@ class AuditRepository {
     }));
   }
 
-  /**
-   * Get audit events by customer
-   */
+
+  // Handles get customer audit trail.
   async getCustomerAuditTrail(customerId, options = {}) {
     const { since, until, eventTypes, limit = 100 } = options;
 
@@ -179,9 +169,8 @@ class AuditRepository {
     return result.rows;
   }
 
-  /**
-   * Verify event chain integrity (detect tampering)
-   */
+
+  // Handles verify chain integrity.
   async verifyChainIntegrity(startEventId, endEventId) {
     const sql = `
       SELECT event_id, event_payload, event_hash, previous_hash
@@ -231,9 +220,8 @@ class AuditRepository {
     };
   }
 
-  /**
-   * Get audit statistics
-   */
+
+  // Handles get stats.
   async getStats(since) {
     const sql = `
       SELECT 
@@ -251,9 +239,8 @@ class AuditRepository {
     return result.rows[0];
   }
 
-  /**
-   * Log audit query (who accessed what)
-   */
+
+  // Handles log query.
   async logQuery(queryType, queryParams, resultCount, executionTimeMs, queriedBy, reason) {
     const sql = `
       INSERT INTO audit_queries (
@@ -276,8 +263,7 @@ class AuditRepository {
     return result.rows[0].query_id;
   }
 
-  // ─── Private Helpers ─────────────────────────────────────────────────────
-
+  // Handles calculate hash.
   _calculateHash(payload, previousHash) {
     const data = JSON.stringify(payload) + (previousHash || '');
     return crypto.createHash('sha256').update(data).digest('hex');

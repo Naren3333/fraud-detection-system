@@ -12,6 +12,7 @@ const kafkaLogLevelMap = {
   [KafkaLogLevel.DEBUG]: 'debug',
 };
 
+// Handles create kafka.
 const createKafka = () => {
   if (kafka) return kafka;
 
@@ -24,7 +25,6 @@ const createKafka = () => {
     logCreator: () => ({ namespace, level, label, log }) => {
       const mappedLevel = kafkaLogLevelMap[level] || 'debug';
       const { message, ...extra } = log;
-      // Only surface WARN+ from Kafka internals to keep logs clean
       if (level <= KafkaLogLevel.WARN) {
         logger[mappedLevel](`[Kafka:${namespace}] ${message}`, extra);
       }
@@ -34,6 +34,7 @@ const createKafka = () => {
   return kafka;
 };
 
+// Handles create consumer.
 const createConsumer = async () => {
   const k = createKafka();
 
@@ -43,7 +44,6 @@ const createConsumer = async () => {
     heartbeatInterval: config.kafka.heartbeatInterval,
     maxWaitTimeInMs: 100,
     retry: config.kafka.retry,
-    // Manual offset management
     autoCommit: false,
   });
 
@@ -78,6 +78,7 @@ const createConsumer = async () => {
   return consumer;
 };
 
+// Handles create producer.
 const createProducer = async () => {
   const k = createKafka();
 
@@ -101,9 +102,8 @@ const createProducer = async () => {
   return producer;
 };
 
-/**
- * Publish a message to a Kafka topic with structured headers and compression.
- */
+
+// Handles publish.
 const publish = async (producer, topic, partitionKey, payload, headers = {}) => {
   const messageHeaders = {
     'content-type': 'application/json',
@@ -135,9 +135,8 @@ const publish = async (producer, topic, partitionKey, payload, headers = {}) => 
   return result;
 };
 
-/**
- * Publish a batch of messages in a single producer.send call.
- */
+
+// Handles publish batch.
 const publishBatch = async (producer, topic, messages) => {
   const result = await producer.send({
     topic,

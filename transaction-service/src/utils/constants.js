@@ -11,8 +11,6 @@ module.exports = {
   EVENT_TYPES: {
     TRANSACTION_CREATED: 'transaction.created',
   },
-
-  // Header names - must match API Gateway exactly
   HEADERS: {
     REQUEST_ID:      'x-request-id',
     CORRELATION_ID:  'x-correlation-id',

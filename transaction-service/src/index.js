@@ -34,6 +34,7 @@ app.use(errorHandler);
 
 let server;
 
+// Handles shutdown.
 const shutdown = async (signal) => {
   logger.info(`${signal} received - starting graceful shutdown`);
 
@@ -69,6 +70,7 @@ process.on('unhandledRejection', (reason) => {
   shutdown('unhandledRejection');
 });
 
+// Handles bootstrap.
 const bootstrap = async () => {
   try {
     logger.info('Bootstrapping Transaction Service...');

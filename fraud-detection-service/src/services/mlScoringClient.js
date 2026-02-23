@@ -23,6 +23,7 @@ class MLScoringClient {
     });
   }
 
+  // Handles get score.
   async getScore(transaction, ruleResults, childLogger) {
     const log = childLogger || logger;
     const startTime = Date.now();
@@ -62,7 +63,7 @@ class MLScoringClient {
           error: err.message,
           code: err.code,
           httpStatus: err.response?.status,
-          responseData: err.response?.data, // ← ADD THIS to see validation errors
+          responseData: err.response?.data,
           durationMs,
         });
         errorsTotal.inc({ component: 'ml_scoring', type: err.code || 'http_error' });
@@ -83,8 +84,8 @@ class MLScoringClient {
     }
   }
 
+  // Handles call scoring service.
   async _callScoringService(transaction, ruleResults, log) {
-    // ─── FIXED: Normalize transaction data ───────────────────────────────────
     const normalizedTransaction = {
       id: transaction.id,
       customerId: transaction.customerId,
@@ -98,8 +99,6 @@ class MLScoringClient {
       metadata: transaction.metadata || {},
       createdAt: transaction.createdAt || new Date().toISOString(),
     };
-
-    // ─── FIXED: Normalize rule results ──────────────────────────────────────
     const normalizedRuleResults = {
       flagged: Boolean(ruleResults.flagged),
       ruleScore: ruleResults.ruleScore || 0,
@@ -137,6 +136,7 @@ class MLScoringClient {
     };
   }
 
+  // Handles fallback.
   _fallback(ruleResults, reason) {
     let score = 30;
 
@@ -163,10 +163,10 @@ class MLScoringClient {
     };
   }
 
+  // Handles get circuit breaker stats.
   getCircuitBreakerStats() {
     return circuitBreaker.getStats();
   }
 }
 
 module.exports = new MLScoringClient();
-

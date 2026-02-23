@@ -18,9 +18,27 @@ flowchart TD
 
     Kafka -- "Kafka: transaction.scored" --> Decision[Decision Engine :3005]
     Decision -- "Kafka: transaction.finalised / transaction.flagged" --> Notification[Notification Service :3006]
+    Decision -- "Kafka events" --> Audit[Audit Service :3007]
+    Notification -- "Kafka events" --> Audit
+    Transaction -- "Kafka events" --> Audit
 
     Decision --> DecisionDB[(Postgres decision-db)]
     Analytics --> DecisionDB
+
+    Gateway -. "metrics" .-> Prometheus[Monitoring Service : Prometheus 9099]
+    User -. "metrics" .-> Prometheus
+    Transaction -. "metrics" .-> Prometheus
+    Fraud -. "metrics" .-> Prometheus
+    ML -. "metrics" .-> Prometheus
+    Decision -. "metrics" .-> Prometheus
+    Notification -. "metrics" .-> Prometheus
+    Audit -. "metrics" .-> Prometheus
+    Analytics -. "metrics" .-> Prometheus
+    Prometheus --> Grafana[Monitoring Service : Grafana 3009]
+
+    Decision -. "manual review escalation" .-> HumanVerify[Human Verification Service - Planned]
+    HumanVerify -. "review decision" .-> Decision
+    Decision -. "post-decision reversal workflow" .-> Chargeback[Chargeback/Reversal Service - Planned]
 ```
 
 ## Current Services
@@ -34,8 +52,16 @@ flowchart TD
 | ML Scoring Service | 3004 | Live |
 | Decision Engine | 3005 | Live |
 | Notification Service | 3006 | Live |
-| Audit Service | 3007 | Planned |
+| Audit Service | 3007 | Live |
 | Analytics Service | 3008 | Live |
+| Monitoring Service (Prometheus/Grafana) | 9099 / 3009 | Live |
+
+## Planned Services
+
+| Service | Status |
+|---|---|
+| Human Verification Service | Planned |
+| Chargeback/Reversal Service | Planned |
 
 ---
 
@@ -60,6 +86,8 @@ Main entrypoints:
 
 - API Gateway: `http://localhost:3000`
 - Analytics Dashboard UI: `http://localhost:3008`
+- Grafana Dashboard: `http://localhost:3009`
+- Prometheus UI: `http://localhost:9099`
 
 ---
 
@@ -166,7 +194,7 @@ fraud-detection-system/
 |   |-- Dockerfile
 |   `-- package.json
 |
-`-- analytics-service/
+|-- analytics-service/
     |-- src/
     |   |-- config/           # App config, logger, DB/Redis/Kafka clients
     |   |-- public/           # Dashboard UI (index.html, JS, CSS)
@@ -176,6 +204,21 @@ fraud-detection-system/
     |-- .dockerignore
     |-- Dockerfile
     `-- package.json
+
+|-- audit-service/
+|   |-- src/
+|   |   |-- config/           # App config, logger, Kafka, metrics
+|   |   |-- db/               # PostgreSQL pool, migrations
+|   |   |-- consumers/        # Kafka event consumers for audit trails
+|   |   |-- routes/           # Health, metrics, and audit query APIs
+|   |   `-- index.js
+|   |-- .dockerignore
+|   |-- Dockerfile
+|   `-- package.json
+|
+`-- monitoring/
+    |-- prometheus.yml        # Prometheus scrape configuration
+    `-- grafana/              # Grafana provisioning + dashboards
 ```
 
 ---
@@ -191,6 +234,9 @@ Examples:
 
 - Gateway: `http://localhost:3000/api/v1/health`
 - Analytics: `http://localhost:3008/api/v1/health`
+- Audit: `http://localhost:3007/api/v1/health`
+- Prometheus: `http://localhost:9099/-/healthy`
+- Grafana: `http://localhost:3009/api/health`
 
 ---
 
@@ -200,8 +246,8 @@ Use Postman collection: `testing/test.json`.
 
 1. Start services with Docker Compose.
 2. Import `testing/test.json` in Postman.
-3. Run folders in order from `01` to `08`.
-4. Visit analytics dashboard UI at `http://localhost:3008` during/after tests.
+3. Run folders in order from `01` to `09`.
+4. Visit analytics dashboard UI at `http://localhost:3008` and Grafana at `http://localhost:3009` during/after tests.
 
 Detailed guide: `testing/TESTING.md`.
 
@@ -218,6 +264,9 @@ Detailed guide: `testing/TESTING.md`.
 | user-db | postgres:15-alpine | User storage |
 | transaction-db | postgres:15-alpine | Transaction storage |
 | decision-db | postgres:15-alpine | Decision storage |
+| audit-db | postgres:15-alpine | Audit storage |
+| prometheus | prom/prometheus:v2.51.0 | Metrics scraping and storage |
+| grafana | grafana/grafana:10.4.2 | Metrics dashboards and visualization |
 
 ### Kafka Topics
 

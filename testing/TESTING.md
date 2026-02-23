@@ -22,9 +22,11 @@ docker compose up --build -d
 2. Import `testing/test.json`.
 3. Use collection variables (already embedded in the collection):
    - `baseUrl = http://localhost:3000`
-   - direct service URLs for ports 3001-3006 and 3008 are preconfigured.
-4. Open Analytics Dashboard UI in browser:
+   - direct service URLs for ports 3001-3008 are preconfigured.
+   - monitoring URLs are preconfigured (`http://localhost:9099` and `http://localhost:3009`).
+4. Open dashboards in browser:
    - `http://localhost:3008`
+   - `http://localhost:3009`
 
 ## 3. Collection Structure (Run Order)
 
@@ -37,7 +39,8 @@ Run folders in this order:
 5. `05 - ML Scoring Service Direct`
 6. `06 - Notification Service`
 7. `07 - Rate Limit and Error Probes`
-8. `08 - End-to-End Smoke Flow`
+8. `08 - Audit Service`
+9. `09 - End-to-End Smoke Flow`
 
 ## 4. What Each Folder Validates
 
@@ -52,7 +55,10 @@ Checks health/live/ready/metrics endpoints for:
 - ML scoring service (`:3004`)
 - Decision engine service (`:3005`)
 - Notification service (`:3006`)
+- Audit service (`:3007`)
 - Analytics service (`:3008`)
+- Prometheus (`:9099`)
+- Grafana (`:3009`)
 
 Expected: HTTP `200` for healthy services.
 
@@ -189,4 +195,6 @@ System is healthy when:
 - High-risk transaction reaches decision engine and is queryable.
 - ML scoring endpoints return valid responses.
 - Notification service health and metrics are reachable.
+- Audit service endpoints are reachable.
+- Monitoring stack endpoints are reachable (Prometheus and Grafana).
 - Rate limiting returns `429` under burst attempts.

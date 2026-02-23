@@ -1,8 +1,8 @@
 {
   "info": {
-    "name": "Fraud Detection Platform - Comprehensive",
+    "name": "Fraud Detection Platform",
     "_postman_id": "fdp-collection-003",
-    "description": "Comprehensive Postman collection covering API Gateway, User, Transaction, Fraud, ML Scoring, Decision Engine, Notification Service, Audit Service, and Analytics Dashboard scenarios.",
+    "description": "Comprehensive Postman collection covering API Gateway, User, Transaction, Fraud, ML Scoring, Decision Engine, Notification Service, Audit Service, Analytics Dashboard, and Monitoring (Prometheus/Grafana) scenarios.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -15,6 +15,8 @@
     { "key": "notificationServiceUrl", "value": "http://localhost:3006", "type": "string" },
     { "key": "auditServiceUrl", "value": "http://localhost:3007", "type": "string" },
     { "key": "analyticsServiceUrl", "value": "http://localhost:3008", "type": "string" },
+    { "key": "prometheusUrl", "value": "http://localhost:9099", "type": "string" },
+    { "key": "grafanaUrl", "value": "http://localhost:3009", "type": "string" },
     { "key": "accessToken", "value": "", "type": "string" },
     { "key": "refreshToken", "value": "", "type": "string" },
     { "key": "userId", "value": "", "type": "string" },
@@ -110,6 +112,14 @@
         {
           "name": "Analytics Dashboard UI (Open in Browser)",
           "request": { "method": "GET", "url": "{{analyticsServiceUrl}}/" }
+        },
+        {
+          "name": "Prometheus Health",
+          "request": { "method": "GET", "url": "{{prometheusUrl}}/-/healthy" }
+        },
+        {
+          "name": "Grafana Health",
+          "request": { "method": "GET", "url": "{{grafanaUrl}}/api/health" }
         }
       ]
     },

@@ -5,40 +5,104 @@ Real-time payment fraud detection platform built with Node.js microservices, Kaf
 ---
 
 ```mermaid
-flowchart TD
-    Client[External Clients] --> Gateway[API Gateway :3000]
+flowchart LR
 
-    Gateway --> User[User Service :3002]
-    Gateway --> Transaction[Transaction Service :3001]
-    Gateway --> Analytics[Analytics Service :3008]
+%% =====================================================
+%% LAYER 1 – EDGE
+%% =====================================================
+subgraph Edge
+    Client[External Clients]
+    Gateway[API Gateway :3000]
+    Client --> Gateway
+end
 
-    Transaction -- "Kafka: transaction.created" --> Kafka[(Kafka Cluster)]
-    Kafka --> Fraud[Fraud Detection Service :3003]
-    Fraud -- "HTTP" --> ML[ML Scoring Service :3004]
+%% =====================================================
+%% LAYER 2 – CORE SERVICES
+%% =====================================================
+subgraph Core_Services
 
-    Kafka -- "Kafka: transaction.scored" --> Decision[Decision Engine :3005]
-    Decision -- "Kafka: transaction.finalised / transaction.flagged" --> Notification[Notification Service :3006]
-    Decision -- "Kafka events" --> Audit[Audit Service :3007]
-    Notification -- "Kafka events" --> Audit
-    Transaction -- "Kafka events" --> Audit
+    User[User Service :3002]
+    Transaction[Transaction Service :3001]
+    Fraud[Fraud Detection Service :3003]
+    ML[ML Scoring Service :3004]
+    Decision[Decision Engine :3005]
+    Notification[Notification Service :3006]
+    Audit[Audit Service :3007]
+    Analytics[Analytics Service :3008]
 
-    Decision --> DecisionDB[(Postgres decision-db)]
-    Analytics --> DecisionDB
+end
 
-    Gateway -. "metrics" .-> Prometheus[Monitoring Service : Prometheus 9099]
-    User -. "metrics" .-> Prometheus
-    Transaction -. "metrics" .-> Prometheus
-    Fraud -. "metrics" .-> Prometheus
-    ML -. "metrics" .-> Prometheus
-    Decision -. "metrics" .-> Prometheus
-    Notification -. "metrics" .-> Prometheus
-    Audit -. "metrics" .-> Prometheus
-    Analytics -. "metrics" .-> Prometheus
-    Prometheus --> Grafana[Monitoring Service : Grafana 3009]
+%% =====================================================
+%% LAYER 3 – MESSAGING
+%% =====================================================
+subgraph Messaging
+    Kafka[(Kafka Cluster)]
+end
 
-    Decision -. "manual review escalation" .-> HumanVerify[Human Verification Service - Planned]
-    HumanVerify -. "review decision" .-> Decision
-    Decision -. "post-decision reversal workflow" .-> Chargeback[Chargeback/Reversal Service - Planned]
+%% =====================================================
+%% DATA
+%% =====================================================
+subgraph Data
+    DecisionDB[(Postgres decision-db)]
+end
+
+%% =====================================================
+%% MONITORING
+%% =====================================================
+subgraph Observability
+    Prometheus[Prometheus :9099]
+    Grafana[Grafana :3009]
+    Prometheus --> Grafana
+end
+
+%% =====================================================
+%% MAIN FLOWS
+%% =====================================================
+
+Gateway -- "/auth/*" --> User
+Gateway --> Transaction
+Gateway --> Analytics
+Gateway --> Audit
+
+Transaction -- "transaction.created" --> Kafka
+Kafka --> Fraud
+Fraud -- HTTP --> ML
+Kafka -- "transaction.scored" --> Decision
+
+Decision -- "finalised / flagged" --> Notification
+Decision -- "finalised / flagged" --> Transaction
+
+Decision --> DecisionDB
+Analytics --> DecisionDB
+
+%% =====================================================
+%% AUDIT STREAMS
+%% =====================================================
+
+Decision -- events --> Audit
+Notification -- events --> Audit
+Transaction -- events --> Audit
+
+%% =====================================================
+%% FUTURE EXTENSIONS
+%% =====================================================
+
+Decision -. manual review .-> HumanVerify[Human Verification Service - Planned]
+HumanVerify -. review decision .-> Decision
+Decision -. reversal workflow .-> Chargeback[Chargeback Service - Planned]
+
+%% =====================================================
+%% METRICS
+%% =====================================================
+
+Gateway -. metrics .-> Prometheus
+Transaction -. metrics .-> Prometheus
+Fraud -. metrics .-> Prometheus
+ML -. metrics .-> Prometheus
+Decision -. metrics .-> Prometheus
+Notification -. metrics .-> Prometheus
+Audit -. metrics .-> Prometheus
+Analytics -. metrics .-> Prometheus
 ```
 
 ## Current Services

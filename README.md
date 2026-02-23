@@ -195,16 +195,16 @@ fraud-detection-system/
 |   `-- package.json
 |
 |-- analytics-service/
-    |-- src/
-    |   |-- config/           # App config, logger, DB/Redis/Kafka clients
-    |   |-- public/           # Dashboard UI (index.html, JS, CSS)
-    |   |-- routes/           # Health + analytics API endpoints
-    |   |-- services/         # Aggregation and real-time websocket broadcast
-    |   `-- index.js
-    |-- .dockerignore
-    |-- Dockerfile
-    `-- package.json
-
+|   |-- src/
+|   |   |-- config/           # App config, logger, DB/Redis/Kafka clients
+|   |   |-- public/           # Dashboard UI (index.html, JS, CSS)
+|   |   |-- routes/           # Health + analytics API endpoints
+|   |   |-- services/         # Aggregation and real-time websocket broadcast
+|   |   `-- index.js
+|   |-- .dockerignore
+|   |-- Dockerfile
+|   `-- package.json
+|
 |-- audit-service/
 |   |-- src/
 |   |   |-- config/           # App config, logger, Kafka, metrics

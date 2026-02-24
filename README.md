@@ -89,7 +89,6 @@ Transaction -- events --> Audit
 
 Decision -. manual review .-> HumanVerify[Human Verification Service - Planned]
 HumanVerify -. review decision .-> Decision
-Decision -. reversal workflow .-> Chargeback[Chargeback Service - Planned]
 
 %% =====================================================
 %% METRICS
@@ -125,7 +124,6 @@ Analytics -. metrics .-> Prometheus
 | Service | Status |
 |---|---|
 | Human Verification Service | Planned |
-| Chargeback/Reversal Service | Planned |
 
 ---
 

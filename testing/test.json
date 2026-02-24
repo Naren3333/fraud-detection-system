@@ -327,7 +327,9 @@
                 "pm.test('created', function(){ pm.response.to.have.status(201); });",
                 "const json = pm.response.json();",
                 "pm.collectionVariables.set('transactionId', json.data.transactionId);",
-                "pm.collectionVariables.set('customerId', json.data.customerId || 'cust_' + Date.now());"
+                "pm.environment.set('transactionId', json.data.transactionId);",
+                "pm.collectionVariables.set('customerId', json.data.customerId || 'cust_' + Date.now());",
+                "pm.environment.set('customerId', json.data.customerId || 'cust_' + Date.now());"
               ]
             }
           }],
@@ -471,6 +473,7 @@
                 "const json = pm.response.json();",
                 "if (json.success && json.data && json.data.transactionId) {",
                 "  pm.collectionVariables.set('highRiskTransactionId', json.data.transactionId);",
+                "  pm.environment.set('highRiskTransactionId', json.data.transactionId);",
                 "  console.log('High-risk tx id:', json.data.transactionId);",
                 "}"
               ]
@@ -662,7 +665,7 @@
         },
         {
           "name": "Step 3 - Create Transaction",
-          "event": [{ "listen": "test", "script": { "exec": ["const json = pm.response.json(); if (json.success && json.data) { pm.collectionVariables.set('transactionId', json.data.transactionId); }", "pm.test('txn created', function(){ pm.response.to.have.status(201); });"] } }],
+          "event": [{ "listen": "test", "script": { "exec": ["const json = pm.response.json(); if (json.success && json.data) { pm.collectionVariables.set('transactionId', json.data.transactionId); pm.environment.set('transactionId', json.data.transactionId); }", "pm.test('txn created', function(){ pm.response.to.have.status(201); });"] } }],
           "request": {
             "method": "POST",
             "header": [

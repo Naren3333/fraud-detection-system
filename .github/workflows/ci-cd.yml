@@ -1,0 +1,299 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      run_full_suite:
+        description: "Run integration and e2e tests"
+        required: false
+        default: false
+        type: boolean
+      deploy_env:
+        description: "Optional deploy target"
+        required: false
+        default: none
+        type: choice
+        options:
+          - none
+          - staging
+          - production
+      rollback_ref:
+        description: "Optional git ref for rollback (tag/commit/branch)"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "18"
+  DEFAULT_DEPLOY_PATH: "/opt/fraud-detection-system"
+
+jobs:
+  quality:
+    name: Lint and Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: testing-infrastructure
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: testing-infrastructure/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Run unit tests
+        run: npm run test:unit
+
+      - name: Upload unit coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-coverage
+          path: testing-infrastructure/coverage
+          if-no-files-found: ignore
+          retention-days: 7
+
+  full-suite:
+    name: Integration and E2E (Manual)
+    needs: quality
+    if: github.event_name == 'workflow_dispatch' && inputs.run_full_suite == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: testing-infrastructure
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: testing-infrastructure/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start test infrastructure
+        run: docker compose -f docker/docker-compose.test.yml up -d
+
+      - name: Wait for dependencies
+        run: |
+          timeout 120 bash -c 'until docker ps --filter "name=test-kafka" --filter "health=healthy" --format "{{.Names}}" | grep -q test-kafka; do sleep 3; done'
+
+      - name: Run integration tests
+        run: npm run test:integration
+
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+
+      - name: Run e2e tests
+        run: |
+          mkdir -p reports
+          npm run test:e2e
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-e2e-reports
+          path: testing-infrastructure/reports
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Stop test infrastructure
+        if: always()
+        run: docker compose -f docker/docker-compose.test.yml down -v
+
+  deploy-staging:
+    name: Deploy to Staging
+    needs: quality
+    if: |
+      github.event_name == 'push' && github.ref == 'refs/heads/develop' ||
+      github.event_name == 'workflow_dispatch' && inputs.deploy_env == 'staging'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: staging
+
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.STAGING_SSH_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            DEPLOY_PATH="${{ secrets.DEPLOY_APP_DIR }}"
+            if [ -z "$DEPLOY_PATH" ]; then
+              DEPLOY_PATH="${{ env.DEFAULT_DEPLOY_PATH }}"
+            fi
+
+            REPO_URL="https://x-access-token:${{ secrets.DEPLOY_REPO_TOKEN }}@github.com/${{ github.repository }}.git"
+            REF="${{ github.ref_name }}"
+
+            if [ ! -d "$DEPLOY_PATH/.git" ]; then
+              mkdir -p "$DEPLOY_PATH"
+              git clone "$REPO_URL" "$DEPLOY_PATH"
+            fi
+
+            cd "$DEPLOY_PATH"
+            git remote set-url origin "$REPO_URL"
+            git fetch --all --prune
+            git checkout "$REF"
+            git reset --hard "origin/$REF"
+
+            docker compose up -d --build --remove-orphans
+            docker image prune -f
+
+      - name: Smoke test staging
+        run: curl -fsSL "${{ secrets.STAGING_HEALTHCHECK_URL }}"
+
+  deploy-production:
+    name: Deploy to Production
+    needs: quality
+    if: |
+      github.event_name == 'push' && github.ref == 'refs/heads/main' ||
+      github.event_name == 'workflow_dispatch' && inputs.deploy_env == 'production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: production
+
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          port: ${{ secrets.PROD_SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            DEPLOY_PATH="${{ secrets.DEPLOY_APP_DIR }}"
+            if [ -z "$DEPLOY_PATH" ]; then
+              DEPLOY_PATH="${{ env.DEFAULT_DEPLOY_PATH }}"
+            fi
+
+            REPO_URL="https://x-access-token:${{ secrets.DEPLOY_REPO_TOKEN }}@github.com/${{ github.repository }}.git"
+            REF="${{ github.ref_name }}"
+
+            if [ ! -d "$DEPLOY_PATH/.git" ]; then
+              mkdir -p "$DEPLOY_PATH"
+              git clone "$REPO_URL" "$DEPLOY_PATH"
+            fi
+
+            cd "$DEPLOY_PATH"
+            git remote set-url origin "$REPO_URL"
+            git fetch --all --prune
+            git checkout "$REF"
+            git reset --hard "origin/$REF"
+
+            docker compose up -d --build --remove-orphans
+            docker image prune -f
+
+      - name: Smoke test production
+        run: curl -fsSL "${{ secrets.PROD_HEALTHCHECK_URL }}"
+
+  rollback:
+    name: Rollback
+    if: github.event_name == 'workflow_dispatch' && inputs.rollback_ref != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: ${{ inputs.deploy_env == 'production' && 'production' || 'staging' }}
+
+    steps:
+      - name: Rollback staging over SSH
+        if: inputs.deploy_env == 'staging'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.STAGING_SSH_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            DEPLOY_PATH="${{ secrets.DEPLOY_APP_DIR }}"
+            if [ -z "$DEPLOY_PATH" ]; then
+              DEPLOY_PATH="${{ env.DEFAULT_DEPLOY_PATH }}"
+            fi
+
+            REPO_URL="https://x-access-token:${{ secrets.DEPLOY_REPO_TOKEN }}@github.com/${{ github.repository }}.git"
+            REF="${{ inputs.rollback_ref }}"
+
+            if [ ! -d "$DEPLOY_PATH/.git" ]; then
+              mkdir -p "$DEPLOY_PATH"
+              git clone "$REPO_URL" "$DEPLOY_PATH"
+            fi
+
+            cd "$DEPLOY_PATH"
+            git remote set-url origin "$REPO_URL"
+            git fetch --all --prune
+            git checkout "$REF"
+            docker compose up -d --build --remove-orphans
+
+      - name: Rollback production over SSH
+        if: inputs.deploy_env == 'production'
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.PROD_SSH_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          port: ${{ secrets.PROD_SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            DEPLOY_PATH="${{ secrets.DEPLOY_APP_DIR }}"
+            if [ -z "$DEPLOY_PATH" ]; then
+              DEPLOY_PATH="${{ env.DEFAULT_DEPLOY_PATH }}"
+            fi
+
+            REPO_URL="https://x-access-token:${{ secrets.DEPLOY_REPO_TOKEN }}@github.com/${{ github.repository }}.git"
+            REF="${{ inputs.rollback_ref }}"
+
+            if [ ! -d "$DEPLOY_PATH/.git" ]; then
+              mkdir -p "$DEPLOY_PATH"
+              git clone "$REPO_URL" "$DEPLOY_PATH"
+            fi
+
+            cd "$DEPLOY_PATH"
+            git remote set-url origin "$REPO_URL"
+            git fetch --all --prune
+            git checkout "$REF"
+            docker compose up -d --build --remove-orphans

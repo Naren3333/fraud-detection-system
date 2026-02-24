@@ -1,0 +1,133 @@
+# docker-compose.test.yml
+# Testing infrastructure with isolated test databases
+
+networks:
+  test-net:
+    driver: bridge
+
+services:
+  # ─── Test Databases ────────────────────────────────────────────────────────
+  test-postgres-user:
+    image: postgres:15-alpine
+    container_name: test-postgres-user
+    networks: [test-net]
+    environment:
+      POSTGRES_DB: user_db_test
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  test-postgres-transaction:
+    image: postgres:15-alpine
+    container_name: test-postgres-transaction
+    networks: [test-net]
+    environment:
+      POSTGRES_DB: transaction_db_test
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  test-postgres-decision:
+    image: postgres:15-alpine
+    container_name: test-postgres-decision
+    networks: [test-net]
+    environment:
+      POSTGRES_DB: decision_db_test
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+    ports:
+      - "5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  test-postgres-audit:
+    image: postgres:15-alpine
+    container_name: test-postgres-audit
+    networks: [test-net]
+    environment:
+      POSTGRES_DB: audit_db_test
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+    ports:
+      - "5436:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ─── Test Redis ────────────────────────────────────────────────────────────
+  test-redis:
+    image: redis:7-alpine
+    container_name: test-redis
+    networks: [test-net]
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ─── Test Kafka ────────────────────────────────────────────────────────────
+  test-zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: test-zookeeper
+    networks: [test-net]
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  test-kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: test-kafka
+    networks: [test-net]
+    depends_on:
+      - test-zookeeper
+    ports:
+      - "9093:9093"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: test-zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://test-kafka:9092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server=localhost:9093"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Init Kafka Topics ─────────────────────────────────────────────────────
+  test-kafka-init:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: test-kafka-init
+    networks: [test-net]
+    depends_on:
+      test-kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        kafka-topics --bootstrap-server test-kafka:9092 --create --if-not-exists --topic transaction.created --partitions 3 --replication-factor 1
+        kafka-topics --bootstrap-server test-kafka:9092 --create --if-not-exists --topic transaction.scored --partitions 3 --replication-factor 1
+        kafka-topics --bootstrap-server test-kafka:9092 --create --if-not-exists --topic transaction.finalised --partitions 3 --replication-factor 1
+        kafka-topics --bootstrap-server test-kafka:9092 --create --if-not-exists --topic transaction.flagged --partitions 3 --replication-factor 1
+
+  # ─── Test Reporter ─────────────────────────────────────────────────────────

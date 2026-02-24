@@ -14,8 +14,8 @@
     "microservices",
     "fraud-detection"
   ],
-  "author": "Naren",
-  "license": "UNLICENSED",
+  "author": "ESD G05 T05",
+  "license": "SMU",
   "dependencies": {
     "express": "^4.18.2",
     "helmet": "^7.1.0",
@@ -35,7 +35,8 @@
     "prom-client": "^15.1.0",
     "opossum": "^8.1.3",
     "compression": "^1.7.4",
-    "express-slow-down": "^2.0.1"
+    "express-slow-down": "^2.0.1",
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
     "nodemon": "^3.0.2",

@@ -5,8 +5,10 @@ const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
 const compression = require('compression');
+const swaggerUi = require('swagger-ui-express');
 
 const config = require('./config');
+const swaggerSpec = require('./config/swagger');
 const logger = require('./config/logger');
 const decisionConsumer = require('./consumers/decisionConsumer');
 const routes = require('./routes');
@@ -26,6 +28,10 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use('/api/v1', routes);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.get('/api-docs.json', (req, res) => {
+  res.json(swaggerSpec);
+});
 
 // 404 handler
 app.use((req, res) => {

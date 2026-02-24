@@ -2,6 +2,8 @@
   "name": "fraud-detection-transaction-service",
   "version": "1.0.0",
   "description": "Transaction Service - handles ingestion, idempotency, and Kafka publishing",
+  "author": "ESD G05 T05",
+  "license": "SMU",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
@@ -21,7 +23,9 @@
     "winston-daily-rotate-file": "^4.7.1",
     "helmet": "^7.1.0",
     "cors": "^2.8.5",
-    "compression": "^1.7.4"
+    "compression": "^1.7.4",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

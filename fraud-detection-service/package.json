@@ -2,6 +2,8 @@
   "name": "fraud-detection-service",
   "version": "1.0.0",
   "description": "Enterprise fraud detection microservice — rule engine + ML scoring pipeline",
+  "license": "SMU",
+  "author": "ESD G05 T05",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -24,7 +26,9 @@
     "prom-client": "^15.1.0",
     "redis": "^4.6.10",
     "uuid": "^9.0.0",
-    "winston": "^3.11.0"
+    "winston": "^3.11.0",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
     "eslint": "^8.54.0",
@@ -35,3 +39,4 @@
     "node": ">=18.0.0"
   }
 }
+

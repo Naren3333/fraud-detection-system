@@ -5,8 +5,10 @@ const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
 const compression = require('compression');
+const swaggerUi = require('swagger-ui-express');
 
 const config = require('./config');
+const swaggerSpec = require('./config/swagger');
 const logger = require('./config/logger');
 const { createPool, closePool } = require('./db/pool');
 const { createClient: createRedisClient, closeClient: closeRedisClient } = require('./config/redis');
@@ -25,6 +27,10 @@ app.use(express.urlencoded({ extended: true }));
 app.use(requestContext);
 
 app.use('/api/v1', routes);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.get('/api-docs.json', (req, res) => {
+  res.json(swaggerSpec);
+});
 
 app.use(notFoundHandler);
 app.use(errorHandler);

@@ -33,6 +33,7 @@ module.exports = {
 
   services: {
     transaction: process.env.TRANSACTION_SERVICE_URL || 'http://transaction-service:3001',
+    decisionEngine: process.env.DECISION_ENGINE_SERVICE_URL || 'http://decision-engine-service:3005',
     mlScoring: process.env.ML_SCORING_SERVICE_URL || 'http://ml-scoring-service:3004',
     audit: process.env.AUDIT_SERVICE_URL || 'http://audit-service:3007',
     analytics: process.env.ANALYTICS_SERVICE_URL || 'http://analytics-service:3008',

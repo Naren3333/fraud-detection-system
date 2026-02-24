@@ -3,6 +3,18 @@ const { query } = require('../db/pool');
 const { getClient: getRedisClient } = require('../config/redis');
 const logger = require('../config/logger');
 
+/**
+ * @openapi
+ * /api/v1/health:
+ *   get:
+ *     tags: [user-service]
+ *     summary: Service health status
+ *     responses:
+ *       200:
+ *         description: Service healthy
+ *       503:
+ *         description: Service degraded or unhealthy
+ */
 // Handles GET /health.
 router.get('/health', async (req, res) => {
   const health = {
@@ -36,6 +48,18 @@ router.get('/health', async (req, res) => {
   res.status(statusCode).json(health);
 });
 
+/**
+ * @openapi
+ * /api/v1/health/ready:
+ *   get:
+ *     tags: [user-service]
+ *     summary: Readiness probe
+ *     responses:
+ *       200:
+ *         description: Service ready
+ *       503:
+ *         description: Service not ready
+ */
 // Handles GET /health/ready.
 router.get('/health/ready', async (req, res) => {
   try {
@@ -56,6 +80,16 @@ router.get('/health/ready', async (req, res) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/v1/health/live:
+ *   get:
+ *     tags: [user-service]
+ *     summary: Liveness probe
+ *     responses:
+ *       200:
+ *         description: Process alive
+ */
 // Handles GET /health/live.
 router.get('/health/live', (req, res) => {
   res.status(200).json({

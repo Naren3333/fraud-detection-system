@@ -7,8 +7,10 @@ const cors = require('cors');
 const compression = require('compression');
 const path = require('path');
 const http = require('http');
+const swaggerUi = require('swagger-ui-express');
 
 const config = require('./config');
+const swaggerSpec = require('./config/swagger');
 const logger = require('./config/logger');
 const { createPool, closePool } = require('./config/db');
 const { createClient, closeClient } = require('./config/redis');
@@ -36,6 +38,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // API Routes
 app.use('/api/v1', routes);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.get('/api-docs.json', (req, res) => {
+  res.json(swaggerSpec);
+});
 
 // Serve dashboard on root
 app.get('/', (req, res) => {

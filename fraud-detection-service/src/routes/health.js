@@ -2,6 +2,18 @@ const router = require('express').Router();
 const { getClient: getRedisClient } = require('../config/redis');
 const mlScoringClient = require('../services/mlScoringClient');
 const logger = require('../config/logger');
+/**
+ * @openapi
+ * /api/v1/health:
+ *   get:
+ *     tags: [fraud-detection-service]
+ *     summary: Service health status
+ *     responses:
+ *       200:
+ *         description: Service healthy
+ *       503:
+ *         description: Service degraded/unhealthy
+ */
 // Handles GET /health.
 router.get('/health', async (req, res) => {
   const health = {
@@ -47,6 +59,18 @@ router.get('/health', async (req, res) => {
   health.status = degraded ? 'degraded' : 'healthy';
   res.status(degraded ? 503 : 200).json(health);
 });
+/**
+ * @openapi
+ * /api/v1/health/ready:
+ *   get:
+ *     tags: [fraud-detection-service]
+ *     summary: Readiness probe
+ *     responses:
+ *       200:
+ *         description: Service ready
+ *       503:
+ *         description: Service not ready
+ */
 // Handles GET /health/ready.
 router.get('/health/ready', async (req, res) => {
   try {
@@ -65,6 +89,16 @@ router.get('/health/ready', async (req, res) => {
     });
   }
 });
+/**
+ * @openapi
+ * /api/v1/health/live:
+ *   get:
+ *     tags: [fraud-detection-service]
+ *     summary: Liveness probe
+ *     responses:
+ *       200:
+ *         description: Process alive
+ */
 // Handles GET /health/live.
 router.get('/health/live', (_req, res) => {
   res.status(200).json({

@@ -4,6 +4,14 @@ Real-time payment fraud detection platform built with Node.js microservices, Kaf
 
 ---
 
+## Project Metadata
+
+- Team / Author: `ESD G05 T05`
+- License: `SMU`
+- Centralized REST API documentation: `http://localhost:3000/api-docs`
+
+---
+
 ```mermaid
 flowchart LR
 

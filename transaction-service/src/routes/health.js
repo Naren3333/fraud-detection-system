@@ -2,6 +2,18 @@ const router = require('express').Router();
 const { getPool }         = require('../db/pool');
 const { isProducerReady } = require('../kafka/producer');
 
+/**
+ * @openapi
+ * /api/v1/health:
+ *   get:
+ *     tags: [transaction-service]
+ *     summary: Service health status
+ *     responses:
+ *       200:
+ *         description: Service is healthy
+ *       503:
+ *         description: Service is unhealthy
+ */
 // Handles GET /health.
 router.get('/health', async (req, res) => {
   const checks = {};
@@ -21,9 +33,31 @@ router.get('/health', async (req, res) => {
   });
 });
 
+/**
+ * @openapi
+ * /api/v1/health/live:
+ *   get:
+ *     tags: [transaction-service]
+ *     summary: Liveness probe
+ *     responses:
+ *       200:
+ *         description: Process is alive
+ */
 // Handles GET /health/live.
 router.get('/health/live',  (_req, res) => res.json({ status: 'alive' }));
 
+/**
+ * @openapi
+ * /api/v1/health/ready:
+ *   get:
+ *     tags: [transaction-service]
+ *     summary: Readiness probe
+ *     responses:
+ *       200:
+ *         description: Service is ready
+ *       503:
+ *         description: Service is not ready
+ */
 // Handles GET /health/ready.
 router.get('/health/ready', async (_req, res) => {
   try   { await getPool().query('SELECT 1'); res.json({ status: 'ready' }); }

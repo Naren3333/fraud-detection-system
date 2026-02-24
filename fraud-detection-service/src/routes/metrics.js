@@ -1,6 +1,18 @@
 const router = require('express').Router();
 const { register } = require('../metrics');
 const config = require('../config');
+/**
+ * @openapi
+ * /api/v1/metrics:
+ *   get:
+ *     tags: [fraud-detection-service]
+ *     summary: Prometheus metrics endpoint
+ *     responses:
+ *       200:
+ *         description: Metrics payload
+ *       404:
+ *         description: Metrics disabled
+ */
 // Handles GET /metrics.
 router.get('/metrics', async (req, res) => {
   if (!config.metrics.enabled) {

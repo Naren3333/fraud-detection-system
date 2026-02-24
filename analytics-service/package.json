@@ -8,8 +8,8 @@
     "dev": "nodemon src/index.js"
   },
   "keywords": ["analytics", "dashboard", "real-time", "metrics"],
-  "author": "Enterprise Team",
-  "license": "MIT",
+  "author": "ESD G05 T05",
+  "license": "SMU",
   "dependencies": {
     "express": "^4.18.2",
     "express-async-errors": "^3.1.1",
@@ -23,7 +23,9 @@
     "winston": "^3.11.0",
     "uuid": "^9.0.1",
     "prom-client": "^15.1.0",
-    "ws": "^8.16.0"
+    "ws": "^8.16.0",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

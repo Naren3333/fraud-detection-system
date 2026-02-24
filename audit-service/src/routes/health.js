@@ -2,6 +2,18 @@ const router = require('express').Router();
 const { query } = require('../db/pool');
 const logger = require('../config/logger');
 
+/**
+ * @openapi
+ * /api/v1/health:
+ *   get:
+ *     tags: [audit-service]
+ *     summary: Service health status
+ *     responses:
+ *       200:
+ *         description: Service healthy
+ *       503:
+ *         description: Service degraded/unhealthy
+ */
 // Handles GET /health.
 router.get('/health', async (req, res) => {
   const health = {
@@ -29,6 +41,16 @@ router.get('/health', async (req, res) => {
   res.status(degraded ? 503 : 200).json(health);
 });
 
+/**
+ * @openapi
+ * /api/v1/health/live:
+ *   get:
+ *     tags: [audit-service]
+ *     summary: Liveness probe
+ *     responses:
+ *       200:
+ *         description: Process alive
+ */
 // Handles GET /health/live.
 router.get('/health/live', (_req, res) => {
   res.status(200).json({ status: 'alive', timestamp: new Date().toISOString() });

@@ -3,9 +3,11 @@ const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
 const compression = require('compression');
+const swaggerUi = require('swagger-ui-express');
 const config = require('./config');
 const logger = require('./config/logger');
 const { createRedisClient, closeRedisConnection } = require('./config/redis');
+const aggregateSwaggerSpecs = require('./config/swaggerAggregator');
 const routes = require('./routes');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const requestLogger = require('./middleware/requestLogger');
@@ -31,6 +33,33 @@ app.use(requestLogger);
 
 // Routes
 app.use('/api/v1', routes);
+app.get('/api-docs.json', async (req, res, next) => {
+  try {
+    const swaggerSpec = await aggregateSwaggerSpecs();
+    res.json(swaggerSpec);
+  } catch (error) {
+    next(error);
+  }
+});
+app.use('/api-docs', swaggerUi.serve);
+app.use('/api-docs', async (req, res, next) => {
+  try {
+    const swaggerSpec = await aggregateSwaggerSpecs();
+    swaggerUi.setup(swaggerSpec, {
+      customSiteTitle: 'Fraud Detection REST API Documentation',
+      swaggerOptions: {
+        supportedSubmitMethods: [],
+        docExpansion: 'list',
+        defaultModelRendering: 'example',
+        defaultModelsExpandDepth: 1,
+        tagsSorter: 'alpha',
+        operationsSorter: 'alpha',
+      },
+    })(req, res, next);
+  } catch (error) {
+    next(error);
+  }
+});
 
 // Error handling
 app.use(notFoundHandler);

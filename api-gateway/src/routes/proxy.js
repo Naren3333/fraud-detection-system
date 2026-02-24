@@ -24,6 +24,20 @@ const serviceRoutes = [
     rewriteTo:            '/api/v1/audit',
   },
   {
+    pathPrefix:           '/decisions',
+    target:               config.services.decisionEngine,
+    serviceName:          'decision-engine-service',
+    useTransactionLimiter: false,
+    rewriteTo:            '/api/v1/decisions',
+  },
+  {
+    pathPrefix:           '/thresholds',
+    target:               config.services.decisionEngine,
+    serviceName:          'decision-engine-service',
+    useTransactionLimiter: false,
+    rewriteTo:            '/api/v1/thresholds',
+  },
+  {
     pathPrefix:           '/analytics',
     target:               config.services.analytics,
     serviceName:          'analytics-service',

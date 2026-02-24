@@ -3,6 +3,18 @@ const emailService = require('../services/emailService');
 const smsService = require('../services/smsService');
 const logger = require('../config/logger');
 
+/**
+ * @openapi
+ * /api/v1/health:
+ *   get:
+ *     tags: [notification-service]
+ *     summary: Service health status
+ *     responses:
+ *       200:
+ *         description: Service healthy
+ *       503:
+ *         description: Service degraded/unhealthy
+ */
 // Handles GET /health.
 router.get('/health', async (req, res) => {
   const health = {
@@ -51,6 +63,18 @@ router.get('/health', async (req, res) => {
   res.status(degraded ? 503 : 200).json(health);
 });
 
+/**
+ * @openapi
+ * /api/v1/health/ready:
+ *   get:
+ *     tags: [notification-service]
+ *     summary: Readiness probe
+ *     responses:
+ *       200:
+ *         description: Service ready
+ *       503:
+ *         description: Service not ready
+ */
 // Handles GET /health/ready.
 router.get('/health/ready', async (req, res) => {
   try {
@@ -78,6 +102,16 @@ router.get('/health/ready', async (req, res) => {
   }
 });
 
+/**
+ * @openapi
+ * /api/v1/health/live:
+ *   get:
+ *     tags: [notification-service]
+ *     summary: Liveness probe
+ *     responses:
+ *       200:
+ *         description: Process alive
+ */
 // Handles GET /health/live.
 router.get('/health/live', (_req, res) => {
   res.status(200).json({

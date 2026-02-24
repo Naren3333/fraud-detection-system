@@ -1,16 +1,83 @@
 const axios = require('axios');
 
 const services = [
-  { name: 'transaction-service', url: 'http://transaction-service:3001/api-docs.json' },
-  { name: 'user-service', url: 'http://user-service:3002/api-docs.json' },
-  { name: 'fraud-detection-service', url: 'http://fraud-detection-service:3003/api-docs.json' },
-  { name: 'ml-scoring-service', url: 'http://ml-scoring-service:3004/api-docs.json' },
-  { name: 'decision-engine-service', url: 'http://decision-engine-service:3005/api-docs.json' },
-  { name: 'notification-service', url: 'http://notification-service:3006/api-docs.json' },
-  { name: 'audit-service', url: 'http://audit-service:3007/api-docs.json' },
-  { name: 'analytics-service', url: 'http://analytics-service:3008/api-docs.json' },
-  { name: 'human-verification-service', url: 'http://human-verification-service:3010/api-docs.json' }
+  {
+    name: 'transaction-service',
+    url: 'http://transaction-service:3001/api-docs.json',
+    includePrefixes: ['/api/v1/transactions'],
+  },
+  {
+    name: 'user-service',
+    url: 'http://user-service:3002/api-docs.json',
+    includePrefixes: ['/api/v1/auth'],
+  },
+  {
+    name: 'decision-engine-service',
+    url: 'http://decision-engine-service:3005/api-docs.json',
+    includePrefixes: ['/api/v1/decisions', '/api/v1/thresholds'],
+  },
+  {
+    name: 'audit-service',
+    url: 'http://audit-service:3007/api-docs.json',
+    includePrefixes: ['/api/v1/audit'],
+  },
+  {
+    name: 'analytics-service',
+    url: 'http://analytics-service:3008/api-docs.json',
+    includePrefixes: ['/api/v1/analytics'],
+  },
+  {
+    name: 'human-verification-service',
+    url: 'http://human-verification-service:3010/api-docs.json',
+    includePrefixes: ['/api/v1/reviews'],
+  },
 ];
+
+const gatewayPaths = {
+  '/api/v1/health': {
+    get: {
+      tags: ['api-gateway'],
+      summary: 'API Gateway health status',
+      responses: {
+        200: { description: 'Gateway healthy' },
+        503: { description: 'Gateway degraded/unhealthy' },
+      },
+    },
+  },
+  '/api/v1/health/live': {
+    get: {
+      tags: ['api-gateway'],
+      summary: 'API Gateway liveness probe',
+      responses: {
+        200: { description: 'Gateway process alive' },
+      },
+    },
+  },
+  '/api/v1/health/ready': {
+    get: {
+      tags: ['api-gateway'],
+      summary: 'API Gateway readiness probe',
+      responses: {
+        200: { description: 'Gateway ready' },
+        503: { description: 'Gateway not ready' },
+      },
+    },
+  },
+  '/api/v1/metrics': {
+    get: {
+      tags: ['api-gateway'],
+      summary: 'API Gateway metrics endpoint',
+      responses: {
+        200: { description: 'Metrics payload' },
+      },
+    },
+  },
+};
+
+const shouldIncludePath = (path, includePrefixes) => {
+  if (!includePrefixes || includePrefixes.length === 0) return true;
+  return includePrefixes.some((prefix) => path.startsWith(prefix));
+};
 
 async function aggregateSwaggerSpecs() {
   const mergedSpec = {
@@ -26,12 +93,29 @@ async function aggregateSwaggerSpecs() {
     }
   };
 
+  Object.assign(mergedSpec.paths, gatewayPaths);
+
   for (const service of services) {
     try {
       const { data } = await axios.get(service.url, { timeout: 2000 });
 
       if (data.paths) {
-        Object.assign(mergedSpec.paths, data.paths);
+        for (const [path, pathItem] of Object.entries(data.paths)) {
+          if (!shouldIncludePath(path, service.includePrefixes)) continue;
+
+          if (!mergedSpec.paths[path]) {
+            mergedSpec.paths[path] = {};
+          }
+
+          for (const [method, operation] of Object.entries(pathItem)) {
+            if (!mergedSpec.paths[path][method]) {
+              mergedSpec.paths[path][method] = operation;
+              continue;
+            }
+
+            console.warn(`Duplicate path/method skipped: ${method.toUpperCase()} ${path} from ${service.name}`);
+          }
+        }
       }
 
       if (data.components?.schemas) {

@@ -26,6 +26,7 @@ subgraph Core_Services
     Fraud[Fraud Detection Service :3003]
     ML[ML Scoring Service :3004]
     Decision[Decision Engine :3005]
+    HumanVerify[Human Verification Service :3010]
     Notification[Notification Service :3006]
     Audit[Audit Service :3007]
     Analytics[Analytics Service :3008]
@@ -44,6 +45,7 @@ end
 %% =====================================================
 subgraph Data
     DecisionDB[(Postgres decision-db)]
+    HumanReviewDB[(Postgres human-review-db)]
 end
 
 %% =====================================================
@@ -63,16 +65,20 @@ Gateway -- "/auth/*" --> User
 Gateway --> Transaction
 Gateway --> Analytics
 Gateway --> Audit
+Gateway -- "/reviews/*" --> HumanVerify
 
 Transaction -- "transaction.created" --> Kafka
 Kafka --> Fraud
 Fraud -- HTTP --> ML
 Kafka -- "transaction.scored" --> Decision
 
-Decision -- "finalised / flagged" --> Notification
-Decision -- "finalised / flagged" --> Transaction
+Decision -- "transaction.finalised / transaction.flagged" --> Notification
+Decision -- "transaction.finalised / transaction.flagged" --> Transaction
+Decision -- "transaction.flagged" --> HumanVerify
+HumanVerify -- "transaction.reviewed" --> Transaction
 
 Decision --> DecisionDB
+HumanVerify --> HumanReviewDB
 Analytics --> DecisionDB
 
 %% =====================================================
@@ -82,13 +88,7 @@ Analytics --> DecisionDB
 Decision -- events --> Audit
 Notification -- events --> Audit
 Transaction -- events --> Audit
-
-%% =====================================================
-%% FUTURE EXTENSIONS
-%% =====================================================
-
-Decision -. manual review .-> HumanVerify[Human Verification Service - Planned]
-HumanVerify -. review decision .-> Decision
+HumanVerify -- events --> Audit
 
 %% =====================================================
 %% METRICS
@@ -114,16 +114,11 @@ Analytics -. metrics .-> Prometheus
 | Fraud Detection Service | 3003 | Live |
 | ML Scoring Service | 3004 | Live |
 | Decision Engine | 3005 | Live |
+| Human Verification Service | 3010 | Live |
 | Notification Service | 3006 | Live |
 | Audit Service | 3007 | Live |
 | Analytics Service | 3008 | Live |
 | Monitoring Service (Prometheus/Grafana) | 9099 / 3009 | Live |
-
-## Planned Services
-
-| Service | Status |
-|---|---|
-| Human Verification Service | Planned |
 
 ---
 

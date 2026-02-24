@@ -67,11 +67,12 @@ const authLimiter = createRateLimiter({
 });
 
 const transactionLimiter = createRateLimiter({
-  windowMs: 60 * 1000,
-  max: 50,
+  windowMs: config.transactionRateLimit.windowMs,
+  max: config.transactionRateLimit.max,
   message: 'Transaction rate limit exceeded',
   keyGenerator: (req) => {
-    return req.user?.userId || req.ip;
+    const customerId = req.body?.customerId || req.user?.userId || req.ip;
+    return `${config.transactionRateLimit.keyPrefix}${customerId}`;
   },
 });
 

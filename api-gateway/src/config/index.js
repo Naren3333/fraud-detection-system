@@ -25,12 +25,18 @@ module.exports = {
     max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS, 10) || 100,
     skipSuccessfulRequests: process.env.RATE_LIMIT_SKIP_SUCCESSFUL_REQUESTS === 'true',
   },
+  transactionRateLimit: {
+    windowMs: parseInt(process.env.TXN_RATE_LIMIT_WINDOW_MS, 10) || 60000,
+    max: parseInt(process.env.TXN_RATE_LIMIT_MAX_PER_CUSTOMER, 10) || 30,
+    keyPrefix: process.env.TXN_RATE_LIMIT_KEY_PREFIX || 'txn:customer:',
+  },
 
   services: {
     transaction: process.env.TRANSACTION_SERVICE_URL || 'http://transaction-service:3001',
     mlScoring: process.env.ML_SCORING_SERVICE_URL || 'http://ml-scoring-service:3004',
     audit: process.env.AUDIT_SERVICE_URL || 'http://audit-service:3007',
     analytics: process.env.ANALYTICS_SERVICE_URL || 'http://analytics-service:3008',
+    humanVerification: process.env.HUMAN_VERIFICATION_SERVICE_URL || 'http://human-verification-service:3010',
   },
 
   circuitBreaker: {

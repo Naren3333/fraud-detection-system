@@ -48,8 +48,9 @@ const start = async () => {
 
   await consumer.subscribe({
     topics: [
-      'transaction.finalised',
-      'transaction.flagged',
+      config.kafka.topics.transactionFinalised,
+      config.kafka.topics.transactionFlagged,
+      config.kafka.topics.transactionReviewed,
     ],
     fromBeginning: false,
   });
@@ -63,7 +64,11 @@ const start = async () => {
 
   isRunning = true;
   logger.info('Decision consumer running', {
-    topics: ['transaction.finalised', 'transaction.flagged'],
+    topics: [
+      config.kafka.topics.transactionFinalised,
+      config.kafka.topics.transactionFlagged,
+      config.kafka.topics.transactionReviewed,
+    ],
   });
 };
 
@@ -103,7 +108,7 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
     }
 
     transactionId = data.transactionId;
-    const decision = data.decision;
+    const decision = data.reviewDecision || data.decision;
 
     if (!transactionId || !decision) {
       logger.error('Decision message missing transactionId or decision - skipping', {
@@ -135,6 +140,7 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
         transactionId,
         decision,
         newStatus,
+        sourceTopic: topic,
         correlationId: data.correlationId,
       });
     }

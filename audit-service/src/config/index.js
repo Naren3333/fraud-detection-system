@@ -24,7 +24,7 @@ module.exports = {
     groupId: process.env.KAFKA_GROUP_ID || 'audit-group',
     sessionTimeout: parseInt(process.env.KAFKA_CONSUMER_SESSION_TIMEOUT, 10) || 30000,
     heartbeatInterval: parseInt(process.env.KAFKA_CONSUMER_HEARTBEAT_INTERVAL, 10) || 3000,
-    topics: (process.env.KAFKA_TOPICS || 'transaction.created,transaction.scored,transaction.finalised,transaction.flagged').split(','),
+    topics: (process.env.KAFKA_TOPICS || 'transaction.created,transaction.scored,transaction.finalised,transaction.flagged,transaction.reviewed').split(','),
     retry: {
       initialRetryTime: 100,
       retries: 8,

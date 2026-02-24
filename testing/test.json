@@ -15,6 +15,7 @@
     { "key": "notificationServiceUrl", "value": "http://localhost:3006", "type": "string" },
     { "key": "auditServiceUrl", "value": "http://localhost:3007", "type": "string" },
     { "key": "analyticsServiceUrl", "value": "http://localhost:3008", "type": "string" },
+    { "key": "humanVerificationServiceUrl", "value": "http://localhost:3010", "type": "string" },
     { "key": "prometheusUrl", "value": "http://localhost:9099", "type": "string" },
     { "key": "grafanaUrl", "value": "http://localhost:3009", "type": "string" },
     { "key": "accessToken", "value": "", "type": "string" },
@@ -22,6 +23,7 @@
     { "key": "userId", "value": "", "type": "string" },
     { "key": "transactionId", "value": "", "type": "string" },
     { "key": "highRiskTransactionId", "value": "", "type": "string" },
+    { "key": "reviewDecision", "value": "APPROVED", "type": "string" },
     { "key": "customerId", "value": "", "type": "string" },
     { "key": "testEmail", "value": "", "type": "string" },
     { "key": "testPassword", "value": "SecurePass123!", "type": "string" },
@@ -679,6 +681,204 @@
           "name": "Step 4 - Verify Decision (Retry if 404)",
           "event": [{ "listen": "test", "script": { "exec": ["pm.test('decision available or pending', function(){ pm.expect([200,404]).to.include(pm.response.code); });", "if (pm.response.code === 404) { console.log('Decision not persisted yet. Retry this request after a short delay.'); }"] } }],
           "request": { "method": "GET", "url": "{{decisionServiceUrl}}/api/v1/decisions/{{transactionId}}" }
+        }
+      ]
+    },
+    {
+      "name": "10 - Human Verification Flow",
+      "item": [
+        {
+          "name": "Human Verification Service Health",
+          "request": {
+            "method": "GET",
+            "url": "{{humanVerificationServiceUrl}}/api/v1/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('human verification health 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Pending Reviews (Gateway)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/reviews/pending?limit=20&offset=0"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('pending reviews responds', function(){ pm.expect([200,401,403]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Review By High-Risk Transaction",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/reviews/{{highRiskTransactionId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('review record available or pending', function(){ pm.expect([200,404]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 404) { console.log('Review record not yet queued. Retry after a short delay.'); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit Manual Review Decision (Gateway)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/v1/reviews/{{highRiskTransactionId}}/decision",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"{{reviewDecision}}\",\n  \"reviewedBy\": \"postman-analyst\",\n  \"notes\": \"Manual verification completed via Postman\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('manual review accepted or not ready', function(){ pm.expect([200,404]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('review decision persisted', function(){ pm.expect(json.data.finalDecision).to.eql(pm.collectionVariables.get('reviewDecision')); });",
+                  "} else {",
+                  "  console.log('Review record not found yet. Run \"Get Review By High-Risk Transaction\" then retry.');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Transaction Status After Review",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/transactions/{{highRiskTransactionId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('transaction fetch ok', function(){ pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "const expected = pm.collectionVariables.get('reviewDecision') === 'DECLINED' ? 'REJECTED' : pm.collectionVariables.get('reviewDecision');",
+                  "pm.test('status reflects manual review eventually', function(){ pm.expect(['FLAGGED', expected]).to.include(json.data.status); });",
+                  "if (json.data.status !== expected) { console.log('Status not updated yet; retry this request in a few seconds.'); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Set Review Decision = DECLINED",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('reviewDecision', 'DECLINED');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('variable set', function(){ pm.expect(pm.collectionVariables.get('reviewDecision')).to.eql('DECLINED'); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/reviews/{{highRiskTransactionId}}"
+          }
+        },
+        {
+          "name": "Submit Manual Review Decision = DECLINED",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": "{{baseUrl}}/api/v1/reviews/{{highRiskTransactionId}}/decision",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"{{reviewDecision}}\",\n  \"reviewedBy\": \"postman-analyst\",\n  \"notes\": \"Manual review changed to decline for rejection mapping test\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('manual decline accepted or not ready', function(){ pm.expect([200,404]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('declined review persisted', function(){ pm.expect(json.data.finalDecision).to.eql('DECLINED'); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Transaction Status After DECLINED Review",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": "{{baseUrl}}/api/v1/transactions/{{highRiskTransactionId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('transaction fetch ok', function(){ pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('declined maps to REJECTED eventually', function(){ pm.expect(['FLAGGED','REJECTED']).to.include(json.data.status); });",
+                  "if (json.data.status !== 'REJECTED') { console.log('Status not REJECTED yet; retry this request in a few seconds.'); }"
+                ]
+              }
+            }
+          ]
         }
       ]
     }

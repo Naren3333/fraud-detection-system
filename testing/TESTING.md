@@ -22,7 +22,7 @@ docker compose up --build -d
 2. Import `testing/test.json`.
 3. Use collection variables (already embedded in the collection):
    - `baseUrl = http://localhost:3000`
-   - direct service URLs for ports 3001-3008 are preconfigured.
+   - direct service URLs for ports 3001-3008 and 3010 are preconfigured.
    - monitoring URLs are preconfigured (`http://localhost:9099` and `http://localhost:3009`).
 4. Open dashboards in browser:
    - `http://localhost:3008`
@@ -41,6 +41,7 @@ Run folders in this order:
 7. `07 - Rate Limit and Error Probes`
 8. `08 - Audit Service`
 9. `09 - End-to-End Smoke Flow`
+10. `10 - Human Verification Flow`
 
 ## 4. What Each Folder Validates
 
@@ -137,7 +138,7 @@ Includes:
 - Auth brute-force probe (run quickly multiple times): expect `401` initially and `429` when limited.
 - Login failure probe for invalid credentials.
 
-### 08 - End-to-End Smoke Flow
+### 09 - End-to-End Smoke Flow
 
 Simple production-like smoke run:
 
@@ -147,6 +148,17 @@ Simple production-like smoke run:
 4. Verify decision (retry if first call is `404`)
 
 Expected: transaction created and decision eventually persisted.
+
+### 10 - Human Verification Flow
+
+Validates manual review backend flow:
+
+- Health check for Human Verification Service (`:3010`)
+- List pending manual reviews through API Gateway
+- Fetch review item by `highRiskTransactionId`
+- Submit manual decision (`APPROVED` / `DECLINED` / `FLAGGED`)
+- Verify transaction status transitions after review event is consumed
+- Includes explicit `DECLINED -> REJECTED` mapping check in transaction status
 
 ## 5. Async and Reliability Notes
 

@@ -30,6 +30,13 @@ const serviceRoutes = [
     useTransactionLimiter: false,
     rewriteTo:            '/api/v1/analytics',
   },
+  {
+    pathPrefix:           '/reviews',
+    target:               config.services.humanVerification,
+    serviceName:          'human-verification-service',
+    useTransactionLimiter: false,
+    rewriteTo:            '/api/v1/reviews',
+  },
 ];
 // Handles make proxy handler.
 const makeProxyHandler = (target, serviceName, rewriteTo, pathPrefix) => {

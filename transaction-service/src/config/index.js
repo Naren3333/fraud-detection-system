@@ -20,6 +20,9 @@ module.exports = {
     clientId: process.env.KAFKA_CLIENT_ID || 'transaction-service',
     topics: {
       transactionCreated: process.env.KAFKA_TOPIC_TRANSACTION_CREATED || 'transaction.created',
+      transactionFinalised: process.env.KAFKA_TOPIC_TRANSACTION_FINALISED || 'transaction.finalised',
+      transactionFlagged: process.env.KAFKA_TOPIC_TRANSACTION_FLAGGED || 'transaction.flagged',
+      transactionReviewed: process.env.KAFKA_TOPIC_TRANSACTION_REVIEWED || 'transaction.reviewed',
     },
     retry: { attempts: 8, initialRetryTime: 300 },
   },

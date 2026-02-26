@@ -1,5 +1,6 @@
 require('express-async-errors');
 require('dotenv').config();
+require('./config/tracing');
 
 const express = require('express');
 const helmet = require('helmet');
@@ -173,3 +174,4 @@ const bootstrap = async () => {
 bootstrap();
 
 module.exports = app;
+

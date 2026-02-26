@@ -1,5 +1,6 @@
 'use strict';
 require('express-async-errors');
+require('./config/tracing');
 
 const express = require('express');
 const helmet = require('helmet');
@@ -88,3 +89,4 @@ bootstrap().catch((err) => {
 });
 
 module.exports = app;
+

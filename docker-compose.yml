@@ -4,6 +4,7 @@ networks:
   fraud-net:
     driver: bridge
 
+
 volumes:
   transaction-db-data:
   user-db-data:
@@ -16,6 +17,15 @@ volumes:
   audit-db-data:
   prometheus-data:
   grafana-data:
+
+x-otel-env: &otel-env
+  OTEL_ENABLED: "true"
+  OTEL_SERVICE_NAMESPACE: fraud-detection-platform
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+  OTEL_TRACES_SAMPLER: parentbased_traceidratio
+  OTEL_TRACES_SAMPLER_ARG: "0.2"
+  OTEL_PROPAGATORS: tracecontext,baggage
 
 services:
   zookeeper:
@@ -143,6 +153,8 @@ services:
       kafka-init:
         condition: service_completed_successfully
     environment:
+      <<: *otel-env
+      OTEL_SERVICE_NAME: transaction-service
       NODE_ENV:              production
       PORT:                  3001
       SERVICE_NAME:          transaction-service
@@ -192,6 +204,8 @@ services:
       human-verification-service:
         condition: service_healthy
     environment:
+      <<: *otel-env
+      OTEL_SERVICE_NAME: api-gateway
       NODE_ENV:                     production
       PORT:                         3000
       SERVICE_NAME:                 api-gateway
@@ -249,6 +263,8 @@ services:
       redis:
         condition: service_healthy
     environment:
+      <<: *otel-env
+      OTEL_SERVICE_NAME: user-service
       NODE_ENV:              production
       PORT:                  3002
       SERVICE_NAME:          user-service
@@ -297,6 +313,8 @@ services:
         redis:
           condition: service_healthy
       environment:
+        <<: *otel-env
+        OTEL_SERVICE_NAME: fraud-detection-service
         NODE_ENV:              production
         PORT:                  3003
         SERVICE_NAME:          fraud-detection-service
@@ -344,6 +362,8 @@ services:
       redis:
         condition: service_healthy
     environment:
+      <<: *otel-env
+      OTEL_SERVICE_NAME: ml-scoring-service
       NODE_ENV:              production
       PORT:                  3004
       SERVICE_NAME:          ml-scoring-service
@@ -415,6 +435,8 @@ services:
       kafka-init:
         condition: service_completed_successfully
     environment:
+      <<: *otel-env
+      OTEL_SERVICE_NAME: decision-engine-service
       NODE_ENV:              production
       PORT:                  3005
       SERVICE_NAME:          decision-engine-service
@@ -477,6 +499,8 @@ services:
       kafka-init:
         condition: service_completed_successfully
     environment:
+      <<: *otel-env
+      OTEL_SERVICE_NAME: notification-service
       NODE_ENV:              production
       PORT:                  3006
       SERVICE_NAME:          notification-service
@@ -560,6 +584,8 @@ services:
       kafka-init:
         condition: service_completed_successfully
     environment:
+      <<: *otel-env
+      OTEL_SERVICE_NAME: human-verification-service
       NODE_ENV:              production
       PORT:                  3010
       SERVICE_NAME:          human-verification-service
@@ -602,6 +628,8 @@ services:
       redis:
         condition: service_healthy
     environment:
+      <<: *otel-env
+      OTEL_SERVICE_NAME: analytics-service
       NODE_ENV:              production
       PORT:                  3008
       SERVICE_NAME:          analytics-service
@@ -671,6 +699,8 @@ services:
       kafka-init:
         condition: service_completed_successfully
     environment:
+      <<: *otel-env
+      OTEL_SERVICE_NAME: audit-service
       NODE_ENV:              production
       PORT:                  3007
       SERVICE_NAME:          audit-service
@@ -703,6 +733,44 @@ services:
       start_period: 20s
     restart: unless-stopped
     command: sh -c "npm run migrate && npm start"
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.121.0
+    container_name: otel-collector
+    networks: [fraud-net]
+    command: ["--config=/etc/otel-collector-config.yml"]
+    volumes:
+      - ./monitoring/otel-collector-config.yml:/etc/otel-collector-config.yml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "13133:13133"
+      - "8889:8889"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:13133/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    container_name: jaeger
+    networks: [fraud-net]
+    ports:
+      - "16686:16686"
+    environment:
+      METRICS_STORAGE_TYPE: prometheus
+      PROMETHEUS_SERVER_URL: http://prometheus:9090
+      PROMETHEUS_QUERY_SUPPORT_SPANMETRICS_CONNECTOR: "true"
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:16686/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
 
   prometheus:
     image: prom/prometheus:v2.51.0

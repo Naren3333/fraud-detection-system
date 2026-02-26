@@ -1,4 +1,5 @@
 require('express-async-errors');
+require('./config/tracing');
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -145,3 +146,4 @@ const startServer = async () => {
 startServer();
 
 module.exports = app;
+

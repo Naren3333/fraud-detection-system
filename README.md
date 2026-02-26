@@ -153,6 +153,7 @@ Main entrypoints:
 - Analytics Dashboard UI: `http://localhost:3008`
 - Grafana Dashboard: `http://localhost:3009`
 - Prometheus UI: `http://localhost:9099`
+- Jaeger UI (Tracing): `http://localhost:16686`
 
 ---
 
@@ -332,6 +333,34 @@ Detailed guide: `testing/TESTING.md`.
 | audit-db | postgres:15-alpine | Audit storage |
 | prometheus | prom/prometheus:v2.51.0 | Metrics scraping and storage |
 | grafana | grafana/grafana:10.4.2 | Metrics dashboards and visualization |
+| otel-collector | otel/opentelemetry-collector-contrib:0.121.0 | Collects OTLP traces from services |
+| jaeger | jaegertracing/all-in-one:1.57 | Distributed tracing storage and UI |
+
+### Distributed Tracing
+
+This stack uses OpenTelemetry tracing from each microservice to `otel-collector`, then exports to Jaeger.
+
+- OTEL Collector endpoint (HTTP): `http://otel-collector:4318`
+- Jaeger UI: `http://localhost:16686`
+- Sampling strategy: `parentbased_traceidratio` with ratio `0.2`
+
+To validate traces:
+
+1. Start platform: `docker compose up --build -d`
+2. Send requests through API Gateway (`/api/v1/...`)
+3. Open Jaeger UI and search for services (for example `api-gateway`, `transaction-service`, `fraud-detection-service`)
+
+### Monitoring Jaeger
+
+Jaeger and the OpenTelemetry Collector are now included in the Prometheus scrape config and Grafana provisioning:
+
+- Prometheus targets:
+  - `otel-collector:8888` (collector metrics)
+  - `jaeger:14269` (Jaeger admin/metrics)
+- Grafana datasource:
+  - `Jaeger` (for trace exploration from Grafana)
+- Grafana dashboard:
+  - `Tracing Operations` (collector throughput, dropped spans, Jaeger request/error signals)
 
 ### Kafka Topics
 

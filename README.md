@@ -318,6 +318,61 @@ Detailed guide: `testing/TESTING.md`.
 
 ---
 
+## CI/CD Pipeline
+
+The GitHub Actions workflow is at `.github/workflows/ci-cd.yml`.
+
+### What runs automatically
+
+- Pull requests to `develop` and `main`:
+  - Test harness quality gate (`testing-infrastructure` lint, format, unit coverage)
+  - Service validation matrix across all microservices (install, optional lint/test, JS syntax check)
+  - Docker build validation matrix across all service Dockerfiles
+  - Dependency review gate
+  - CodeQL static analysis
+
+- Push to `develop`:
+  - All CI gates above
+  - Deploy to `staging` (after CI gates pass)
+
+- Push to `main`:
+  - All CI gates above
+  - Deploy to `production` (after CI gates pass)
+
+### Manual workflow options
+
+From `workflow_dispatch`, you can:
+
+- set `run_full_suite=true` to run integration + Playwright E2E tests
+- set `deploy_env=staging|production` for manual promotion
+- set `rollback_ref` with `rollback_env` to roll back a target environment
+
+### Required GitHub configuration
+
+1. Create environments:
+- `staging`
+- `production`
+
+2. Add environment secrets:
+- `STAGING_SSH_HOST`, `STAGING_SSH_USER`, `STAGING_SSH_KEY`, `STAGING_SSH_PORT`
+- `PROD_SSH_HOST`, `PROD_SSH_USER`, `PROD_SSH_KEY`, `PROD_SSH_PORT`
+- `DEPLOY_REPO_TOKEN`
+- `DEPLOY_APP_DIR` (optional)
+- `STAGING_HEALTHCHECK_URL`
+- `PROD_HEALTHCHECK_URL`
+
+3. Enforce environment protection rules:
+- required reviewers for `production`
+- optionally required reviewers for `staging`
+- restrict deploy branches (`develop` -> staging, `main` -> production)
+
+### Recommended branch protection
+
+- Require pull request before merge
+- Require status checks from CI jobs (quality, service validation, docker build, CodeQL)
+- Require branches to be up to date before merge
+
+---
 ## Infrastructure
 
 | Container | Image | Purpose |
@@ -356,3 +411,4 @@ docker compose down
 # Stop + remove volumes
 docker compose down -v
 ```
+

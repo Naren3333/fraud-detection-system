@@ -1,4 +1,4 @@
-name: CI
+name: CI-CD
 
 on:
   push:
@@ -21,18 +21,22 @@ on:
           - none
           - staging
           - production
+      rollback_env:
+        description: "Rollback target"
+        required: false
+        default: staging
+        type: choice
+        options:
+          - staging
+          - production
       rollback_ref:
         description: "Optional git ref for rollback (tag/commit/branch)"
         required: false
         default: ""
         type: string
 
-permissions:
-  contents: read
-  packages: write
-
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-cd-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -41,9 +45,11 @@ env:
 
 jobs:
   quality:
-    name: Lint and Unit Tests
+    name: Test Harness Quality
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: testing-infrastructure
@@ -68,24 +74,161 @@ jobs:
       - name: Check formatting
         run: npm run format:check
 
-      - name: Run unit tests
-        run: npm run test:unit
+      - name: Run unit tests with coverage
+        run: npm run test:unit:coverage
 
-      - name: Upload unit coverage
+      - name: Upload unit coverage artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: unit-coverage
+          name: test-harness-unit-coverage
           path: testing-infrastructure/coverage
           if-no-files-found: ignore
           retention-days: 7
 
+  service-validation:
+    name: Service Validation (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - user-service
+          - transaction-service
+          - fraud-detection-service
+          - ml-scoring-service
+          - decision-engine-service
+          - notification-service
+          - audit-service
+          - analytics-service
+          - human-verification-service
+
+    defaults:
+      run:
+        working-directory: ${{ matrix.service }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ${{ matrix.service }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run lint if configured
+        shell: bash
+        run: |
+          HAS_LINT=$(node -e "const p=require('./package.json'); process.stdout.write(p.scripts && p.scripts.lint ? 'true' : 'false')")
+          if [ "$HAS_LINT" = "true" ]; then
+            npm run lint
+          else
+            echo "No lint script configured for ${{ matrix.service }}"
+          fi
+
+      - name: Run tests if configured
+        shell: bash
+        run: |
+          HAS_TEST=$(node -e "const p=require('./package.json'); process.stdout.write(p.scripts && p.scripts.test ? 'true' : 'false')")
+          if [ "$HAS_TEST" = "true" ]; then
+            npm test -- --ci
+          else
+            echo "No test script configured for ${{ matrix.service }}"
+          fi
+
+      - name: JavaScript syntax check
+        shell: bash
+        run: |
+          if [ -f index.js ]; then
+            node --check index.js
+          fi
+          if [ -f src/index.js ]; then
+            node --check src/index.js
+          fi
+          if [ -d src ]; then
+            find src -type f -name '*.js' -print0 | xargs -0 -n1 node --check
+          fi
+
+  dependency-review:
+    name: Dependency Review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Dependency review
+        uses: actions/dependency-review-action@v4
+
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  docker-build-validation:
+    name: Docker Build Validation (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - api-gateway
+          - user-service
+          - transaction-service
+          - fraud-detection-service
+          - ml-scoring-service
+          - decision-engine-service
+          - notification-service
+          - audit-service
+          - analytics-service
+          - human-verification-service
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -f ${{ matrix.service }}/Dockerfile ${{ matrix.service }}
+
   full-suite:
     name: Integration and E2E (Manual)
-    needs: quality
+    needs: [quality, service-validation, docker-build-validation]
     if: github.event_name == 'workflow_dispatch' && inputs.run_full_suite == true
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: read
     defaults:
       run:
         working-directory: testing-infrastructure
@@ -107,22 +250,22 @@ jobs:
       - name: Start test infrastructure
         run: docker compose -f docker/docker-compose.test.yml up -d
 
-      - name: Wait for dependencies
+      - name: Wait for test dependencies
         run: |
-          timeout 120 bash -c 'until docker ps --filter "name=test-kafka" --filter "health=healthy" --format "{{.Names}}" | grep -q test-kafka; do sleep 3; done'
+          timeout 180 bash -c 'until docker ps --filter "name=test-kafka" --filter "health=healthy" --format "{{.Names}}" | grep -q test-kafka; do sleep 3; done'
 
       - name: Run integration tests
         run: npm run test:integration
 
-      - name: Install Playwright Browsers
+      - name: Install Playwright browsers
         run: npx playwright install --with-deps
 
-      - name: Run e2e tests
+      - name: Run E2E tests
         run: |
           mkdir -p reports
           npm run test:e2e
 
-      - name: Upload test reports
+      - name: Upload integration and E2E reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -137,12 +280,14 @@ jobs:
 
   deploy-staging:
     name: Deploy to Staging
-    needs: quality
+    needs: [quality, service-validation, docker-build-validation, codeql]
     if: |
       github.event_name == 'push' && github.ref == 'refs/heads/develop' ||
       github.event_name == 'workflow_dispatch' && inputs.deploy_env == 'staging'
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    permissions:
+      contents: read
     environment:
       name: staging
 
@@ -163,7 +308,7 @@ jobs:
             fi
 
             REPO_URL="https://x-access-token:${{ secrets.DEPLOY_REPO_TOKEN }}@github.com/${{ github.repository }}.git"
-            REF="${{ github.ref_name }}"
+            REF="${{ github.sha }}"
 
             if [ ! -d "$DEPLOY_PATH/.git" ]; then
               mkdir -p "$DEPLOY_PATH"
@@ -173,23 +318,29 @@ jobs:
             cd "$DEPLOY_PATH"
             git remote set-url origin "$REPO_URL"
             git fetch --all --prune
-            git checkout "$REF"
-            git reset --hard "origin/$REF"
+            git checkout --force "$REF"
 
             docker compose up -d --build --remove-orphans
             docker image prune -f
 
       - name: Smoke test staging
-        run: curl -fsSL "${{ secrets.STAGING_HEALTHCHECK_URL }}"
+        run: |
+          for i in {1..5}; do
+            curl -fsSL "${{ secrets.STAGING_HEALTHCHECK_URL }}" && exit 0
+            sleep 5
+          done
+          exit 1
 
   deploy-production:
     name: Deploy to Production
-    needs: quality
+    needs: [quality, service-validation, docker-build-validation, codeql]
     if: |
       github.event_name == 'push' && github.ref == 'refs/heads/main' ||
       github.event_name == 'workflow_dispatch' && inputs.deploy_env == 'production'
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    permissions:
+      contents: read
     environment:
       name: production
 
@@ -210,7 +361,7 @@ jobs:
             fi
 
             REPO_URL="https://x-access-token:${{ secrets.DEPLOY_REPO_TOKEN }}@github.com/${{ github.repository }}.git"
-            REF="${{ github.ref_name }}"
+            REF="${{ github.sha }}"
 
             if [ ! -d "$DEPLOY_PATH/.git" ]; then
               mkdir -p "$DEPLOY_PATH"
@@ -220,26 +371,32 @@ jobs:
             cd "$DEPLOY_PATH"
             git remote set-url origin "$REPO_URL"
             git fetch --all --prune
-            git checkout "$REF"
-            git reset --hard "origin/$REF"
+            git checkout --force "$REF"
 
             docker compose up -d --build --remove-orphans
             docker image prune -f
 
       - name: Smoke test production
-        run: curl -fsSL "${{ secrets.PROD_HEALTHCHECK_URL }}"
+        run: |
+          for i in {1..5}; do
+            curl -fsSL "${{ secrets.PROD_HEALTHCHECK_URL }}" && exit 0
+            sleep 5
+          done
+          exit 1
 
   rollback:
     name: Rollback
     if: github.event_name == 'workflow_dispatch' && inputs.rollback_ref != ''
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    permissions:
+      contents: read
     environment:
-      name: ${{ inputs.deploy_env == 'production' && 'production' || 'staging' }}
+      name: ${{ inputs.rollback_env }}
 
     steps:
       - name: Rollback staging over SSH
-        if: inputs.deploy_env == 'staging'
+        if: inputs.rollback_env == 'staging'
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.STAGING_SSH_HOST }}
@@ -265,11 +422,11 @@ jobs:
             cd "$DEPLOY_PATH"
             git remote set-url origin "$REPO_URL"
             git fetch --all --prune
-            git checkout "$REF"
+            git checkout --force "$REF"
             docker compose up -d --build --remove-orphans
 
       - name: Rollback production over SSH
-        if: inputs.deploy_env == 'production'
+        if: inputs.rollback_env == 'production'
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.PROD_SSH_HOST }}
@@ -295,5 +452,5 @@ jobs:
             cd "$DEPLOY_PATH"
             git remote set-url origin "$REPO_URL"
             git fetch --all --prune
-            git checkout "$REF"
+            git checkout --force "$REF"
             docker compose up -d --build --remove-orphans

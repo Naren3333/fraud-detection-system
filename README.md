@@ -342,7 +342,7 @@ This stack uses OpenTelemetry tracing from each microservice to `otel-collector`
 
 - OTEL Collector endpoint (HTTP): `http://otel-collector:4318`
 - Jaeger UI: `http://localhost:16686`
-- Sampling strategy: `parentbased_traceidratio` with ratio `0.2`
+- Sampling strategy: `parentbased_traceidratio` with ratio `1.0`
 
 To validate traces:
 

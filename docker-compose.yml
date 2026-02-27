@@ -24,7 +24,7 @@ x-otel-env: &otel-env
   OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
   OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
   OTEL_TRACES_SAMPLER: parentbased_traceidratio
-  OTEL_TRACES_SAMPLER_ARG: "0.2"
+  OTEL_TRACES_SAMPLER_ARG: "1.0"
   OTEL_PROPAGATORS: tracecontext,baggage
 
 services:
@@ -754,18 +754,21 @@ services:
     restart: unless-stopped
 
   jaeger:
-    image: jaegertracing/all-in-one:1.57
+    image: cr.jaegertracing.io/jaegertracing/jaeger:2.14.0
     container_name: jaeger
     networks: [fraud-net]
     ports:
       - "16686:16686"
-    environment:
-      METRICS_STORAGE_TYPE: prometheus
-      PROMETHEUS_SERVER_URL: http://prometheus:9090
-      PROMETHEUS_QUERY_SUPPORT_SPANMETRICS_CONNECTOR: "true"
-      PROMETHEUS_QUERY_NORMALIZE_CALLS: "true"
-      PROMETHEUS_QUERY_NORMALIZE_DURATION: "true"
-      PROMETHEUS_QUERY_NAMESPACE: ""
+    command:
+      - "--set=extensions.jaeger_query.ui.config_file=/etc/jaeger/ui-config.json"
+      - "--set=extensions.jaeger_storage.metric_backends.prometheus_backend.prometheus.endpoint=http://prometheus:9090"
+      - "--set=extensions.jaeger_storage.metric_backends.prometheus_backend.prometheus.normalize_calls=true"
+      - "--set=extensions.jaeger_storage.metric_backends.prometheus_backend.prometheus.normalize_duration=true"
+      - "--set=extensions.jaeger_storage.metric_backends.prometheus_backend.prometheus.metric_namespace="
+      - "--set=extensions.jaeger_storage.metric_backends.prometheus_backend.prometheus.latency_unit=ms"
+      - "--set=extensions.jaeger_query.storage.metrics=prometheus_backend"
+    volumes:
+      - ./monitoring/jaeger/ui-config.json:/etc/jaeger/ui-config.json:ro
     depends_on:
       - prometheus
     healthcheck:

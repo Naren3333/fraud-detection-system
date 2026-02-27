@@ -765,7 +765,7 @@ services:
       PROMETHEUS_QUERY_SUPPORT_SPANMETRICS_CONNECTOR: "true"
       PROMETHEUS_QUERY_NORMALIZE_CALLS: "true"
       PROMETHEUS_QUERY_NORMALIZE_DURATION: "true"
-      PROMETHEUS_QUERY_NAMESPACE: traces_span_metrics
+      PROMETHEUS_QUERY_NAMESPACE: ""
     depends_on:
       - prometheus
     healthcheck:

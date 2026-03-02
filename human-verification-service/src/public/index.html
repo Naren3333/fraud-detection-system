@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Human Verification Dashboard</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Human Verification Dashboard</h1>
+    <p>Review flagged transactions</p>
+  </header>
+
+  <main>
+    <div class="toolbar">
+      <button onclick="loadReviews()">Refresh</button>
+      <span id="status"></span>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>User</th>
+          <th>Amount</th>
+          <th>Score</th>
+          <th>Reason</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="reviewTable">
+        <!-- Dynamic rows -->
+      </tbody>
+    </table>
+  </main>
+
+  <script src="review.js"></script>
+</body>
+</html>

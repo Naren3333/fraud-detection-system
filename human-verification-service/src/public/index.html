@@ -4,38 +4,114 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Human Verification Dashboard</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="/css/dashboard.css" />
 </head>
 <body>
-  <header>
-    <h1>Human Verification Dashboard</h1>
-    <p>Review flagged transactions</p>
-  </header>
+  <div class="container">
+    <header class="header">
+      <h1>Human Verification Dashboard <span class="realtime-badge">• LIVE</span></h1>
+      <p>Review and action flagged transactions from backend queue.</p>
+    </header>
 
-  <main>
-    <div class="toolbar">
-      <button onclick="loadReviews()">Refresh</button>
-      <span id="status"></span>
-    </div>
+    <section class="toolbar">
+      <button id="refreshBtn" type="button" class="time-btn refresh-btn">Refresh Queue</button>
 
-    <table>
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>User</th>
-          <th>Amount</th>
-          <th>Score</th>
-          <th>Reason</th>
-          <th>Status</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody id="reviewTable">
-        <!-- Dynamic rows -->
-      </tbody>
-    </table>
-  </main>
+      <div class="control-group reviewer-group">
+        <label class="control-label" for="reviewerInput">Reviewer</label>
+        <input id="reviewerInput" type="text" placeholder="analyst-01" value="analyst-01" />
+      </div>
 
-  <script src="review.js"></script>
+      <div class="filter-group">
+        <label class="control-label" for="filterInput">Filter</label>
+        <div class="filter-input-wrap">
+          <span class="filter-icon" aria-hidden="true">⌕</span>
+          <input id="filterInput" type="search" placeholder="Search transaction / customer / merchant / reason" />
+          <button id="clearFilterBtn" type="button" class="filter-clear-btn" aria-label="Clear filter">Clear</button>
+        </div>
+      </div>
+
+      <div class="control-group control-group--compact">
+        <span class="control-label">Refresh</span>
+        <label class="checkbox-label">
+          <input id="autoRefreshInput" type="checkbox" checked />
+          Auto refresh (15s)
+        </label>
+      </div>
+
+      <span id="statusMessage" class="status toolbar-status"></span>
+    </section>
+
+    <section class="stats-grid" id="overview-stats">
+      <div class="stat-card cyan">
+        <div class="stat-label">Pending Reviews</div>
+        <div class="stat-value cyan" id="pendingCount">0</div>
+        <div class="stat-change">Items from queue</div>
+      </div>
+
+      <div class="stat-card green">
+        <div class="stat-label">Visible After Filter</div>
+        <div class="stat-value green" id="visibleCount">0</div>
+        <div class="stat-change">Rows currently shown</div>
+      </div>
+
+      <div class="stat-card orange">
+        <div class="stat-label">Data Availability</div>
+        <div class="stat-value orange" id="dataAvailability">NO</div>
+        <div class="stat-change" id="dataHint">Waiting for pending items</div>
+      </div>
+
+      <div class="stat-card purple">
+        <div class="stat-label">Active Reviewer</div>
+        <div class="stat-value purple" id="activeReviewer">analyst-01</div>
+        <div class="stat-change">Decision submitter</div>
+      </div>
+    </section>
+
+    <section class="table-card">
+      <div class="chart-title">Manual Review Queue</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Transaction</th>
+              <th>Customer</th>
+              <th>Merchant</th>
+              <th>Amount</th>
+              <th>Risk</th>
+              <th>Reason</th>
+              <th>Queue Status</th>
+              <th>Notes</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="reviewRows"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <template id="rowTemplate">
+    <tr>
+      <td data-col="transactionId"></td>
+      <td data-col="customerId"></td>
+      <td data-col="merchantId"></td>
+      <td data-col="amount"></td>
+      <td data-col="riskScore"></td>
+      <td data-col="reason"></td>
+      <td data-col="queueStatus"></td>
+      <td>
+        <textarea data-input="notes" rows="2" placeholder="Optional analyst notes"></textarea>
+      </td>
+      <td>
+        <div class="actions">
+          <button type="button" data-decision="APPROVED">Approve</button>
+          <button type="button" data-decision="DECLINED" class="danger">Decline</button>
+          <button type="button" data-decision="FLAGGED">Keep Flagged</button>
+        </div>
+      </td>
+    </tr>
+  </template>
+
+  <script src="/js/dashboard.js"></script>
 </body>
 </html>

@@ -1,3 +1,4 @@
+
 # Human Verification Service
 
 Backend-only manual review service for `FLAGGED` transactions.
@@ -11,31 +12,47 @@ Backend-only manual review service for `FLAGGED` transactions.
 
 ## API Endpoints
 
-- `GET /api/v1/reviews/pending?limit=20&offset=0`
-- `GET /api/v1/reviews/:transactionId`
-- `POST /api/v1/reviews/:transactionId/decision`
+-`GET /api/v1/reviews/pending?limit=20&offset=0`
+
+-`GET /api/v1/reviews/:transactionId`
+
+-`POST /api/v1/reviews/:transactionId/decision`
+
+- Dashboard: `GET /` (human review UI using the above APIs)
+- Dashboard supports pending queue view, client-side filtering, decision notes, and approve/decline/keep-flagged actions.
 
 ### Submit Decision Payload
 
 ```json
+
 {
+
   "decision": "APPROVED",
+
   "reviewedBy": "analyst-01",
+
   "notes": "False positive, approve"
+
 }
+
 ```
 
 Allowed `decision` values:
-- `APPROVED`
-- `DECLINED`
-- `FLAGGED` (keep held)
+
+-`APPROVED`
+
+-`DECLINED`
+
+-`FLAGGED` (keep held)
 
 ## Important Integration Points
 
 ### Where data comes from
 
 - Decision Engine publishes flagged events:
-  - `decision-engine-service/src/consumers/transactionConsumer.js`
+
+  -`decision-engine-service/src/consumers/transactionConsumer.js`
+
   - topic `transaction.flagged`
 
 ### Where reviewed decision is sent
@@ -45,14 +62,19 @@ Allowed `decision` values:
 ### Where transaction status is updated
 
 - Transaction Service consumer applies reviewed decisions:
-  - `transaction-service/src/kafka/decisionConsumer.js`
+
+  -`transaction-service/src/kafka/decisionConsumer.js`
+
   - update status via `transactionRepository.updateStatus(...)`
 
 ## Env knobs
 
 Set in `.env`:
 
-- `KAFKA_INPUT_TOPIC_FLAGGED`
-- `KAFKA_OUTPUT_TOPIC_REVIEWED`
-- `DB_*`
-- `KAFKA_*`
+-`KAFKA_INPUT_TOPIC_FLAGGED`
+
+-`KAFKA_OUTPUT_TOPIC_REVIEWED`
+
+-`DB_*`
+
+-`KAFKA_*`

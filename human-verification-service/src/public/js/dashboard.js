@@ -1,11 +1,12 @@
 const reviewRows = document.getElementById('reviewRows');
 const refreshBtn = document.getElementById('refreshBtn');
-const statusMessage = document.getElementById('statusMessage');
 const reviewerInput = document.getElementById('reviewerInput');
 const filterInput = document.getElementById('filterInput');
 const clearFilterBtn = document.getElementById('clearFilterBtn');
 const autoRefreshInput = document.getElementById('autoRefreshInput');
 const rowTemplate = document.getElementById('rowTemplate');
+const statusFilterGroup = document.getElementById('statusFilterGroup');
+const statusFilterButtons = statusFilterGroup ? [...statusFilterGroup.querySelectorAll('[data-queue-filter]')] : [];
 
 const pendingCount = document.getElementById('pendingCount');
 const visibleCount = document.getElementById('visibleCount');
@@ -18,6 +19,14 @@ const REFRESH_INTERVAL_MS = 15000;
 
 let latestReviews = [];
 let poller = null;
+let activeQueueFilter = 'ALL';
+
+
+const setStatus = (message, isError = false) => {
+  if (isError) {
+    console.error(message);
+  }
+};
 
 const updateDataStats = (totalCount, visibleRows) => {
   pendingCount.textContent = totalCount;
@@ -32,15 +41,15 @@ const updateDataStats = (totalCount, visibleRows) => {
   }
 };
 
-const setStatus = (message, isError = false) => {
-  statusMessage.textContent = message;
-  statusMessage.style.color = isError ? '#ff5555' : '#8be9fd';
-};
-
-
 const updateFilterUI = () => {
   const hasFilter = Boolean(filterInput.value.trim());
   clearFilterBtn.disabled = !hasFilter;
+};
+
+const updateQueueFilterUI = () => {
+  statusFilterButtons.forEach((button) => {
+    button.classList.toggle('active', button.dataset.queueFilter === activeQueueFilter);
+  });
 };
 
 const parseAmount = (row) => {
@@ -63,7 +72,10 @@ const mapRow = (row) => ({
   riskScore: row.riskScore ?? '-',
   reason: row.decisionReason || '-',
   queueStatus: row.queueStatus || 'PENDING',
-  searchable: [row.transactionId, row.customerId, row.merchantId, row.decisionReason].filter(Boolean).join(' ').toLowerCase(),
+  searchable: [row.transactionId, row.customerId, row.merchantId, row.decisionReason, row.queueStatus]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase(),
 });
 
 const disableRowButtons = (row, disabled) => {
@@ -79,7 +91,6 @@ const submitDecision = async ({ transactionId, decision, notes }) => {
     return;
   }
 
-  setStatus(`Submitting ${decision} for ${transactionId}...`);
   const response = await fetch(`${API_BASE}/${encodeURIComponent(transactionId)}/decision`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -95,7 +106,6 @@ const submitDecision = async ({ transactionId, decision, notes }) => {
     throw new Error(payload.error || `Failed with status ${response.status}`);
   }
 
-  setStatus(`Decision ${decision} submitted for ${transactionId}.`);
   await loadPendingReviews();
 };
 
@@ -139,7 +149,12 @@ const renderRows = (reviews) => {
 
   if (!reviews.length) {
     const row = document.createElement('tr');
-    row.innerHTML = '<td colspan="9">No pending manual review items yet.</td>';
+    row.innerHTML = `
+      <td colspan="9" class="empty-state-cell">
+        <div class="status-line">Loaded ${latestReviews.length} pending item(s).</div>
+        <div class="empty-line">No pending manual review items yet.</div>
+      </td>
+    `;
     reviewRows.appendChild(row);
     updateDataStats(latestReviews.length, 0);
     return;
@@ -149,21 +164,19 @@ const renderRows = (reviews) => {
   updateDataStats(latestReviews.length, reviews.length);
 };
 
-const filterRows = () => {
+const applyFilters = () => {
   const keyword = filterInput.value.trim().toLowerCase();
   updateFilterUI();
+  updateQueueFilterUI();
 
-  if (!keyword) {
-    renderRows(latestReviews);
-    if (latestReviews.length) {
-      setStatus(`Loaded ${latestReviews.length} pending item(s).`);
-    }
-    return;
-  }
+  const filtered = latestReviews.filter((row) => {
+    const mapped = mapRow(row);
+    const matchesKeyword = !keyword || mapped.searchable.includes(keyword);
+    const matchesStatus = activeQueueFilter === 'ALL' || mapped.queueStatus === activeQueueFilter;
+    return matchesKeyword && matchesStatus;
+  });
 
-  const filtered = latestReviews.filter((row) => mapRow(row).searchable.includes(keyword));
   renderRows(filtered);
-  setStatus(`Filter active: showing ${filtered.length} of ${latestReviews.length} pending item(s).`);
 };
 
 reviewerInput.addEventListener('input', () => {
@@ -179,8 +192,7 @@ const loadPendingReviews = async () => {
 
   const payload = await response.json();
   latestReviews = payload?.data || [];
-  filterRows();
-  setStatus(`Loaded ${latestReviews.length} pending item(s).`);
+  applyFilters();
 };
 
 const startPolling = () => {
@@ -198,7 +210,6 @@ const startPolling = () => {
 
 refreshBtn.addEventListener('click', async () => {
   activeReviewer.textContent = reviewerInput.value.trim() || 'Not set';
-  setStatus('Loading pending manual reviews...');
   try {
     await loadPendingReviews();
   } catch (error) {
@@ -206,17 +217,28 @@ refreshBtn.addEventListener('click', async () => {
   }
 });
 
-filterInput.addEventListener('input', filterRows);
+filterInput.addEventListener('input', applyFilters);
 clearFilterBtn.addEventListener('click', () => {
   filterInput.value = '';
-  filterRows();
+  applyFilters();
   filterInput.focus();
 });
 autoRefreshInput.addEventListener('change', startPolling);
 
+statusFilterButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    activeQueueFilter = button.dataset.queueFilter || 'ALL';
+    applyFilters();
+  });
+});
+
+reviewerInput.addEventListener('input', () => {
+  activeReviewer.textContent = reviewerInput.value.trim() || 'Not set';
+});
+
 activeReviewer.textContent = reviewerInput.value.trim() || 'Not set';
 updateFilterUI();
-setStatus('Loading pending manual reviews...');
+updateQueueFilterUI();
 loadPendingReviews()
   .then(startPolling)
   .catch((error) => {

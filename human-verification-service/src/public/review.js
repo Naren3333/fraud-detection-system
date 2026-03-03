@@ -4,7 +4,7 @@ const statusText = document.getElementById("status");
 async function loadReviews() {
   try {
     statusText.textContent = "Loading...";
-    const res = await fetch("/api/v1/reviews");
+    const res = await fetch("/api/v1/reviews/pending");
     const json = await res.json();
 
     if (!json.success) {
@@ -12,7 +12,6 @@ async function loadReviews() {
     }
 
     const reviews = json.data.pendingReviews;
-
     tableBody.innerHTML = "";
 
     if (!reviews || reviews.length === 0) {
@@ -36,12 +35,21 @@ async function loadReviews() {
         <td>${tx.reason ?? "-"}</td>
         <td class="status-pending">pending</td>
         <td>
-          <button class="approve" onclick="approve('${tx.id}')">Approve</button>
-          <button class="reject" onclick="reject('${tx.id}')">Reject</button>
+          <button class="approve-btn" data-id="${tx.id}">Approve</button>
+          <button class="reject-btn" data-id="${tx.id}">Reject</button>
         </td>
       `;
 
       tableBody.appendChild(row);
+    });
+
+    // Attach event listeners after rows are added
+    document.querySelectorAll(".approve-btn").forEach(btn => {
+      btn.addEventListener("click", () => submitDecision(btn.dataset.id, "approve"));
+    });
+
+    document.querySelectorAll(".reject-btn").forEach(btn => {
+      btn.addEventListener("click", () => submitDecision(btn.dataset.id, "decline"));
     });
 
     statusText.textContent = "";
@@ -51,38 +59,36 @@ async function loadReviews() {
   }
 }
 
-async function approve(id) {
-  if (!confirm("Approve this transaction?")) return;
+async function submitDecision(transactionId, decision) {
+  if (!confirm(`${decision === "approve" ? "Approve" : "Reject"} this transaction?`)) return;
 
   try {
-    const res = await fetch(`/api/v1/reviews/${id}/approve`, {
-      method: "POST"
+    const res = await fetch(`/api/v1/reviews/${transactionId}/decision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        decision,
+        reviewerId: "reviewer-1",
+        reason: "" // optional, can add text input later
+      })
     });
 
     const json = await res.json();
-    if (!json.success) throw new Error();
+    if (!json.success) throw new Error("API failure");
 
+    // reload table after decision
     loadReviews();
   } catch (err) {
-    alert("Failed to approve transaction");
+    alert(`Failed to ${decision} transaction`);
+    console.error(err);
   }
 }
 
-async function reject(id) {
-  if (!confirm("Reject this transaction?")) return;
+// Automatically load reviews on page load
+window.addEventListener("DOMContentLoaded", loadReviews);
 
-  try {
-    const res = await fetch(`/api/v1/reviews/${id}/reject`, {
-      method: "POST"
-    });
-
-    const json = await res.json();
-    if (!json.success) throw new Error();
-
-    loadReviews();
-  } catch (err) {
-    alert("Failed to reject transaction");
-  }
+// Optional: add refresh button functionality if you have one
+const refreshBtn = document.getElementById("refresh-btn");
+if (refreshBtn) {
+  refreshBtn.addEventListener("click", loadReviews);
 }
-
-window.onload = loadReviews;

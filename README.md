@@ -15,101 +15,132 @@ Real-time payment fraud detection platform built with Node.js microservices, Kaf
 ```mermaid
 flowchart LR
 
-%% =====================================================
+%% =========================
+%% STYLES
+%% =========================
+classDef edge fill:#1f2937,stroke:#94a3b8,color:#fff,stroke-width:1px;
+classDef svc fill:#111827,stroke:#60a5fa,color:#fff,stroke-width:1px;
+classDef bus fill:#0f172a,stroke:#f59e0b,color:#fff,stroke-width:1px;
+classDef db fill:#0b1220,stroke:#34d399,color:#fff,stroke-width:1px;
+classDef obs fill:#0b1220,stroke:#a78bfa,color:#fff,stroke-width:1px;
+
+%% =========================
 %% LAYER 1 – EDGE
-%% =====================================================
-subgraph Edge
-    Client[External Clients]
-    Gateway[API Gateway :3000]
-    Client --> Gateway
+%% =========================
+subgraph L1[Edge]
+direction LR
+Client[External Clients]:::edge
+Gateway[API Gateway :3000]:::edge
+Client --> Gateway
 end
 
-%% =====================================================
+%% =========================
 %% LAYER 2 – CORE SERVICES
-%% =====================================================
-subgraph Core_Services
-
-    User[User Service :3002]
-    Transaction[Transaction Service :3001]
-    Fraud[Fraud Detection Service :3003]
-    ML[ML Scoring Service :3004]
-    Decision[Decision Engine :3005]
-    HumanVerify[Human Verification Service :3010]
-    Notification[Notification Service :3006]
-    Audit[Audit Service :3007]
-    Analytics[Analytics Service :3008]
-
+%% =========================
+subgraph L2[Core Services]
+direction LR
+User[User Service :3002]:::svc
+Transaction[Transaction Service :3001]:::svc
+Fraud[Fraud Detection :3003]:::svc
+ML[ML Scoring :3004]:::svc
+Decision[Decision Engine :3005]:::svc
+HumanVerify[Human Verification :3010]:::svc
+Appeal[Appeal Service :3011]:::svc
+Notification[Notification :3006]:::svc
+Audit[Audit :3007]:::svc
+Analytics[Analytics :3008]:::svc
 end
 
-%% =====================================================
+%% =========================
 %% LAYER 3 – MESSAGING
-%% =====================================================
-subgraph Messaging
-    Kafka[(Kafka Cluster)]
+%% =========================
+subgraph L3[Messaging]
+direction TB
+Kafka[(Kafka Cluster)]:::bus
 end
 
-%% =====================================================
+%% =========================
 %% DATA
-%% =====================================================
-subgraph Data
-    DecisionDB[(Postgres decision-db)]
-    HumanReviewDB[(Postgres human-review-db)]
+%% =========================
+subgraph L4[Data Stores]
+direction TB
+DecisionDB[(Postgres decision-db)]:::db
+HumanReviewDB[(Postgres human-review-db)]:::db
+AppealDB[(Postgres appeal-db)]:::db
 end
 
-%% =====================================================
-%% MONITORING
-%% =====================================================
-subgraph Observability
-    Prometheus[Prometheus :9099]
-    Grafana[Grafana :3009]
-    Prometheus --> Grafana
+%% =========================
+%% OBSERVABILITY
+%% =========================
+subgraph L5[Observability]
+direction TB
+Prometheus[Prometheus :9099]:::obs
+Grafana[Grafana :3009]:::obs
+Prometheus --> Grafana
 end
 
-%% =====================================================
-%% MAIN FLOWS
-%% =====================================================
-
+%% =========================
+%% HTTP ROUTES (clean + top-level)
+%% =========================
 Gateway -- "/auth/*" --> User
-Gateway --> Transaction
-Gateway --> Analytics
-Gateway --> Audit
+Gateway -- "/transactions/*" --> Transaction
+Gateway -- "/analytics/*" --> Analytics
+Gateway -- "/audit/*" --> Audit
 Gateway -- "/reviews/*" --> HumanVerify
+Gateway -- "/appeals/*" --> Appeal
 
+%% =========================
+%% EVENT FLOWS (grouped)
+%% =========================
 Transaction -- "transaction.created" --> Kafka
-Kafka --> Fraud
-Fraud -- HTTP --> ML
+Kafka -- "transaction.created" --> Fraud
+Fraud -- "score.request" --> ML
+ML -- "score.result" --> Fraud
+Fraud -- "transaction.scored" --> Kafka
 Kafka -- "transaction.scored" --> Decision
 
-Decision -- "transaction.finalised / transaction.flagged" --> Notification
-Decision -- "transaction.finalised / transaction.flagged" --> Transaction
-Decision -- "transaction.flagged" --> HumanVerify
-HumanVerify -- "transaction.reviewed" --> Transaction
+Decision -- "transaction.finalised" --> Kafka
+Decision -- "transaction.flagged" --> Kafka
+Kafka -- "transaction.finalised" --> Transaction
+Kafka -- "transaction.finalised" --> Notification
+Kafka -- "transaction.flagged" --> HumanVerify
 
+HumanVerify -- "transaction.reviewed" --> Kafka
+Kafka -- "transaction.reviewed" --> Transaction
+
+Transaction -- "rejected/flagged" --> Appeal
+Appeal -- "appeal.created" --> Kafka
+Appeal -- "appeal.resolved" --> Kafka
+Kafka -- "appeal.resolved" --> Transaction
+Appeal -- "manual re-review request" --> HumanVerify
+
+%% =========================
+%% DB LINKS
+%% =========================
 Decision --> DecisionDB
 HumanVerify --> HumanReviewDB
+Appeal --> AppealDB
 Analytics --> DecisionDB
 
-%% =====================================================
-%% AUDIT STREAMS
-%% =====================================================
+%% =========================
+%% AUDIT EVENTS (reduce clutter: everything -> Audit via events)
+%% =========================
+Kafka -- "events" --> Audit
 
-Decision -- events --> Audit
-Notification -- events --> Audit
-Transaction -- events --> Audit
-HumanVerify -- events --> Audit
-
-%% =====================================================
-%% METRICS
-%% =====================================================
-
-Gateway -. metrics .-> Prometheus
-Transaction -. metrics .-> Prometheus
-Fraud -. metrics .-> Prometheus
-ML -. metrics .-> Prometheus
-Decision -. metrics .-> Prometheus
-Notification -. metrics .-> Prometheus
-Audit -. metrics .-> Prometheus
-Analytics -. metrics .-> Prometheus
+%% =========================
+%% METRICS (compact: group via one label)
+%% =========================
+Gateway -.-> Prometheus
+User -.-> Prometheus
+Transaction -.-> Prometheus
+Fraud -.-> Prometheus
+ML -.-> Prometheus
+Decision -.-> Prometheus
+HumanVerify -.-> Prometheus
+Appeal -.-> Prometheus
+Notification -.-> Prometheus
+Audit -.-> Prometheus
+Analytics -.-> Prometheus
 ```
 
 ## Current Services

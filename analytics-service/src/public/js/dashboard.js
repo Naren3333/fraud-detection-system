@@ -90,6 +90,7 @@ async function loadDashboard() {
     if (data.success) {
       updateOverviewStats(data.data.overview);
       updateAnalystImpact(data.data.analystImpact || {});
+      updateAppealImpact(data.data.appealImpact || {});
       updateDecisionBreakdown(data.data.decisions);
       updateTimeSeriesChart(data.data.timeSeries);
       updateRiskScoreChart(data.data.riskScores);
@@ -131,6 +132,23 @@ function updateAnalystImpact(stats) {
   document.getElementById('review-approved-count').textContent = `${approvedAfterReview.toLocaleString()} approved`;
   document.getElementById('review-declined-count').textContent = `${declinedAfterReview.toLocaleString()} declined`;
   document.getElementById('review-turnaround-secs').textContent = `${turnaroundSeconds.toLocaleString()} seconds`;
+}
+
+// Handles update appeal impact stats.
+function updateAppealImpact(stats) {
+  const created = stats.appealsCreated || 0;
+  const pending = stats.appealsPending || 0;
+  const reversed = stats.reversedCount || 0;
+  const upheld = stats.upheldCount || 0;
+  const reverseRate = stats.reverseRate || 0;
+  const upholdRate = stats.upholdRate || 0;
+
+  document.getElementById('appeals-created').textContent = created.toLocaleString();
+  document.getElementById('appeals-pending').textContent = pending.toLocaleString();
+  document.getElementById('appeals-reversed-rate').textContent = `${reverseRate}%`;
+  document.getElementById('appeals-upheld-rate').textContent = `${upholdRate}%`;
+  document.getElementById('appeals-reversed-count').textContent = `${reversed.toLocaleString()} reversed`;
+  document.getElementById('appeals-upheld-count').textContent = `${upheld.toLocaleString()} upheld`;
 }
 
 // Handles update decision breakdown.

@@ -17,6 +17,17 @@ module.exports = {
     idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT, 10) || 30000,
     connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT, 10) || 2000,
   },
+  appealDb: {
+    enabled: process.env.APPEAL_DB_ENABLED !== 'false',
+    host: process.env.APPEAL_DB_HOST || 'appeal-db',
+    port: parseInt(process.env.APPEAL_DB_PORT, 10) || 5432,
+    database: process.env.APPEAL_DB_NAME || 'appeal_db',
+    user: process.env.APPEAL_DB_USER || 'appeal_admin',
+    password: process.env.APPEAL_DB_PASSWORD || 'appeal_password',
+    max: parseInt(process.env.APPEAL_DB_MAX_CONNECTIONS, 10) || 10,
+    idleTimeoutMillis: parseInt(process.env.APPEAL_DB_IDLE_TIMEOUT, 10) || 30000,
+    connectionTimeoutMillis: parseInt(process.env.APPEAL_DB_CONNECTION_TIMEOUT, 10) || 2000,
+  },
 
   redis: {
     host: process.env.REDIS_HOST || 'localhost',

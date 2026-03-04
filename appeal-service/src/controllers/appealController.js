@@ -31,6 +31,7 @@ class AppealController {
         err.message.includes('required') ||
         err.message.includes('allowed only') ||
         err.message.includes('already exists') ||
+        err.message.includes('already been appealed') ||
         err.message.includes('does not belong') ||
         err.message.includes('duplicate key')
       ) {

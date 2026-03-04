@@ -636,6 +636,8 @@ services:
     depends_on:
       decision-db:
         condition: service_healthy
+      appeal-db:
+        condition: service_healthy
       redis:
         condition: service_healthy
     environment:
@@ -653,6 +655,14 @@ services:
       DB_USER:               decision_admin
       DB_PASSWORD:           decision_password
       DB_MAX_CONNECTIONS:    10
+      # Appeal DB (read-only)
+      APPEAL_DB_ENABLED:     true
+      APPEAL_DB_HOST:        appeal-db
+      APPEAL_DB_PORT:        5432
+      APPEAL_DB_NAME:        appeal_db
+      APPEAL_DB_USER:        appeal_admin
+      APPEAL_DB_PASSWORD:    appeal_password
+      APPEAL_DB_MAX_CONNECTIONS: 10
       # Redis (time-series metrics)
       REDIS_HOST:            redis
       REDIS_PORT:            6379

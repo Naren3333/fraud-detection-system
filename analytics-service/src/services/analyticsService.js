@@ -1,4 +1,4 @@
-const { query } = require('../config/db');
+const { query, queryAppeal } = require('../config/db');
 const { getClient: getRedis } = require('../config/redis');
 const logger = require('../config/logger');
 const config = require('../config');
@@ -25,6 +25,7 @@ class AnalyticsService {
       topMerchants,
       geographicDistribution,
       analystImpact,
+      appealImpact,
     ] = await Promise.all([
       this._getOverviewStats(since),
       this._getDecisionBreakdown(since),
@@ -34,6 +35,7 @@ class AnalyticsService {
       this._getTopMerchants(since, 10),
       this._getGeographicDistribution(since),
       this._getAnalystImpactStats(since),
+      this._getAppealImpactStats(since),
     ]);
 
     return {
@@ -45,6 +47,7 @@ class AnalyticsService {
       topMerchants,
       geography: geographicDistribution,
       analystImpact,
+      appealImpact,
       metadata: {
         timeRange,
         since: since.toISOString(),
@@ -343,6 +346,51 @@ class AnalyticsService {
       avgReviewTurnaroundSeconds: Number(avgTurnaroundSeconds.toFixed(1)),
       avgReviewTurnaroundMinutes: Number((avgTurnaroundSeconds / 60).toFixed(2)),
     };
+  }
+
+  // Handles get appeal impact stats.
+  async _getAppealImpactStats(since) {
+    try {
+      const sql = `
+        SELECT
+          COUNT(*) FILTER (WHERE created_at >= $1) AS appeals_created,
+          COUNT(*) FILTER (WHERE current_status IN ('OPEN', 'UNDER_REVIEW')) AS appeals_pending,
+          COUNT(*) FILTER (WHERE current_status = 'RESOLVED' AND resolved_at >= $1) AS appeals_resolved,
+          COUNT(*) FILTER (WHERE resolution = 'UPHOLD' AND resolved_at >= $1) AS upheld_count,
+          COUNT(*) FILTER (WHERE resolution = 'REVERSE' AND resolved_at >= $1) AS reversed_count,
+          COUNT(DISTINCT transaction_id) FILTER (WHERE created_at >= $1) AS unique_transactions_appealed
+        FROM appeals
+      `;
+
+      const { rows } = await queryAppeal(sql, [since]);
+      const stats = rows[0] || {};
+      const appealsResolved = parseInt(stats.appeals_resolved) || 0;
+      const reversedCount = parseInt(stats.reversed_count) || 0;
+      const upheldCount = parseInt(stats.upheld_count) || 0;
+
+      return {
+        appealsCreated: parseInt(stats.appeals_created) || 0,
+        appealsPending: parseInt(stats.appeals_pending) || 0,
+        appealsResolved,
+        upheldCount,
+        reversedCount,
+        uniqueTransactionsAppealed: parseInt(stats.unique_transactions_appealed) || 0,
+        reverseRate: appealsResolved > 0 ? Number(((reversedCount / appealsResolved) * 100).toFixed(1)) : 0,
+        upholdRate: appealsResolved > 0 ? Number(((upheldCount / appealsResolved) * 100).toFixed(1)) : 0,
+      };
+    } catch (err) {
+      logger.warn('Appeal impact stats unavailable', { error: err.message });
+      return {
+        appealsCreated: 0,
+        appealsPending: 0,
+        appealsResolved: 0,
+        upheldCount: 0,
+        reversedCount: 0,
+        uniqueTransactionsAppealed: 0,
+        reverseRate: 0,
+        upholdRate: 0,
+      };
+    }
   }
 
   // Handles get time range date.

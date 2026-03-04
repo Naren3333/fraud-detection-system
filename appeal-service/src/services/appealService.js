@@ -32,9 +32,9 @@ class AppealService {
       throw new Error('appealReason must be at least 10 characters');
     }
 
-    const existing = await appealRepository.getActiveByTransaction(transactionId);
+    const existing = await appealRepository.getAnyByTransaction(transactionId);
     if (existing) {
-      throw new Error(`Active appeal already exists for transaction ${transactionId}`);
+      throw new Error(`Transaction ${transactionId} has already been appealed`);
     }
 
     const transaction = await this._fetchTransaction(transactionId, authHeader);

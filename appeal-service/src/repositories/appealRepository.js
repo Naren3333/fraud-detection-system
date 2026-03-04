@@ -62,6 +62,19 @@ class AppealRepository {
     return rows[0] ? this._map(rows[0]) : null;
   }
 
+  // Handles get latest by transaction regardless of status.
+  async getAnyByTransaction(transactionId) {
+    const { rows } = await query(`
+      SELECT *
+      FROM appeals
+      WHERE transaction_id = $1
+      ORDER BY created_at DESC
+      LIMIT 1;
+    `, [transactionId]);
+
+    return rows[0] ? this._map(rows[0]) : null;
+  }
+
   // Handles list pending.
   async listPending(limit = 20, offset = 0) {
     const { rows } = await query(`

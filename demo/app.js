@@ -254,10 +254,16 @@ function renderTransactions(transactions) {
       const css = statusClass(tx.status);
       const status = String(tx.status || "").toUpperCase();
       let action = "-";
+      const hasAppeal = state.appeals.some((appeal) => {
+        const appealTxId = appeal.transactionId || appeal.transaction_id;
+        return String(appealTxId) === String(tx.id);
+      });
       if (status === "FLAGGED") {
         action = `<button class="inline-btn decline-btn" data-id="${tx.id}">Decline</button>`;
       } else if (status === "REJECTED") {
-        action = `<button class="inline-btn appeal-btn" data-id="${tx.id}">Appeal</button>`;
+        action = hasAppeal
+          ? `<button class="inline-btn" disabled>Appealed</button>`
+          : `<button class="inline-btn appeal-btn" data-id="${tx.id}">Appeal</button>`;
       }
       return `<tr data-tx-id="${tx.id}">
         <td>${formatDate(date)}</td>

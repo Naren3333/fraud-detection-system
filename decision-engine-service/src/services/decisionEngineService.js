@@ -49,6 +49,35 @@ class DecisionEngineService {
 
       return this._buildDecisionResult(decision, reasons, decisionFactors, null);
     }
+    const confidenceAdjustment = this._applyConfidenceAdjustment(
+      fraudAnalysis.riskScore,
+      fraudAnalysis.mlResults?.confidence
+    );
+    const adjustedScore = confidenceAdjustment.adjustedScore;
+    decisionFactors.confidenceAdjustment = confidenceAdjustment;
+
+    const certaintyAutoDecline = this._checkCertaintyAutoDecline(
+      adjustedScore,
+      fraudAnalysis.mlResults?.confidence
+    );
+    if (certaintyAutoDecline) {
+      decision = 'DECLINED';
+      reasons.push(certaintyAutoDecline.reason);
+      decisionFactors.certaintyAutoDecline = true;
+      decisionFactors.thresholdBased = true;
+      decisionFactors.adjustedScore = adjustedScore;
+      decisionFactors.originalScore = fraudAnalysis.riskScore;
+
+      log.info('Auto-declined by certainty threshold', {
+        decision,
+        adjustedScore,
+        confidence: fraudAnalysis.mlResults?.confidence,
+        minScore: config.thresholds.certaintyDeclineMinScore,
+        minConfidence: config.thresholds.certaintyDeclineMinConfidence,
+      });
+
+      return this._buildDecisionResult(decision, reasons, decisionFactors, null);
+    }
     const highValueOverride = this._checkHighValue(originalTransaction);
     if (highValueOverride) {
       decision = highValueOverride.decision;
@@ -75,13 +104,6 @@ class DecisionEngineService {
 
       return this._buildDecisionResult(decision, reasons, decisionFactors, geoOverride);
     }
-    const confidenceAdjustment = this._applyConfidenceAdjustment(
-      fraudAnalysis.riskScore,
-      fraudAnalysis.mlResults?.confidence
-    );
-
-    const adjustedScore = confidenceAdjustment.adjustedScore;
-    decisionFactors.confidenceAdjustment = confidenceAdjustment;
     if (adjustedScore <= config.thresholds.approveMax) {
       decision = 'APPROVED';
       reasons.push(`Risk score ${adjustedScore} below approval threshold (${config.thresholds.approveMax})`);
@@ -121,6 +143,30 @@ class DecisionEngineService {
         decision: 'DECLINED',
         reason: 'Customer on auto-decline blacklist',
         type: 'BLACKLIST',
+      };
+    }
+
+    return null;
+  }
+
+  // Handles certainty auto-decline.
+  _checkCertaintyAutoDecline(adjustedScore, confidence) {
+    if (!config.thresholds.certaintyAutoDeclineEnabled) {
+      return null;
+    }
+
+    if (!Number.isFinite(confidence)) {
+      return null;
+    }
+
+    if (
+      adjustedScore >= config.thresholds.certaintyDeclineMinScore &&
+      confidence >= config.thresholds.certaintyDeclineMinConfidence
+    ) {
+      return {
+        decision: 'DECLINED',
+        reason: `High-certainty fraud signal (score ${adjustedScore}, confidence ${confidence}) auto-declined`,
+        type: 'CERTAINTY_AUTO_DECLINE',
       };
     }
 
@@ -210,6 +256,9 @@ class DecisionEngineService {
       confidence: {
         highApprove: config.thresholds.highConfidenceApprove,
         lowFlag: config.thresholds.lowConfidenceFlag,
+        certaintyAutoDeclineEnabled: config.thresholds.certaintyAutoDeclineEnabled,
+        certaintyDeclineMinScore: config.thresholds.certaintyDeclineMinScore,
+        certaintyDeclineMinConfidence: config.thresholds.certaintyDeclineMinConfidence,
       },
     };
   }

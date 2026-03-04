@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MNA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="bg-layer"></div>
+  <main class="app-shell">
+    <section id="authView" class="panel auth-panel">
+      <div class="brand-block">
+        <p class="overline">Live Integration Demo</p>
+        <h1>MNA Bank</h1>
+        <p class="subtext">Uses project API for real registration, login, profile updates, transaction submission, and fraud status updates.</p>
+      </div>
+
+      <div class="api-base">
+        <label>API Base URL
+          <input id="apiBaseInput" type="text" value="http://localhost:3000/api/v1">
+        </label>
+      </div>
+
+      <div class="auth-grid">
+        <form id="registerForm" class="card">
+          <h2>Create Account (API)</h2>
+          <label>First Name<input name="firstName" required placeholder="Jane"></label>
+          <label>Last Name<input name="lastName" required placeholder="Doe"></label>
+          <label>Email<input name="email" type="email" required placeholder="jane@email.com"></label>
+          <label>Password<input name="password" type="password" minlength="8" required placeholder="At least 8 characters"></label>
+          <button type="submit">Register</button>
+        </form>
+
+        <form id="loginForm" class="card">
+          <h2>Sign In (API)</h2>
+          <label>Email<input name="email" type="email" required placeholder="jane@email.com"></label>
+          <label>Password<input name="password" type="password" required placeholder="Your password"></label>
+          <button type="submit">Login</button>
+          <p class="muted">JWT access + refresh token flow from your user-service.</p>
+        </form>
+      </div>
+      <p id="authStatus" class="status-line"></p>
+    </section>
+
+    <section id="dashboardView" class="hidden">
+      <header class="topbar">
+        <div>
+          <p class="overline">Fraud Detection Showcase</p>
+          <h2 id="welcomeText">Welcome</h2>
+          <p id="apiStatus" class="muted"></p>
+        </div>
+        <div class="top-actions">
+          <button id="refreshBtn" class="ghost">Refresh</button>
+          <button id="logoutBtn" class="ghost">Logout</button>
+        </div>
+      </header>
+
+      <section class="balance-grid">
+        <article class="panel accent">
+          <p>Total Submitted</p>
+          <h3 id="mainBalance">$0.00</h3>
+        </article>
+        <article class="panel">
+          <p>Pending</p>
+          <h3 id="reserveBalance">0</h3>
+        </article>
+        <article class="panel">
+          <p>Approved / Rejected / Flagged</p>
+          <h3 id="totalBalance">0 / 0 / 0</h3>
+        </article>
+      </section>
+
+      <section class="content-grid">
+        <article class="panel">
+          <h3>Transfer To Another Account</h3>
+          <form id="transferForm" class="transfer-form">
+            <div class="form-grid">
+              <label class="span-2">Recipient Customer ID
+                <select id="recipientSelect">
+                  <option value="cust-1001">cust-1001</option>
+                  <option value="cust-1002">cust-1002</option>
+                  <option value="cust-2008">cust-2008</option>
+                </select>
+              </label>
+              <label class="span-2">Or Custom Recipient ID<input id="customRecipient" type="text" placeholder="cust-custom-001"></label>
+              <label>Amount<input id="transferAmount" type="number" min="1" step="0.01" required></label>
+              <label>Currency
+                <select id="currencySelect">
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="GBP">GBP</option>
+                  <option value="SGD">SGD</option>
+                  <option value="JPY">JPY</option>
+                  <option value="AUD">AUD</option>
+                  <option value="CAD">CAD</option>
+                  <option value="CHF">CHF</option>
+                  <option value="HKD">HKD</option>
+                  <option value="MYR">MYR</option>
+                </select>
+              </label>
+              <label class="span-2">Risk Scenario
+                <select id="riskScenario">
+                  <option value="normal">Normal payment (likely approved)</option>
+                  <option value="suspicious">Suspicious pattern (likely flagged)</option>
+                  <option value="extreme">Extreme risk (pushes toward decline)</option>
+                </select>
+              </label>
+              <label class="span-2">Location Preset
+                <select id="locationPreset">
+                  <option value="trusted">Trusted: US / New York</option>
+                  <option value="travel">Travel: BR / Manaus</option>
+                  <option value="highrisk">High Risk: NG / Lagos</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </label>
+            </div>
+            <div id="customLocationFields" class="form-grid hidden">
+              <label>Custom Country (ISO-2)<input id="customCountry" type="text" maxlength="2" placeholder="US"></label>
+              <label>Custom City<input id="customCity" type="text" placeholder="New York"></label>
+              <label>Custom Latitude<input id="customLat" type="number" step="0.000001" placeholder="40.7128"></label>
+              <label>Custom Longitude<input id="customLng" type="number" step="0.000001" placeholder="-74.0060"></label>
+            </div>
+            <button type="submit">Send Transfer</button>
+          </form>
+          <p class="muted">Submits real <code>POST /api/v1/transactions</code> through API Gateway.</p>
+          <p id="transferStatus" class="status-line"></p>
+        </article>
+
+        <article class="panel">
+          <h3>Profile (API)</h3>
+          <form id="profileForm" class="transfer-form">
+            <label>First Name<input id="profileFirstName" type="text"></label>
+            <label>Last Name<input id="profileLastName" type="text"></label>
+            <label>Phone (+6591234567)<input id="profilePhone" type="text"></label>
+            <button type="submit">Update Profile</button>
+          </form>
+          <p id="profileMeta" class="muted"></p>
+          <p id="profileStatus" class="status-line"></p>
+        </article>
+      </section>
+
+      <section class="panel section-gap">
+        <h3>Transaction History (API)</h3>
+        <input id="transactionSearch" type="text" placeholder="Search by transaction ID, merchant, status, or amount">
+        <div class="table-wrap history-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Transaction ID</th>
+                <th>Recipient / Merchant</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="transactionRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel section-gap">
+        <h3>Email Inbox (Rendered Flagged/Declined Templates)</h3>
+        <p class="muted">Generated from real transaction statuses returned by your transaction-service.</p>
+        <input id="emailSearch" type="text" placeholder="Search emails by subject or type">
+        <div class="mail-layout">
+          <aside class="mail-list" id="mailList"></aside>
+          <iframe id="mailPreview" title="Email preview"></iframe>
+        </div>
+      </section>
+
+      <section class="panel section-gap">
+        <h3>Demo Notes</h3>
+        <p class="muted">Use two browser windows to log in as two users and send transfers with different risk scenarios. Status updates may take a few seconds while Kafka consumers process decisions.</p>
+      </section>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>

@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const config = require('../config');
 const logger = require('../config/logger');
 const userRepository = require('../repositories/userRepository');
-const { UnauthorizedError, ConflictError, TooManyRequestsError, NotFoundError } = require('../utils/errors');
+const { UnauthorizedError, ConflictError, TooManyRequestsError, NotFoundError, ValidationError } = require('../utils/errors');
 const { USER_ROLES, USER_STATUS } = require('../utils/constants');
 
 class UserService {
@@ -135,7 +135,17 @@ class UserService {
   
   // Handles update profile.
   async updateProfile(userId, updates) {
-    const user = await userRepository.update(userId, updates);
+    const mappedUpdates = {};
+    if (typeof updates.firstName === 'string') mappedUpdates.first_name = updates.firstName;
+    if (typeof updates.lastName === 'string') mappedUpdates.last_name = updates.lastName;
+    if (typeof updates.phone === 'string') mappedUpdates.phone = updates.phone;
+    if (updates.metadata && typeof updates.metadata === 'object') mappedUpdates.metadata = updates.metadata;
+
+    if (Object.keys(mappedUpdates).length === 0) {
+      throw new ValidationError('No valid profile fields provided');
+    }
+
+    const user = await userRepository.update(userId, mappedUpdates);
     logger.info('User profile updated', { userId });
     return this._sanitizeUser(user);
   }

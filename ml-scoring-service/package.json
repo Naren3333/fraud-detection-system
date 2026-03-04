@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "fraud-detection-ml-scoring-service",
   "version": "2.0.0",
   "description": "Enterprise ML risk scoring service with model versioning and feature engineering",
@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "train": "node src/models/train.js"
+    "train:model": "node scripts/trainOfflineModel.js",
+    "generate:synthetic": "node scripts/generateSyntheticTrainingData.js"
   },
   "keywords": [
     "machine-learning",

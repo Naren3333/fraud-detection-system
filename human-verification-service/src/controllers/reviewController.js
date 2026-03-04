@@ -24,11 +24,11 @@ class ReviewController {
   // Handles submit decision.
   async submitDecision(req, res) {
     const { decision, reviewedBy, notes } = req.body;
-    const allowed = new Set(['APPROVED', 'DECLINED', 'FLAGGED']);
+    const allowed = new Set(['APPROVED', 'DECLINED']);
     if (!allowed.has(decision)) {
       return res.status(400).json({
         success: false,
-        error: 'decision must be APPROVED, DECLINED, or FLAGGED',
+        error: 'decision must be APPROVED or DECLINED',
       });
     }
     if (!reviewedBy || typeof reviewedBy !== 'string') {

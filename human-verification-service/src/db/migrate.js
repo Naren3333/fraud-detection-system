@@ -18,7 +18,7 @@ const migrate = async () => {
                           CHECK (queue_status IN ('PENDING','REVIEWED')),
         previous_decision   VARCHAR(50) NOT NULL DEFAULT 'FLAGGED',
         final_decision      VARCHAR(50)
-                          CHECK (final_decision IN ('APPROVED','DECLINED','FLAGGED')),
+                          CHECK (final_decision IN ('APPROVED','DECLINED')),
         decision_reason     TEXT,
         risk_score          NUMERIC(5,2),
         payload             JSONB NOT NULL DEFAULT '{}'::jsonb,

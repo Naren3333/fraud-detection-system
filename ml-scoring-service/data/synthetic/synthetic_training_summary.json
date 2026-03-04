@@ -1,0 +1,13 @@
+{
+  "generatedAt": "2026-03-04T04:15:17.114Z",
+  "totalRows": 100000,
+  "fraudRows": 15088,
+  "nonFraudRows": 84912,
+  "fraudRate": 0.1509,
+  "files": {
+    "full": "C:\\Users\\Naren\\Documents\\SMU\\y2s2\\ESD\\project\\fraud-detection-system\\ml-scoring-service\\data\\synthetic\\synthetic_training_full.csv",
+    "train": "C:\\Users\\Naren\\Documents\\SMU\\y2s2\\ESD\\project\\fraud-detection-system\\ml-scoring-service\\data\\synthetic\\synthetic_training_train.csv",
+    "val": "C:\\Users\\Naren\\Documents\\SMU\\y2s2\\ESD\\project\\fraud-detection-system\\ml-scoring-service\\data\\synthetic\\synthetic_training_val.csv",
+    "test": "C:\\Users\\Naren\\Documents\\SMU\\y2s2\\ESD\\project\\fraud-detection-system\\ml-scoring-service\\data\\synthetic\\synthetic_training_test.csv"
+  }
+}

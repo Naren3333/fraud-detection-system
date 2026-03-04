@@ -1,4 +1,4 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 
 module.exports = {
   env: process.env.NODE_ENV || 'development',
@@ -17,7 +17,8 @@ module.exports = {
   },
 
   model: {
-    version: process.env.MODEL_VERSION || 'xgboost-v2.1',
+    version: process.env.MODEL_VERSION || 'logreg-offline',
+    artifactPath: process.env.MODEL_ARTIFACT_PATH || 'data/models/latest/model.json',
     cacheTtl: parseInt(process.env.MODEL_CACHE_TTL, 10) || 3600,
     warmCache: process.env.MODEL_WARM_CACHE === 'true',
     confidenceThreshold: parseFloat(process.env.CONFIDENCE_THRESHOLD) || 0.6,
@@ -32,6 +33,10 @@ module.exports = {
       .split(',')
       .map(Number),
     velocityDecay: parseFloat(process.env.FEATURE_VELOCITY_DECAY) || 0.5,
+    highRiskCountries: (process.env.HIGH_RISK_COUNTRIES || 'NG,RU,CN,PK')
+      .split(',')
+      .map((c) => c.trim().toUpperCase())
+      .filter(Boolean),
   },
 
   performance: {

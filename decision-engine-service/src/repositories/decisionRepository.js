@@ -103,6 +103,125 @@ class DecisionRepository {
     return result.rows[0] || null;
   }
 
+  // Handles apply manual review decision.
+  async applyManualReviewDecision({
+    transactionId,
+    decision,
+    correlationId,
+    reviewedBy,
+    reviewNotes,
+    reviewedAt,
+    rawEvent,
+  }) {
+    const client = await getClient();
+
+    try {
+      await client.query('BEGIN');
+
+      const existingDecisionRes = await client.query(`
+        SELECT decision_id, decision
+        FROM decisions
+        WHERE transaction_id = $1
+        FOR UPDATE
+      `, [transactionId]);
+
+      if (existingDecisionRes.rowCount === 0) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+
+      const existing = existingDecisionRes.rows[0];
+
+      const decisionFactorsPatch = {
+        manualReviewApplied: true,
+        manualReview: {
+          reviewedBy: reviewedBy || null,
+          reviewNotes: reviewNotes || null,
+          reviewedAt: reviewedAt || new Date().toISOString(),
+          sourceEventType: 'transaction.reviewed',
+        },
+      };
+
+      const decisionReason = `Manual review final decision: ${decision}`;
+      const updateRes = await client.query(`
+        UPDATE decisions
+        SET
+          decision = $2,
+          decision_reason = $3,
+          decision_factors = COALESCE(decision_factors, '{}'::jsonb) || $4::jsonb,
+          override_applied = TRUE,
+          override_reason = 'Manual review decision',
+          override_type = 'MANUAL_REVIEW',
+          decided_at = NOW(),
+          correlation_id = COALESCE($5, correlation_id),
+          decision_version = '1.0.0-manual-review'
+        WHERE transaction_id = $1
+        RETURNING decision_id, decided_at
+      `, [
+        transactionId,
+        decision,
+        decisionReason,
+        JSON.stringify(decisionFactorsPatch),
+        correlationId || null,
+      ]);
+
+      const latestHistoryRes = await client.query(`
+        SELECT fraud_analysis, original_transaction
+        FROM decision_history
+        WHERE transaction_id = $1
+        ORDER BY recorded_at DESC
+        LIMIT 1
+      `, [transactionId]);
+
+      const latestHistory = latestHistoryRes.rows[0] || {};
+
+      await client.query(`
+        INSERT INTO decision_history (
+          decision_id, transaction_id,
+          fraud_analysis, original_transaction,
+          decision, decision_metadata
+        )
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, [
+        updateRes.rows[0].decision_id,
+        transactionId,
+        JSON.stringify(latestHistory.fraud_analysis || {}),
+        JSON.stringify(latestHistory.original_transaction || {}),
+        decision,
+        JSON.stringify({
+          source: 'manual_review',
+          previousDecision: existing.decision,
+          reviewedBy: reviewedBy || null,
+          reviewNotes: reviewNotes || null,
+          reviewedAt: reviewedAt || new Date().toISOString(),
+          correlationId: correlationId || null,
+          eventType: 'transaction.reviewed',
+          rawEvent: rawEvent || null,
+        }),
+      ]);
+
+      await client.query('COMMIT');
+
+      return {
+        decisionId: updateRes.rows[0].decision_id,
+        decidedAt: updateRes.rows[0].decided_at,
+        previousDecision: existing.decision,
+        decision,
+      };
+    } catch (err) {
+      await client.query('ROLLBACK');
+      logger.error('Failed to apply manual review decision', {
+        transactionId,
+        decision,
+        error: err.message,
+        stack: err.stack,
+      });
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
   
   // Handles get stats.
   async getStats(since) {

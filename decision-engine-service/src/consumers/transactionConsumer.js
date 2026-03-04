@@ -27,11 +27,14 @@ const start = async () => {
 
   consumer = await createConsumer();
   await consumer.subscribe({
-    topics: [config.kafka.inputTopic],
+    topics: [config.kafka.inputTopic, config.kafka.reviewedTopic],
     fromBeginning: false,
   });
 
-  logger.info('Subscribed to input topic', { topic: config.kafka.inputTopic });
+  logger.info('Subscribed to input topics', {
+    scoredTopic: config.kafka.inputTopic,
+    reviewedTopic: config.kafka.reviewedTopic,
+  });
 
   await consumer.run({
     autoCommit: false,
@@ -43,6 +46,7 @@ const start = async () => {
   isRunning = true;
   logger.info('Transaction consumer running', {
     inputTopic: config.kafka.inputTopic,
+    reviewedTopic: config.kafka.reviewedTopic,
     outputTopicApproved: config.kafka.outputTopicApproved,
     outputTopicFlagged: config.kafka.outputTopicFlagged,
   });
@@ -86,6 +90,10 @@ const stop = async () => {
 
 // Handles handle message.
 const handleMessage = async ({ topic, partition, message, heartbeat }) => {
+  if (topic === config.kafka.reviewedTopic) {
+    return handleReviewedMessage({ topic, partition, message });
+  }
+
   const startTime = Date.now();
   const offset = message.offset;
   let transactionId = null;
@@ -95,7 +103,7 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
     const raw = message.value?.toString();
     if (!raw) {
       logger.warn('Received empty Kafka message - skipping', { partition, offset });
-      await commitOffset(partition, offset);
+      await commitOffset(topic, partition, offset);
       kafkaMessagesConsumed.inc({ topic, status: 'skipped' });
       return;
     }
@@ -111,7 +119,7 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
         preview: raw.substring(0, 200),
       });
       await sendToDlq({ raw, reason: 'parse_error', error: parseErr.message, partition, offset });
-      await commitOffset(partition, offset);
+      await commitOffset(topic, partition, offset);
       return;
     }
 
@@ -136,7 +144,7 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
         partition,
         offset,
       });
-      await commitOffset(partition, offset);
+      await commitOffset(topic, partition, offset);
       kafkaMessagesConsumed.inc({ topic, status: 'dlq' });
       return;
     }
@@ -161,7 +169,7 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
 
     const existingDecision = await decisionRepository.findByTransactionId(transactionId);
     if (existingDecision && existingDecision.decision === decisionResult.decision) {
-      await commitOffset(partition, offset);
+      await commitOffset(topic, partition, offset);
       kafkaMessagesConsumed.inc({ topic, status: 'skipped' });
       logger.warn('Duplicate scored event detected; skipping decision republish', {
         transactionId,
@@ -228,7 +236,7 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
         'x-source-service': config.serviceName,
       }
     );
-    await commitOffset(partition, offset);
+    await commitOffset(topic, partition, offset);
 
     const durationMs = Date.now() - startTime;
     decisionsTotal.inc({ decision: decisionResult.decision });
@@ -267,7 +275,7 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
         partition,
         offset,
       });
-      await commitOffset(partition, offset);
+      await commitOffset(topic, partition, offset);
       kafkaMessagesConsumed.inc({ topic, status: 'dlq' });
     } catch (dlqErr) {
       logger.error('Failed to send message to DLQ - offset NOT committed', {
@@ -281,13 +289,120 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
   }
 };
 
+// Handles reviewed message.
+const handleReviewedMessage = async ({ topic, partition, message }) => {
+  const offset = message.offset;
+  let transactionId = null;
+
+  try {
+    const raw = message.value?.toString();
+    if (!raw) {
+      logger.warn('Received empty reviewed message - skipping', { topic, partition, offset });
+      await commitOffset(topic, partition, offset);
+      kafkaMessagesConsumed.inc({ topic, status: 'skipped' });
+      return;
+    }
+
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch (parseErr) {
+      logger.error('Malformed JSON in reviewed message - skipping', {
+        topic,
+        partition,
+        offset,
+        error: parseErr.message,
+      });
+      await commitOffset(topic, partition, offset);
+      kafkaMessagesConsumed.inc({ topic, status: 'skipped' });
+      return;
+    }
+
+    transactionId = data.transactionId;
+    const reviewedDecision = data.reviewDecision || data.decision;
+    const correlationId = data.correlationId || message.headers?.['x-correlation-id']?.toString() || transactionId;
+
+    if (!transactionId || !reviewedDecision) {
+      logger.warn('Reviewed event missing required fields - skipping', {
+        topic,
+        partition,
+        offset,
+        transactionId,
+        reviewedDecision,
+      });
+      await commitOffset(topic, partition, offset);
+      kafkaMessagesConsumed.inc({ topic, status: 'skipped' });
+      return;
+    }
+
+    if (!['APPROVED', 'DECLINED', 'FLAGGED'].includes(reviewedDecision)) {
+      logger.warn('Reviewed event has invalid decision - skipping', {
+        transactionId,
+        reviewedDecision,
+        topic,
+        partition,
+        offset,
+      });
+      await commitOffset(topic, partition, offset);
+      kafkaMessagesConsumed.inc({ topic, status: 'skipped' });
+      return;
+    }
+
+    const updated = await decisionRepository.applyManualReviewDecision({
+      transactionId,
+      decision: reviewedDecision,
+      correlationId,
+      reviewedBy: data.reviewedBy,
+      reviewNotes: data.reviewNotes || data.notes || null,
+      reviewedAt: data.reviewedAt,
+      rawEvent: data,
+    });
+
+    if (!updated) {
+      logger.warn('No existing decision found for reviewed event', {
+        transactionId,
+        reviewedDecision,
+        topic,
+      });
+      await commitOffset(topic, partition, offset);
+      kafkaMessagesConsumed.inc({ topic, status: 'skipped' });
+      return;
+    }
+
+    await commitOffset(topic, partition, offset);
+    kafkaMessagesConsumed.inc({ topic, status: 'success' });
+
+    logger.info('Applied manual review decision to decision record', {
+      transactionId,
+      previousDecision: updated.previousDecision,
+      reviewedDecision,
+      decisionId: updated.decisionId,
+      topic,
+      partition,
+      offset,
+    });
+  } catch (error) {
+    logger.error('Unhandled error processing reviewed message', {
+      transactionId,
+      topic,
+      partition,
+      offset,
+      error: error.message,
+      stack: error.stack,
+    });
+    errorsTotal.inc({ component: 'reviewed_consumer', type: 'unhandled' });
+    await commitOffset(topic, partition, offset);
+    kafkaMessagesConsumed.inc({ topic, status: 'skipped' });
+  }
+};
+
 // Handles commit offset.
-const commitOffset = async (partition, offset) => {
+const commitOffset = async (topic, partition, offset) => {
   if (!consumer) return;
   try {
     await consumer.commitOffsets([
       {
-        topic: config.kafka.inputTopic,
+        topic,
         partition,
         offset: (BigInt(offset) + 1n).toString(),
       },

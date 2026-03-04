@@ -34,6 +34,11 @@ class ReviewService {
 
   // Handles apply decision.
   async applyDecision({ transactionId, decision, reviewedBy, notes }) {
+    const allowed = new Set(['APPROVED', 'DECLINED']);
+    if (!allowed.has(decision)) {
+      throw new Error('decision must be APPROVED or DECLINED');
+    }
+
     const existing = await reviewRepository.getByTransactionId(transactionId);
     if (!existing) {
       throw new Error(`No manual review record for transaction ${transactionId}`);

@@ -25,6 +25,7 @@ module.exports = {
     sessionTimeout: parseInt(process.env.KAFKA_CONSUMER_SESSION_TIMEOUT, 10) || 30000,
     heartbeatInterval: parseInt(process.env.KAFKA_CONSUMER_HEARTBEAT_INTERVAL, 10) || 3000,
     inputTopic: process.env.KAFKA_INPUT_TOPIC || 'transaction.scored',
+    reviewedTopic: process.env.KAFKA_INPUT_TOPIC_REVIEWED || 'transaction.reviewed',
     outputTopicApproved: process.env.KAFKA_OUTPUT_TOPIC_APPROVED || 'transaction.finalised',
     outputTopicFlagged: process.env.KAFKA_OUTPUT_TOPIC_FLAGGED || 'transaction.flagged',
     dlqTopic: process.env.KAFKA_DLQ_TOPIC || 'transaction.decision.dlq',

@@ -49,7 +49,8 @@ class FeatureEngineer {
     features.velocity_amount_hour_norm = this._normalizeVelocity(rawVelocityAmountHour, 10000);
     features.velocity_txn_day_norm = this._normalizeVelocity(rawVelocityTxnDay, 50);
     const geoFactors = ruleResults.riskFactors?.geography || {};
-    features.geo_high_risk = geoFactors.country && config.fraudRules?.geographic?.highRiskCountries?.includes(geoFactors.country) ? 1 : 0;
+    const geoCountry = (geoFactors.country || country || '').toUpperCase();
+    features.geo_high_risk = config.features.highRiskCountries.includes(geoCountry) ? 1 : 0;
     const amountFactors = ruleResults.riskFactors?.amount || {};
     features.amount_suspicious = amountFactors.suspicious ? 1 : 0;
     features.amount_high = amountFactors.highAmount ? 1 : 0;

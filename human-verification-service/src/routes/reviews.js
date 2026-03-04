@@ -56,15 +56,15 @@ router.get('/reviews/:transactionId', controller.getByTransaction.bind(controlle
  *             properties:
  *               decision:
  *                 type: string
- *                 enum: [approve, decline]
- *               reviewerId:
+ *                 enum: [APPROVED, DECLINED]
+ *               reviewedBy:
  *                 type: string
- *               reason:
+ *               notes:
  *                 type: string
  *           example:
- *             decision: approve
- *             reviewerId: reviewer-1
- *             reason: customer confirmed transaction
+ *             decision: APPROVED
+ *             reviewedBy: reviewer-1
+ *             notes: customer confirmed transaction
  *       200:
  *         description: Decision submitted
  *       400:

@@ -19,7 +19,7 @@ Backend-only manual review service for `FLAGGED` transactions.
 -`POST /api/v1/reviews/:transactionId/decision`
 
 - Dashboard: `GET /` (human review UI using the above APIs)
-- Dashboard supports pending queue view, client-side filtering, decision notes, and approve/decline/keep-flagged actions.
+- Dashboard supports pending queue view, client-side filtering, decision notes, and approve/decline actions.
 
 ### Submit Decision Payload
 
@@ -42,8 +42,6 @@ Allowed `decision` values:
 -`APPROVED`
 
 -`DECLINED`
-
--`FLAGGED` (keep held)
 
 ## Important Integration Points
 

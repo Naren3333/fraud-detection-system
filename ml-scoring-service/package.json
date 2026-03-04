@@ -7,6 +7,7 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "train:model": "node scripts/trainOfflineModel.js",
+    "evaluate:model": "node scripts/generateEvaluationReport.js",
     "generate:synthetic": "node scripts/generateSyntheticTrainingData.js"
   },
   "keywords": [

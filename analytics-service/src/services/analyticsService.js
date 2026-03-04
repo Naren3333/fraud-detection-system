@@ -24,6 +24,7 @@ class AnalyticsService {
       topCustomers,
       topMerchants,
       geographicDistribution,
+      analystImpact,
     ] = await Promise.all([
       this._getOverviewStats(since),
       this._getDecisionBreakdown(since),
@@ -32,6 +33,7 @@ class AnalyticsService {
       this._getTopCustomers(since, 10),
       this._getTopMerchants(since, 10),
       this._getGeographicDistribution(since),
+      this._getAnalystImpactStats(since),
     ]);
 
     return {
@@ -42,6 +44,7 @@ class AnalyticsService {
       topCustomers,
       topMerchants,
       geography: geographicDistribution,
+      analystImpact,
       metadata: {
         timeRange,
         since: since.toISOString(),
@@ -280,6 +283,66 @@ class AnalyticsService {
       { country: 'GB', count: 0, declined: 0 },
       { country: 'SG', count: 0, declined: 0 },
     ];
+  }
+
+  // Handles get analyst impact stats.
+  async _getAnalystImpactStats(since) {
+    const sql = `
+      WITH manual_reviews AS (
+        SELECT
+          d.transaction_id,
+          d.decision AS final_decision,
+          d.decided_at,
+          d.decision_factors,
+          CASE
+            WHEN (d.decision_factors->'manualReview'->>'reviewedAt') ~ '^[0-9]{4}-'
+              THEN (d.decision_factors->'manualReview'->>'reviewedAt')::timestamptz
+            ELSE d.decided_at
+          END AS reviewed_at
+        FROM decisions d
+        WHERE d.decided_at >= $1
+          AND (
+            d.override_type = 'MANUAL_REVIEW'
+            OR d.decision_factors->>'manualReviewApplied' = 'true'
+          )
+      ),
+      flagged_first AS (
+        SELECT
+          dh.transaction_id,
+          MIN(dh.recorded_at) AS first_flagged_at
+        FROM decision_history dh
+        WHERE dh.decision = 'FLAGGED'
+        GROUP BY dh.transaction_id
+      )
+      SELECT
+        COUNT(*) AS total_manual_reviews,
+        COUNT(*) FILTER (WHERE mr.final_decision = 'APPROVED') AS approved_after_review,
+        COUNT(*) FILTER (WHERE mr.final_decision = 'DECLINED') AS declined_after_review,
+        AVG(EXTRACT(EPOCH FROM (mr.reviewed_at - ff.first_flagged_at))) AS avg_turnaround_seconds
+      FROM manual_reviews mr
+      LEFT JOIN flagged_first ff ON ff.transaction_id = mr.transaction_id
+    `;
+
+    const { rows } = await query(sql, [since]);
+    const stats = rows[0] || {};
+    const totalManualReviews = parseInt(stats.total_manual_reviews) || 0;
+    const approvedAfterReview = parseInt(stats.approved_after_review) || 0;
+    const declinedAfterReview = parseInt(stats.declined_after_review) || 0;
+    const avgTurnaroundSeconds = Number(parseFloat(stats.avg_turnaround_seconds) || 0);
+
+    return {
+      totalManualReviews,
+      approvedAfterReview,
+      declinedAfterReview,
+      approvedAfterReviewRate: totalManualReviews > 0
+        ? Number(((approvedAfterReview / totalManualReviews) * 100).toFixed(1))
+        : 0,
+      declinedAfterReviewRate: totalManualReviews > 0
+        ? Number(((declinedAfterReview / totalManualReviews) * 100).toFixed(1))
+        : 0,
+      avgReviewTurnaroundSeconds: Number(avgTurnaroundSeconds.toFixed(1)),
+      avgReviewTurnaroundMinutes: Number((avgTurnaroundSeconds / 60).toFixed(2)),
+    };
   }
 
   // Handles get time range date.

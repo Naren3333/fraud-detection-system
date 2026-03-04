@@ -319,6 +319,22 @@ Detailed guide: `testing/TESTING.md`.
 
 ---
 
+## Offline ML Evaluation
+
+Generate a reproducible evaluation report (precision, recall, F1, ROC-AUC, confusion matrix, threshold tradeoffs, and approve/flag/decline impact):
+
+```bash
+cd ml-scoring-service
+npm run evaluate:model
+```
+
+Artifacts are written to:
+
+- `ml-scoring-service/data/models/latest/evaluation.json`
+- `ml-scoring-service/data/models/latest/evaluation.md`
+
+---
+
 ## Infrastructure
 
 | Container | Image | Purpose |

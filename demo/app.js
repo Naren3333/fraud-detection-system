@@ -5,6 +5,8 @@ const state = {
   session: null,
   user: null,
   transactions: [],
+  decisionByTransaction: {},
+  selectedTransactionId: null,
   poller: null,
 };
 
@@ -34,6 +36,7 @@ const profileLastName = document.getElementById("profileLastName");
 const profilePhone = document.getElementById("profilePhone");
 
 const transactionRows = document.getElementById("transactionRows");
+const explainabilityPanel = document.getElementById("explainabilityPanel");
 const mailList = document.getElementById("mailList");
 const mailPreview = document.getElementById("mailPreview");
 const transactionSearch = document.getElementById("transactionSearch");
@@ -97,6 +100,9 @@ function setSession(session) {
 function clearSession() {
   state.session = null;
   state.user = null;
+  state.transactions = [];
+  state.decisionByTransaction = {};
+  state.selectedTransactionId = null;
   localStorage.removeItem(SESSION_KEY);
 }
 
@@ -232,6 +238,8 @@ function renderTransactions(transactions) {
 
   if (!filtered.length) {
     transactionRows.innerHTML = "<tr><td colspan='6'>No transactions match your search.</td></tr>";
+    state.selectedTransactionId = null;
+    void renderExplainability(null);
     return;
   }
 
@@ -244,7 +252,7 @@ function renderTransactions(transactions) {
       const action = status === "FLAGGED"
         ? `<button class="inline-btn decline-btn" data-id="${tx.id}">Decline</button>`
         : "-";
-      return `<tr>
+      return `<tr data-tx-id="${tx.id}">
         <td>${formatDate(date)}</td>
         <td><code>${tx.id}</code></td>
         <td>${merchant}</td>
@@ -256,7 +264,8 @@ function renderTransactions(transactions) {
     .join("");
 
   transactionRows.querySelectorAll(".decline-btn").forEach((btn) => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", async (event) => {
+      event.stopPropagation();
       const txId = btn.dataset.id;
       try {
         btn.disabled = true;
@@ -277,6 +286,168 @@ function renderTransactions(transactions) {
       }
     });
   });
+
+  const selectedId = filtered.some((tx) => tx.id === state.selectedTransactionId)
+    ? state.selectedTransactionId
+    : filtered[0].id;
+  state.selectedTransactionId = selectedId;
+
+  transactionRows.querySelectorAll("tr[data-tx-id]").forEach((row) => {
+    if (row.dataset.txId === selectedId) {
+      row.classList.add("tx-selected");
+    }
+    row.addEventListener("click", () => {
+      state.selectedTransactionId = row.dataset.txId;
+      transactionRows.querySelectorAll("tr[data-tx-id]").forEach((r) => r.classList.remove("tx-selected"));
+      row.classList.add("tx-selected");
+      void renderExplainability(row.dataset.txId);
+    });
+  });
+
+  void renderExplainability(selectedId);
+}
+
+function transactionById(transactionId) {
+  return state.transactions.find((tx) => tx.id === transactionId) || null;
+}
+
+function inferManualTriggerType(decision) {
+  if (!decision) return "N/A";
+  const overrideType = decision.override_type || decision.overrideType;
+  if (overrideType) return overrideType;
+
+  const factors = decision.decision_factors || decision.decisionFactors || {};
+  if (factors.highValue) return "HIGH_VALUE";
+  if (factors.geographicRisk) return "GEOGRAPHIC_RISK";
+  if (factors.rulesFlagged) return "RULES_FLAGGED";
+  if (factors.thresholdBased) return "THRESHOLD_BAND";
+  return "N/A";
+}
+
+function reasonList(reasonText) {
+  if (!reasonText) return [];
+  return String(reasonText)
+    .split(";")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 4);
+}
+
+function buildExplainabilityHtml(tx, decision) {
+  if (!tx) {
+    return "<p class='muted'>Select a transaction row to load explainability details.</p>";
+  }
+
+  if (!decision) {
+    return `
+      <p class="muted">No decision metadata available yet for <code>${escapeHtml(tx.id)}</code>.</p>
+      <p class="muted">Status is currently <strong>${escapeHtml(String(tx.status || "PENDING"))}</strong>.</p>
+    `;
+  }
+
+  const factors = decision.decision_factors || decision.decisionFactors || {};
+  const reasons = reasonList(decision.decision_reason || decision.decisionReason);
+  const riskScore = decision.risk_score ?? "-";
+  const mlScore = decision.ml_score ?? "-";
+  const ruleScore = decision.rule_score ?? "-";
+  const confidence = decision.confidence ?? "-";
+  const reviewedBy = factors.manualReview?.reviewedBy || "-";
+  const reviewedAt = factors.manualReview?.reviewedAt
+    ? formatDate(factors.manualReview.reviewedAt)
+    : "-";
+
+  const reasonsHtml = reasons.length
+    ? `<ul class="explainability-list">${reasons.map((r) => `<li>${escapeHtml(r)}</li>`).join("")}</ul>`
+    : "<p class='value'>No explicit reasons recorded.</p>";
+
+  return `
+    <div class="explainability-grid">
+      <div class="explainability-item">
+        <p class="label">Transaction</p>
+        <p class="value"><code>${escapeHtml(tx.id)}</code></p>
+      </div>
+      <div class="explainability-item">
+        <p class="label">Decision</p>
+        <p class="value"><strong>${escapeHtml(String(decision.decision || tx.status || "PENDING"))}</strong></p>
+      </div>
+      <div class="explainability-item">
+        <p class="label">Scores</p>
+        <p class="value">Risk: ${escapeHtml(String(riskScore))} | ML: ${escapeHtml(String(mlScore))} | Rule: ${escapeHtml(String(ruleScore))}</p>
+      </div>
+      <div class="explainability-item">
+        <p class="label">Confidence</p>
+        <p class="value">${escapeHtml(String(confidence))}</p>
+      </div>
+      <div class="explainability-item">
+        <p class="label">Manual Review Trigger Type</p>
+        <p class="value">${escapeHtml(inferManualTriggerType(decision))}</p>
+      </div>
+      <div class="explainability-item">
+        <p class="label">Rule Hit / Flags</p>
+        <p class="value">rulesFlagged=${factors.rulesFlagged ? "true" : "false"}, fraudFlagged=${decision.fraud_flagged ? "true" : "false"}</p>
+      </div>
+      <div class="explainability-item span-2">
+        <p class="label">Top Reasons</p>
+        ${reasonsHtml}
+      </div>
+      <div class="explainability-item">
+        <p class="label">Reviewed By</p>
+        <p class="value">${escapeHtml(String(reviewedBy))}</p>
+      </div>
+      <div class="explainability-item">
+        <p class="label">Reviewed At</p>
+        <p class="value">${escapeHtml(String(reviewedAt))}</p>
+      </div>
+    </div>
+  `;
+}
+
+async function ensureDecisionLoaded(transactionId) {
+  if (!transactionId || transactionId in state.decisionByTransaction) {
+    return;
+  }
+
+  try {
+    const payload = await apiRequest(`/decisions/${encodeURIComponent(transactionId)}`);
+    state.decisionByTransaction[transactionId] = payload?.data || null;
+  } catch (error) {
+    if (String(error.message || "").toLowerCase().includes("not found")) {
+      state.decisionByTransaction[transactionId] = null;
+      return;
+    }
+    throw error;
+  }
+}
+
+async function prefetchDecisionDetails(transactions) {
+  const candidates = transactions
+    .filter((tx) => String(tx.status || "").toUpperCase() !== "PENDING")
+    .slice(0, 10)
+    .map((tx) => tx.id)
+    .filter((txId) => !(txId in state.decisionByTransaction));
+
+  if (!candidates.length) return;
+  await Promise.all(candidates.map((txId) => ensureDecisionLoaded(txId).catch(() => null)));
+}
+
+async function renderExplainability(transactionId) {
+  if (!explainabilityPanel) return;
+
+  const tx = transactionById(transactionId);
+  if (!tx) {
+    explainabilityPanel.innerHTML = "<p class='muted'>Select a transaction row to load explainability details.</p>";
+    return;
+  }
+
+  explainabilityPanel.innerHTML = "<p class='muted'>Loading explainability...</p>";
+
+  try {
+    await ensureDecisionLoaded(transactionId);
+    const decision = state.decisionByTransaction[transactionId] || null;
+    explainabilityPanel.innerHTML = buildExplainabilityHtml(tx, decision);
+  } catch (error) {
+    explainabilityPanel.innerHTML = `<p class="status-error">Failed to load explainability: ${escapeHtml(error.message)}</p>`;
+  }
 }
 
 function escapeHtml(str) {
@@ -399,9 +570,12 @@ function buildEmailItems(transactions, userId) {
       currency: tx.currency || "USD",
       merchantId: tx.merchantId || tx.merchant_id || "-",
       timestamp: formatDate(tx.createdAt || tx.created_at),
-      decisionReason: status === "REJECTED"
-        ? "Rule and model signals exceeded decline threshold."
-        : "Risk threshold exceeded and transaction requires manual review.",
+      decisionReason:
+        state.decisionByTransaction[tx.id]?.decision_reason ||
+        state.decisionByTransaction[tx.id]?.decisionReason ||
+        (status === "REJECTED"
+          ? "Rule and model signals exceeded decline threshold."
+          : "Risk threshold exceeded and transaction requires manual review."),
       customerId: userId,
     };
 
@@ -582,6 +756,7 @@ async function loadTransactions() {
   const payload = await apiRequest(`/transactions/customer/${encodeURIComponent(userId)}?limit=60`);
   const transactions = payload.data || [];
   state.transactions = transactions;
+  await prefetchDecisionDetails(transactions);
   renderSummary(transactions);
   renderTransactions(transactions);
   renderEmails(transactions, userId);

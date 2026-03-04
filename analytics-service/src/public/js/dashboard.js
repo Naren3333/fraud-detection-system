@@ -89,6 +89,7 @@ async function loadDashboard() {
 
     if (data.success) {
       updateOverviewStats(data.data.overview);
+      updateAnalystImpact(data.data.analystImpact || {});
       updateDecisionBreakdown(data.data.decisions);
       updateTimeSeriesChart(data.data.timeSeries);
       updateRiskScoreChart(data.data.riskScores);
@@ -110,6 +111,26 @@ function updateOverviewStats(stats) {
   document.getElementById('approved-count').textContent = `${stats.approved.toLocaleString()} approved`;
   document.getElementById('declined-count').textContent = `${stats.declined.toLocaleString()} declined`;
   document.getElementById('flagged-count').textContent = `${stats.flagged.toLocaleString()} flagged`;
+}
+
+// Handles update analyst impact stats.
+function updateAnalystImpact(stats) {
+  const total = stats.totalManualReviews || 0;
+  const approvedAfterReview = stats.approvedAfterReview || 0;
+  const declinedAfterReview = stats.declinedAfterReview || 0;
+  const approvedRate = stats.approvedAfterReviewRate || 0;
+  const declinedRate = stats.declinedAfterReviewRate || 0;
+  const turnaroundMinutes = stats.avgReviewTurnaroundMinutes || 0;
+  const turnaroundSeconds = stats.avgReviewTurnaroundSeconds || 0;
+
+  document.getElementById('manual-reviews-total').textContent = total.toLocaleString();
+  document.getElementById('review-approved-rate').textContent = `${approvedRate}%`;
+  document.getElementById('review-declined-rate').textContent = `${declinedRate}%`;
+  document.getElementById('review-turnaround-mins').textContent = `${turnaroundMinutes}m`;
+
+  document.getElementById('review-approved-count').textContent = `${approvedAfterReview.toLocaleString()} approved`;
+  document.getElementById('review-declined-count').textContent = `${declinedAfterReview.toLocaleString()} declined`;
+  document.getElementById('review-turnaround-secs').textContent = `${turnaroundSeconds.toLocaleString()} seconds`;
 }
 
 // Handles update decision breakdown.

@@ -304,6 +304,51 @@ th {
   border-radius: 10px;
 }
 
+tr.tx-selected td {
+  background: #eef8f5;
+}
+
+.explainability-panel {
+  margin-top: 8px;
+  border: 1px solid #edf1f3;
+  border-radius: 12px;
+  background: #fbfdfc;
+  padding: 12px;
+}
+
+.explainability-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.explainability-item {
+  border: 1px solid #e6ecef;
+  border-radius: 10px;
+  padding: 10px;
+  background: #fff;
+}
+
+.explainability-item .label {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.explainability-item .value {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.explainability-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
 .mail-layout {
   display: grid;
   grid-template-columns: 340px 1fr;
@@ -370,5 +415,9 @@ th {
 
   .span-2 {
     grid-column: auto;
+  }
+
+  .explainability-grid {
+    grid-template-columns: 1fr;
   }
 }

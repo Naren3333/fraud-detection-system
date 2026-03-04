@@ -1,0 +1,146 @@
+{
+  "generatedAt": "2026-03-04T14:56:14.201Z",
+  "modelPath": "C:\\Users\\Naren\\Documents\\SMU\\y2s2\\ESD\\project\\fraud-detection-system\\ml-scoring-service\\data\\models\\latest\\model.json",
+  "testPath": "C:\\Users\\Naren\\Documents\\SMU\\y2s2\\ESD\\project\\fraud-detection-system\\ml-scoring-service\\data\\synthetic\\synthetic_training_test.csv",
+  "sampleCount": 15000,
+  "selectedThreshold": 0.49,
+  "rocAuc": 0.843884,
+  "confusionMatrix": {
+    "truePositive": 1374,
+    "falsePositive": 507,
+    "trueNegative": 12233,
+    "falseNegative": 886
+  },
+  "metrics": {
+    "precision": 0.730463,
+    "recall": 0.607965,
+    "f1": 0.663608,
+    "accuracy": 0.907133,
+    "falsePositiveRate": 0.039796
+  },
+  "thresholdTradeoffs": [
+    {
+      "threshold": 0.45,
+      "tp": 1384,
+      "fp": 522,
+      "tn": 12218,
+      "fn": 876,
+      "precision": 0.726128,
+      "recall": 0.612389,
+      "f1": 0.664426,
+      "accuracy": 0.9068,
+      "falsePositiveRate": 0.040973
+    },
+    {
+      "threshold": 0.4,
+      "tp": 1389,
+      "fp": 537,
+      "tn": 12203,
+      "fn": 871,
+      "precision": 0.721184,
+      "recall": 0.614602,
+      "f1": 0.663641,
+      "accuracy": 0.906133,
+      "falsePositiveRate": 0.042151
+    },
+    {
+      "threshold": 0.5,
+      "tp": 1372,
+      "fp": 504,
+      "tn": 12236,
+      "fn": 888,
+      "precision": 0.731343,
+      "recall": 0.60708,
+      "f1": 0.663443,
+      "accuracy": 0.9072,
+      "falsePositiveRate": 0.03956
+    },
+    {
+      "threshold": 0.35,
+      "tp": 1393,
+      "fp": 551,
+      "tn": 12189,
+      "fn": 867,
+      "precision": 0.716564,
+      "recall": 0.616372,
+      "f1": 0.662702,
+      "accuracy": 0.905467,
+      "falsePositiveRate": 0.04325
+    },
+    {
+      "threshold": 0.3,
+      "tp": 1399,
+      "fp": 567,
+      "tn": 12173,
+      "fn": 861,
+      "precision": 0.711597,
+      "recall": 0.619027,
+      "f1": 0.662092,
+      "accuracy": 0.9048,
+      "falsePositiveRate": 0.044505
+    },
+    {
+      "threshold": 0.55,
+      "tp": 1352,
+      "fp": 491,
+      "tn": 12249,
+      "fn": 908,
+      "precision": 0.733587,
+      "recall": 0.59823,
+      "f1": 0.65903,
+      "accuracy": 0.906733,
+      "falsePositiveRate": 0.03854
+    },
+    {
+      "threshold": 0.25,
+      "tp": 1416,
+      "fp": 622,
+      "tn": 12118,
+      "fn": 844,
+      "precision": 0.694799,
+      "recall": 0.626549,
+      "f1": 0.658911,
+      "accuracy": 0.902267,
+      "falsePositiveRate": 0.048823
+    },
+    {
+      "threshold": 0.6,
+      "tp": 1276,
+      "fp": 433,
+      "tn": 12307,
+      "fn": 984,
+      "precision": 0.746635,
+      "recall": 0.564602,
+      "f1": 0.642983,
+      "accuracy": 0.905533,
+      "falsePositiveRate": 0.033987
+    }
+  ],
+  "triageConfig": {
+    "approveMaxScore": 40,
+    "declineMinScore": 70
+  },
+  "triageImpact": [
+    {
+      "decisionBand": "APPROVED",
+      "count": 13077,
+      "fraudCount": 871,
+      "fraudRate": 0.066605,
+      "sharePct": 87.18
+    },
+    {
+      "decisionBand": "FLAGGED",
+      "count": 661,
+      "fraudCount": 381,
+      "fraudRate": 0.576399,
+      "sharePct": 4.41
+    },
+    {
+      "decisionBand": "DECLINED",
+      "count": 1262,
+      "fraudCount": 1008,
+      "fraudRate": 0.798732,
+      "sharePct": 8.41
+    }
+  ]
+}

@@ -39,6 +39,26 @@ If needed, change `API Base URL` in the UI (default: `http://localhost:3000/api/
 2. Login and submit transfers with different risk scenarios.
 3. Click `Refresh` or wait for auto-refresh to see status transitions.
 4. Open Email Inbox section to preview rendered flagged/declined templates.
+5. Click a transaction row in `Transaction History` to open `Decision Explainability`:
+   - decision + risk/ML/rule scores
+   - top decision reasons
+   - trigger type (`HIGH_VALUE`, `GEOGRAPHIC_RISK`, `THRESHOLD_BAND`, etc.)
+   - manual review metadata when available
+
+## Grading Script
+
+1. Start with one normal transfer and show it becomes `APPROVED`.
+2. Submit one suspicious transfer and show it becomes `FLAGGED`.
+3. Click the flagged row and show explainability reasons/trigger type.
+4. Use `Decline` button on the flagged transaction and show status becomes `REJECTED`.
+5. Show rendered internal email template for the reviewed/declined case.
+6. Open analytics dashboard (`http://localhost:3008`) and point out:
+   - manual reviews count
+   - approved-after-review vs declined-after-review
+   - average review turnaround
+7. Close with model evaluation artifacts:
+   - run `npm run evaluate:model` in `ml-scoring-service`
+   - show generated `evaluation.md` and `evaluation.json`.
 
 ## Why 10,000 Often Becomes Flagged
 

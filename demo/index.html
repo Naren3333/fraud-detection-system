@@ -164,6 +164,14 @@
       </section>
 
       <section class="panel section-gap">
+        <h3>Decision Explainability</h3>
+        <p class="muted">Real-time reasons from decision-engine (`/api/v1/decisions/:transactionId`).</p>
+        <div id="explainabilityPanel" class="explainability-panel">
+          <p class="muted">Select a transaction row to load explainability details.</p>
+        </div>
+      </section>
+
+      <section class="panel section-gap">
         <h3>Email Inbox (Rendered Flagged/Declined Templates)</h3>
         <p class="muted">Generated from real transaction statuses returned by your transaction-service.</p>
         <input id="emailSearch" type="text" placeholder="Search emails by subject or type">

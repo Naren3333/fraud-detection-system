@@ -1,5 +1,6 @@
 const express = require('express');
 const controller = require('../controllers/reviewController');
+const appealReviewController = require('../controllers/appealReviewController');
 
 const router = express.Router();
 
@@ -71,5 +72,54 @@ router.get('/reviews/:transactionId', controller.getByTransaction.bind(controlle
  *         description: Invalid decision payload
  */
 router.post('/reviews/:transactionId/decision', controller.submitDecision.bind(controller));
+
+/**
+ * @openapi
+ * /api/v1/reviews/appeals/pending:
+ *   get:
+ *     tags: [human-verification-service]
+ *     summary: List pending customer appeals for analyst review
+ *     responses:
+ *       200:
+ *         description: Pending appeals returned
+ */
+router.get('/reviews/appeals/pending', appealReviewController.listPending.bind(appealReviewController));
+
+/**
+ * @openapi
+ * /api/v1/reviews/appeals/{appealId}/resolve:
+ *   post:
+ *     tags: [human-verification-service]
+ *     summary: Submit analyst resolution for an appeal
+ *     parameters:
+ *       - in: path
+ *         name: appealId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [resolution, reviewedBy]
+ *             properties:
+ *               resolution:
+ *                 type: string
+ *                 enum: [UPHOLD, REVERSE]
+ *               reviewedBy:
+ *                 type: string
+ *               notes:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Appeal resolution accepted
+ *       400:
+ *         description: Invalid request
+ *       404:
+ *         description: Appeal not found
+ */
+router.post('/reviews/appeals/:appealId/resolve', appealReviewController.resolve.bind(appealReviewController));
 
 module.exports = router;

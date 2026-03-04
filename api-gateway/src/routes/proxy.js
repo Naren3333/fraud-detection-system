@@ -51,6 +51,13 @@ const serviceRoutes = [
     useTransactionLimiter: false,
     rewriteTo:            '/api/v1/reviews',
   },
+  {
+    pathPrefix:           '/appeals',
+    target:               config.services.appeal,
+    serviceName:          'appeal-service',
+    useTransactionLimiter: false,
+    rewriteTo:            '/api/v1/appeals',
+  },
 ];
 // Handles make proxy handler.
 const makeProxyHandler = (target, serviceName, rewriteTo, pathPrefix) => {

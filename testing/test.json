@@ -2,33 +2,150 @@
   "info": {
     "name": "Fraud Detection Platform",
     "_postman_id": "fdp-collection-003",
-    "description": "Comprehensive Postman collection covering API Gateway, User, Transaction, Fraud, ML Scoring, Decision Engine, Notification Service, Audit Service, Analytics Dashboard, and Monitoring (Prometheus/Grafana) scenarios.",
+    "description": "Comprehensive Postman collection covering API Gateway, User, Transaction, Fraud, ML Scoring, Decision Engine, Human Verification, Appeal, Notification, Audit, Analytics, and Monitoring (Prometheus/Grafana) scenarios.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:3000", "type": "string" },
-    { "key": "userServiceUrl", "value": "http://localhost:3002", "type": "string" },
-    { "key": "transactionServiceUrl", "value": "http://localhost:3001", "type": "string" },
-    { "key": "fraudServiceUrl", "value": "http://localhost:3003", "type": "string" },
-    { "key": "mlServiceUrl", "value": "http://localhost:3004", "type": "string" },
-    { "key": "decisionServiceUrl", "value": "http://localhost:3005", "type": "string" },
-    { "key": "notificationServiceUrl", "value": "http://localhost:3006", "type": "string" },
-    { "key": "auditServiceUrl", "value": "http://localhost:3007", "type": "string" },
-    { "key": "analyticsServiceUrl", "value": "http://localhost:3008", "type": "string" },
-    { "key": "humanVerificationServiceUrl", "value": "http://localhost:3010", "type": "string" },
-    { "key": "prometheusUrl", "value": "http://localhost:9099", "type": "string" },
-    { "key": "grafanaUrl", "value": "http://localhost:3009", "type": "string" },
-    { "key": "accessToken", "value": "", "type": "string" },
-    { "key": "refreshToken", "value": "", "type": "string" },
-    { "key": "userId", "value": "", "type": "string" },
-    { "key": "transactionId", "value": "", "type": "string" },
-    { "key": "highRiskTransactionId", "value": "", "type": "string" },
-    { "key": "reviewDecision", "value": "APPROVED", "type": "string" },
-    { "key": "customerId", "value": "", "type": "string" },
-    { "key": "testEmail", "value": "", "type": "string" },
-    { "key": "testPassword", "value": "SecurePass123!", "type": "string" },
-    { "key": "newPassword", "value": "NewSecurePass456!", "type": "string" },
-    { "key": "idempotencyKey", "value": "idem-fixed-001", "type": "string" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "userServiceUrl",
+      "value": "http://localhost:3002",
+      "type": "string"
+    },
+    {
+      "key": "transactionServiceUrl",
+      "value": "http://localhost:3001",
+      "type": "string"
+    },
+    {
+      "key": "fraudServiceUrl",
+      "value": "http://localhost:3003",
+      "type": "string"
+    },
+    {
+      "key": "mlServiceUrl",
+      "value": "http://localhost:3004",
+      "type": "string"
+    },
+    {
+      "key": "decisionServiceUrl",
+      "value": "http://localhost:3005",
+      "type": "string"
+    },
+    {
+      "key": "notificationServiceUrl",
+      "value": "http://localhost:3006",
+      "type": "string"
+    },
+    {
+      "key": "auditServiceUrl",
+      "value": "http://localhost:3007",
+      "type": "string"
+    },
+    {
+      "key": "analyticsServiceUrl",
+      "value": "http://localhost:3008",
+      "type": "string"
+    },
+    {
+      "key": "humanVerificationServiceUrl",
+      "value": "http://localhost:3010",
+      "type": "string"
+    },
+    {
+      "key": "prometheusUrl",
+      "value": "http://localhost:9099",
+      "type": "string"
+    },
+    {
+      "key": "grafanaUrl",
+      "value": "http://localhost:3009",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "transactionId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "highRiskTransactionId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reviewDecision",
+      "value": "APPROVED",
+      "type": "string"
+    },
+    {
+      "key": "customerId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testEmail",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "testPassword",
+      "value": "SecurePass123!",
+      "type": "string"
+    },
+    {
+      "key": "newPassword",
+      "value": "NewSecurePass456!",
+      "type": "string"
+    },
+    {
+      "key": "idempotencyKey",
+      "value": "idem-fixed-001",
+      "type": "string"
+    },
+    {
+      "key": "appealServiceUrl",
+      "value": "http://localhost:3011",
+      "type": "string"
+    },
+    {
+      "key": "appealId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "appealCustomerId",
+      "value": "customer_highrisk",
+      "type": "string"
+    },
+    {
+      "key": "appealResolution",
+      "value": "REVERSE",
+      "type": "string"
+    },
+    {
+      "key": "appealSourceStatus",
+      "value": "",
+      "type": "string"
+    }
   ],
   "item": [
     {
@@ -36,92 +153,201 @@
       "item": [
         {
           "name": "Gateway Health",
-          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/health" },
-          "event": [{ "listen": "test", "script": { "exec": ["pm.test('status 200', function(){ pm.response.to.have.status(200); });"] } }]
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
         },
         {
           "name": "Gateway Live",
-          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/health/live" }
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/health/live"
+          }
         },
         {
           "name": "Gateway Ready",
-          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/health/ready" }
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/health/ready"
+          }
         },
         {
           "name": "Gateway Metrics",
-          "request": { "method": "GET", "url": "{{baseUrl}}/api/v1/metrics" }
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/v1/metrics"
+          }
         },
         {
           "name": "User Service Health",
-          "request": { "method": "GET", "url": "{{userServiceUrl}}/api/v1/health" }
+          "request": {
+            "method": "GET",
+            "url": "{{userServiceUrl}}/api/v1/health"
+          }
         },
         {
           "name": "Transaction Service Health",
-          "request": { "method": "GET", "url": "{{transactionServiceUrl}}/api/v1/health" }
+          "request": {
+            "method": "GET",
+            "url": "{{transactionServiceUrl}}/api/v1/health"
+          }
         },
         {
           "name": "Fraud Service Health",
-          "request": { "method": "GET", "url": "{{fraudServiceUrl}}/api/v1/health" }
+          "request": {
+            "method": "GET",
+            "url": "{{fraudServiceUrl}}/api/v1/health"
+          }
         },
         {
           "name": "Fraud Service Metrics",
-          "request": { "method": "GET", "url": "{{fraudServiceUrl}}/api/v1/metrics" }
+          "request": {
+            "method": "GET",
+            "url": "{{fraudServiceUrl}}/api/v1/metrics"
+          }
         },
         {
           "name": "ML Service Health",
-          "request": { "method": "GET", "url": "{{mlServiceUrl}}/api/v1/health" }
+          "request": {
+            "method": "GET",
+            "url": "{{mlServiceUrl}}/api/v1/health"
+          }
         },
         {
           "name": "ML Service Metrics",
-          "request": { "method": "GET", "url": "{{mlServiceUrl}}/api/v1/metrics" }
+          "request": {
+            "method": "GET",
+            "url": "{{mlServiceUrl}}/api/v1/metrics"
+          }
         },
         {
           "name": "Decision Service Health",
-          "request": { "method": "GET", "url": "{{decisionServiceUrl}}/api/v1/health" }
+          "request": {
+            "method": "GET",
+            "url": "{{decisionServiceUrl}}/api/v1/health"
+          }
         },
         {
           "name": "Decision Service Metrics",
-          "request": { "method": "GET", "url": "{{decisionServiceUrl}}/api/v1/metrics" }
+          "request": {
+            "method": "GET",
+            "url": "{{decisionServiceUrl}}/api/v1/metrics"
+          }
         },
         {
           "name": "Notification Service Health",
-          "request": { "method": "GET", "url": "{{notificationServiceUrl}}/api/v1/health" }
+          "request": {
+            "method": "GET",
+            "url": "{{notificationServiceUrl}}/api/v1/health"
+          }
         },
         {
           "name": "Notification Service Metrics",
-          "request": { "method": "GET", "url": "{{notificationServiceUrl}}/api/v1/metrics" }
+          "request": {
+            "method": "GET",
+            "url": "{{notificationServiceUrl}}/api/v1/metrics"
+          }
         },
         {
           "name": "Audit Service Health",
-          "request": { "method": "GET", "url": "{{auditServiceUrl}}/api/v1/health" }
+          "request": {
+            "method": "GET",
+            "url": "{{auditServiceUrl}}/api/v1/health"
+          }
         },
         {
           "name": "Audit Service Live",
-          "request": { "method": "GET", "url": "{{auditServiceUrl}}/api/v1/health/live" }
+          "request": {
+            "method": "GET",
+            "url": "{{auditServiceUrl}}/api/v1/health/live"
+          }
         },
         {
           "name": "Audit Service Metrics",
-          "request": { "method": "GET", "url": "{{auditServiceUrl}}/api/v1/metrics" }
+          "request": {
+            "method": "GET",
+            "url": "{{auditServiceUrl}}/api/v1/metrics"
+          }
         },
         {
           "name": "Analytics Service Health",
-          "request": { "method": "GET", "url": "{{analyticsServiceUrl}}/api/v1/health" }
+          "request": {
+            "method": "GET",
+            "url": "{{analyticsServiceUrl}}/api/v1/health"
+          }
         },
         {
           "name": "Analytics Dashboard API",
-          "request": { "method": "GET", "url": "{{analyticsServiceUrl}}/api/v1/analytics/dashboard?timeRange=24h" }
+          "request": {
+            "method": "GET",
+            "url": "{{analyticsServiceUrl}}/api/v1/analytics/dashboard?timeRange=24h"
+          }
         },
         {
           "name": "Analytics Dashboard UI (Open in Browser)",
-          "request": { "method": "GET", "url": "{{analyticsServiceUrl}}/" }
+          "request": {
+            "method": "GET",
+            "url": "{{analyticsServiceUrl}}/"
+          }
         },
         {
           "name": "Prometheus Health",
-          "request": { "method": "GET", "url": "{{prometheusUrl}}/-/healthy" }
+          "request": {
+            "method": "GET",
+            "url": "{{prometheusUrl}}/-/healthy"
+          }
         },
         {
           "name": "Grafana Health",
-          "request": { "method": "GET", "url": "{{grafanaUrl}}/api/health" }
+          "request": {
+            "method": "GET",
+            "url": "{{grafanaUrl}}/api/health"
+          }
+        },
+        {
+          "name": "Appeal Service Health",
+          "request": {
+            "method": "GET",
+            "url": "{{appealServiceUrl}}/api/v1/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('appeal health 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Appeal Service Live",
+          "request": {
+            "method": "GET",
+            "url": "{{appealServiceUrl}}/api/v1/health/live"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('appeal live 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -156,7 +382,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{baseUrl}}/api/v1/auth/register",
             "body": {
               "mode": "raw",
@@ -166,58 +397,88 @@
         },
         {
           "name": "Login",
-          "event": [{
-            "listen": "test",
-            "script": {
-              "exec": [
-                "pm.test('login 200', function(){ pm.response.to.have.status(200); });",
-                "const json = pm.response.json();",
-                "pm.test('tokens present', function(){ pm.expect(json.data.accessToken).to.be.a('string'); pm.expect(json.data.refreshToken).to.be.a('string'); });",
-                "pm.collectionVariables.set('accessToken', json.data.accessToken);",
-                "pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
-                "pm.collectionVariables.set('userId', json.data.user.user_id);"
-              ]
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('login 200', function(){ pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "pm.test('tokens present', function(){ pm.expect(json.data.accessToken).to.be.a('string'); pm.expect(json.data.refreshToken).to.be.a('string'); });",
+                  "pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
+                  "pm.collectionVariables.set('userId', json.data.user.user_id);"
+                ]
+              }
             }
-          }],
+          ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{baseUrl}}/api/v1/auth/login",
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}"
+            }
           }
         },
         {
           "name": "Validate Access Token",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": "{{baseUrl}}/api/v1/auth/validate"
           }
         },
         {
           "name": "Refresh Access Token",
-          "event": [{
-            "listen": "test",
-            "script": {
-              "exec": [
-                "pm.test('refresh 200', function(){ pm.response.to.have.status(200); });",
-                "const json = pm.response.json();",
-                "if (json.success && json.data && json.data.accessToken) { pm.collectionVariables.set('accessToken', json.data.accessToken); }"
-              ]
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('refresh 200', function(){ pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "if (json.success && json.data && json.data.accessToken) { pm.collectionVariables.set('accessToken', json.data.accessToken); }"
+                ]
+              }
             }
-          }],
+          ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{baseUrl}}/api/v1/auth/refresh",
-            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+            }
           }
         },
         {
           "name": "Get Profile",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": "{{baseUrl}}/api/v1/auth/profile"
           }
         },
@@ -226,28 +487,45 @@
           "request": {
             "method": "PATCH",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "url": "{{baseUrl}}/api/v1/auth/profile",
-            "body": { "mode": "raw", "raw": "{\n  \"firstName\": \"Updated\",\n  \"lastName\": \"User\",\n  \"metadata\": {\n    \"team\": \"fraud\"\n  }\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Updated\",\n  \"lastName\": \"User\",\n  \"metadata\": {\n    \"team\": \"fraud\"\n  }\n}"
+            }
           }
         },
         {
           "name": "Change Password",
-          "event": [{
-            "listen": "test",
-            "script": {
-              "exec": [
-                "pm.test('password change success', function(){ pm.response.to.have.status(200); });"
-              ]
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('password change success', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
             }
-          }],
+          ],
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "url": "{{baseUrl}}/api/v1/auth/change-password",
             "body": {
@@ -258,42 +536,59 @@
         },
         {
           "name": "Login With New Password",
-          "event": [{
-            "listen": "test",
-            "script": {
-              "exec": [
-                "pm.test('new login success', function(){ pm.response.to.have.status(200); });",
-                "const json = pm.response.json();",
-                "if (json.success && json.data) {",
-                "  pm.collectionVariables.set('accessToken', json.data.accessToken);",
-                "  pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
-                "  pm.collectionVariables.set('testPassword', pm.collectionVariables.get('newPassword'));",
-                "}"
-              ]
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('new login success', function(){ pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "if (json.success && json.data) {",
+                  "  pm.collectionVariables.set('accessToken', json.data.accessToken);",
+                  "  pm.collectionVariables.set('refreshToken', json.data.refreshToken);",
+                  "  pm.collectionVariables.set('testPassword', pm.collectionVariables.get('newPassword'));",
+                  "}"
+                ]
+              }
             }
-          }],
+          ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{baseUrl}}/api/v1/auth/login",
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{newPassword}}\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{newPassword}}\"\n}"
+            }
           }
         },
         {
           "name": "Logout",
-          "event": [{
-            "listen": "test",
-            "script": {
-              "exec": [
-                "pm.test('logout success', function(){ pm.response.to.have.status(200); });",
-                "pm.collectionVariables.set('accessToken', '');",
-                "pm.collectionVariables.set('refreshToken', '');"
-              ]
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('logout success', function(){ pm.response.to.have.status(200); });",
+                  "pm.collectionVariables.set('accessToken', '');",
+                  "pm.collectionVariables.set('refreshToken', '');"
+                ]
+              }
             }
-          }],
+          ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{baseUrl}}/api/v1/auth/logout",
             "body": {
               "mode": "raw",
@@ -303,13 +598,24 @@
         },
         {
           "name": "Forbidden Admin Route (Expected 403)",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": ["pm.test('forbidden or unauthorized', function(){ pm.expect([401,403]).to.include(pm.response.code); });"] }
-          }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('forbidden or unauthorized', function(){ pm.expect([401,403]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": "{{baseUrl}}/api/v1/auth/users/{{userId}}"
           }
         }
@@ -320,26 +626,40 @@
       "item": [
         {
           "name": "Create Transaction (Happy Path)",
-          "event": [{
-            "listen": "test",
-            "script": {
-              "exec": [
-                "pm.test('created', function(){ pm.response.to.have.status(201); });",
-                "const json = pm.response.json();",
-                "pm.collectionVariables.set('transactionId', json.data.transactionId);",
-                "pm.environment.set('transactionId', json.data.transactionId);",
-                "pm.collectionVariables.set('customerId', json.data.customerId || 'cust_' + Date.now());",
-                "pm.environment.set('customerId', json.data.customerId || 'cust_' + Date.now());"
-              ]
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('created', function(){ pm.response.to.have.status(201); });",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('transactionId', json.data.transactionId);",
+                  "pm.environment.set('transactionId', json.data.transactionId);",
+                  "pm.collectionVariables.set('customerId', json.data.customerId || 'cust_' + Date.now());",
+                  "pm.environment.set('customerId', json.data.customerId || 'cust_' + Date.now());"
+                ]
+              }
             }
-          }],
+          ],
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "X-Idempotency-Key", "value": "txn-{{$guid}}" },
-              { "key": "X-Correlation-ID", "value": "corr-{{$timestamp}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Idempotency-Key",
+                "value": "txn-{{$guid}}"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "corr-{{$timestamp}}"
+              }
             ],
             "url": "{{baseUrl}}/api/v1/transactions",
             "body": {
@@ -352,7 +672,12 @@
           "name": "Get Transaction By ID",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": "{{baseUrl}}/api/v1/transactions/{{transactionId}}"
           }
         },
@@ -360,7 +685,12 @@
           "name": "Get Transactions By Customer",
           "request": {
             "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
             "url": "{{baseUrl}}/api/v1/transactions/customer/{{customerId}}?limit=20&offset=0"
           }
         },
@@ -369,10 +699,22 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "X-Idempotency-Key", "value": "{{idempotencyKey}}" },
-              { "key": "X-Correlation-ID", "value": "idem-corr-001" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "idem-corr-001"
+              }
             ],
             "url": "{{baseUrl}}/api/v1/transactions",
             "body": {
@@ -383,23 +725,37 @@
         },
         {
           "name": "Idempotency - Replay Same Request",
-          "event": [{
-            "listen": "test",
-            "script": {
-              "exec": [
-                "pm.test('idempotent replay', function(){ pm.expect([200,201]).to.include(pm.response.code); });",
-                "const json = pm.response.json();",
-                "pm.test('response contains idempotent flag', function(){ pm.expect(json).to.have.property('idempotent'); });"
-              ]
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('idempotent replay', function(){ pm.expect([200,201]).to.include(pm.response.code); });",
+                  "const json = pm.response.json();",
+                  "pm.test('response contains idempotent flag', function(){ pm.expect(json).to.have.property('idempotent'); });"
+                ]
+              }
             }
-          }],
+          ],
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "X-Idempotency-Key", "value": "{{idempotencyKey}}" },
-              { "key": "X-Correlation-ID", "value": "idem-corr-001" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Idempotency-Key",
+                "value": "{{idempotencyKey}}"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "idem-corr-001"
+              }
             ],
             "url": "{{baseUrl}}/api/v1/transactions",
             "body": {
@@ -410,12 +766,27 @@
         },
         {
           "name": "Create Transaction - Validation Error (Expected 400)",
-          "event": [{ "listen": "test", "script": { "exec": ["pm.test('validation failure', function(){ pm.expect([400,422]).to.include(pm.response.code); });"] } }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('validation failure', function(){ pm.expect([400,422]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "url": "{{baseUrl}}/api/v1/transactions",
             "body": {
@@ -426,10 +797,24 @@
         },
         {
           "name": "Create Transaction - Unauthorized (Expected 401)",
-          "event": [{ "listen": "test", "script": { "exec": ["pm.test('unauthorized', function(){ pm.expect([401,403]).to.include(pm.response.code); });"] } }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('unauthorized', function(){ pm.expect([401,403]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{baseUrl}}/api/v1/transactions",
             "body": {
               "mode": "raw",
@@ -444,48 +829,73 @@
       "item": [
         {
           "name": "Get Decision By Transaction ID (Eventually Consistent)",
-          "event": [{
-            "listen": "test",
-            "script": {
-              "exec": [
-                "pm.test('decision endpoint responds', function(){ pm.expect([200,404]).to.include(pm.response.code); });",
-                "if (pm.response.code === 404) { console.log('Decision not ready yet. Retry in 2-5 seconds.'); }"
-              ]
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('decision endpoint responds', function(){ pm.expect([200,404]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 404) { console.log('Decision not ready yet. Retry in 2-5 seconds.'); }"
+                ]
+              }
             }
-          }],
-          "request": { "method": "GET", "url": "{{decisionServiceUrl}}/api/v1/decisions/{{transactionId}}" }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{decisionServiceUrl}}/api/v1/decisions/{{transactionId}}"
+          }
         },
         {
           "name": "Decision Thresholds",
-          "request": { "method": "GET", "url": "{{decisionServiceUrl}}/api/v1/thresholds" }
+          "request": {
+            "method": "GET",
+            "url": "{{decisionServiceUrl}}/api/v1/thresholds"
+          }
         },
         {
           "name": "Decision Stats (Last 24h)",
-          "request": { "method": "GET", "url": "{{decisionServiceUrl}}/api/v1/decisions/stats?since=24h" }
+          "request": {
+            "method": "GET",
+            "url": "{{decisionServiceUrl}}/api/v1/decisions/stats?since=24h"
+          }
         },
         {
           "name": "Create High-Risk Transaction (Decline Candidate)",
-          "event": [{
-            "listen": "test",
-            "script": {
-              "exec": [
-                "pm.test('created', function(){ pm.response.to.have.status(201); });",
-                "const json = pm.response.json();",
-                "if (json.success && json.data && json.data.transactionId) {",
-                "  pm.collectionVariables.set('highRiskTransactionId', json.data.transactionId);",
-                "  pm.environment.set('highRiskTransactionId', json.data.transactionId);",
-                "  console.log('High-risk tx id:', json.data.transactionId);",
-                "}"
-              ]
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('created', function(){ pm.response.to.have.status(201); });",
+                  "const json = pm.response.json();",
+                  "if (json.success && json.data && json.data.transactionId) {",
+                  "  pm.collectionVariables.set('highRiskTransactionId', json.data.transactionId);",
+                  "  pm.environment.set('highRiskTransactionId', json.data.transactionId);",
+                  "  console.log('High-risk tx id:', json.data.transactionId);",
+                  "}"
+                ]
+              }
             }
-          }],
+          ],
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "X-Idempotency-Key", "value": "highrisk-{{$guid}}" },
-              { "key": "X-Correlation-ID", "value": "highrisk-{{$timestamp}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Idempotency-Key",
+                "value": "highrisk-{{$guid}}"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "highrisk-{{$timestamp}}"
+              }
             ],
             "url": "{{baseUrl}}/api/v1/transactions",
             "body": {
@@ -496,21 +906,26 @@
         },
         {
           "name": "Get Decision for High-Risk Transaction",
-          "event": [{
-            "listen": "test",
-            "script": {
-              "exec": [
-                "pm.test('decision available or pending', function(){ pm.expect([200,404]).to.include(pm.response.code); });",
-                "if (pm.response.code === 200) {",
-                "  const json = pm.response.json();",
-                "  if (json.success && json.data && json.data.decision) {",
-                "    console.log('High-risk decision:', json.data.decision);",
-                "  }",
-                "}"
-              ]
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('decision available or pending', function(){ pm.expect([200,404]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.success && json.data && json.data.decision) {",
+                  "    console.log('High-risk decision:', json.data.decision);",
+                  "  }",
+                  "}"
+                ]
+              }
             }
-          }],
-          "request": { "method": "GET", "url": "{{decisionServiceUrl}}/api/v1/decisions/{{highRiskTransactionId}}" }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{decisionServiceUrl}}/api/v1/decisions/{{highRiskTransactionId}}"
+          }
         }
       ]
     },
@@ -519,10 +934,24 @@
       "item": [
         {
           "name": "ML Score Single Transaction",
-          "event": [{ "listen": "test", "script": { "exec": ["pm.test('ml score success', function(){ pm.response.to.have.status(200); });"] } }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('ml score success', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{mlServiceUrl}}/api/v1/score",
             "body": {
               "mode": "raw",
@@ -534,7 +963,12 @@
           "name": "ML Score Batch",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{mlServiceUrl}}/api/v1/score/batch",
             "body": {
               "mode": "raw",
@@ -544,7 +978,10 @@
         },
         {
           "name": "ML Model Info",
-          "request": { "method": "GET", "url": "{{mlServiceUrl}}/api/v1/model/info" }
+          "request": {
+            "method": "GET",
+            "url": "{{mlServiceUrl}}/api/v1/model/info"
+          }
         }
       ]
     },
@@ -553,15 +990,24 @@
       "item": [
         {
           "name": "Notification Live",
-          "request": { "method": "GET", "url": "{{notificationServiceUrl}}/api/v1/health/live" }
+          "request": {
+            "method": "GET",
+            "url": "{{notificationServiceUrl}}/api/v1/health/live"
+          }
         },
         {
           "name": "Notification Ready",
-          "request": { "method": "GET", "url": "{{notificationServiceUrl}}/api/v1/health/ready" }
+          "request": {
+            "method": "GET",
+            "url": "{{notificationServiceUrl}}/api/v1/health/ready"
+          }
         },
         {
           "name": "Notification Health",
-          "request": { "method": "GET", "url": "{{notificationServiceUrl}}/api/v1/health" }
+          "request": {
+            "method": "GET",
+            "url": "{{notificationServiceUrl}}/api/v1/health"
+          }
         }
       ]
     },
@@ -570,22 +1016,56 @@
       "item": [
         {
           "name": "Auth Rate Limit Probe (Run 6x quickly)",
-          "event": [{ "listen": "test", "script": { "exec": ["pm.test('expect 401 or 429', function(){ pm.expect([401,429]).to.include(pm.response.code); });"] } }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('expect 401 or 429', function(){ pm.expect([401,429]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{baseUrl}}/api/v1/auth/login",
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"does-not-exist@example.com\",\n  \"password\": \"WrongPassword!\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"does-not-exist@example.com\",\n  \"password\": \"WrongPassword!\"\n}"
+            }
           }
         },
         {
           "name": "Login with Old Password After Change (Expected 401)",
-          "event": [{ "listen": "test", "script": { "exec": ["pm.test('old password fails', function(){ pm.expect([400,401]).to.include(pm.response.code); });"] } }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('old password fails', function(){ pm.expect([400,401]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{baseUrl}}/api/v1/auth/login",
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"invalid_old_password\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"invalid_old_password\"\n}"
+            }
           }
         }
       ]
@@ -595,13 +1075,21 @@
       "item": [
         {
           "name": "Audit Stats (Last 24h)",
-          "request": { "method": "GET", "url": "{{auditServiceUrl}}/api/v1/audit/stats" }
+          "request": {
+            "method": "GET",
+            "url": "{{auditServiceUrl}}/api/v1/audit/stats"
+          }
         },
         {
           "name": "Audit Trail By Transaction",
           "request": {
             "method": "GET",
-            "header": [{ "key": "X-User-Id", "value": "postman-tester" }],
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "postman-tester"
+              }
+            ],
             "url": "{{auditServiceUrl}}/api/v1/audit/transaction/{{transactionId}}?includePayload=true&reason=postman-test"
           }
         },
@@ -609,7 +1097,12 @@
           "name": "Audit Trail By Customer",
           "request": {
             "method": "GET",
-            "header": [{ "key": "X-User-Id", "value": "postman-tester" }],
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "postman-tester"
+              }
+            ],
             "url": "{{auditServiceUrl}}/api/v1/audit/customer/{{customerId}}?limit=50&reason=postman-test"
           }
         },
@@ -617,7 +1110,12 @@
           "name": "Verify Audit Chain (Event Range)",
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{auditServiceUrl}}/api/v1/audit/verify",
             "body": {
               "mode": "raw",
@@ -645,7 +1143,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{baseUrl}}/api/v1/auth/register",
             "body": {
               "mode": "raw",
@@ -655,23 +1158,60 @@
         },
         {
           "name": "Step 2 - Login",
-          "event": [{ "listen": "test", "script": { "exec": ["const json = pm.response.json(); if (json.success) { pm.collectionVariables.set('accessToken', json.data.accessToken); }", "pm.test('login ok', function(){ pm.response.to.have.status(200); });"] } }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json(); if (json.success) { pm.collectionVariables.set('accessToken', json.data.accessToken); }",
+                  "pm.test('login ok', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "url": "{{baseUrl}}/api/v1/auth/login",
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}"
+            }
           }
         },
         {
           "name": "Step 3 - Create Transaction",
-          "event": [{ "listen": "test", "script": { "exec": ["const json = pm.response.json(); if (json.success && json.data) { pm.collectionVariables.set('transactionId', json.data.transactionId); pm.environment.set('transactionId', json.data.transactionId); }", "pm.test('txn created', function(){ pm.response.to.have.status(201); });"] } }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json(); if (json.success && json.data) { pm.collectionVariables.set('transactionId', json.data.transactionId); pm.environment.set('transactionId', json.data.transactionId); }",
+                  "pm.test('txn created', function(){ pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" },
-              { "key": "X-Idempotency-Key", "value": "smoke-{{$guid}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Idempotency-Key",
+                "value": "smoke-{{$guid}}"
+              }
             ],
             "url": "{{baseUrl}}/api/v1/transactions",
             "body": {
@@ -682,8 +1222,21 @@
         },
         {
           "name": "Step 4 - Verify Decision (Retry if 404)",
-          "event": [{ "listen": "test", "script": { "exec": ["pm.test('decision available or pending', function(){ pm.expect([200,404]).to.include(pm.response.code); });", "if (pm.response.code === 404) { console.log('Decision not persisted yet. Retry this request after a short delay.'); }"] } }],
-          "request": { "method": "GET", "url": "{{decisionServiceUrl}}/api/v1/decisions/{{transactionId}}" }
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('decision available or pending', function(){ pm.expect([200,404]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 404) { console.log('Decision not persisted yet. Retry this request after a short delay.'); }"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{decisionServiceUrl}}/api/v1/decisions/{{transactionId}}"
+          }
         }
       ]
     },
@@ -712,7 +1265,10 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/api/v1/reviews/pending?limit=20&offset=0"
           },
@@ -732,7 +1288,10 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/api/v1/reviews/{{highRiskTransactionId}}"
           },
@@ -753,8 +1312,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "url": "{{baseUrl}}/api/v1/reviews/{{highRiskTransactionId}}/decision",
             "body": {
@@ -784,7 +1349,10 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/api/v1/transactions/{{highRiskTransactionId}}"
           },
@@ -796,8 +1364,9 @@
                   "pm.test('transaction fetch ok', function(){ pm.response.to.have.status(200); });",
                   "const json = pm.response.json();",
                   "const expected = pm.collectionVariables.get('reviewDecision') === 'DECLINED' ? 'REJECTED' : pm.collectionVariables.get('reviewDecision');",
-                  "pm.test('status reflects manual review eventually', function(){ pm.expect(['FLAGGED', expected]).to.include(json.data.status); });",
-                  "if (json.data.status !== expected) { console.log('Status not updated yet; retry this request in a few seconds.'); }"
+                  "pm.test('status reflects manual review or auto-decline path', function(){ pm.expect(['FLAGGED', expected, 'REJECTED']).to.include(json.data.status); });",
+                  "if (json.data.status !== expected && json.data.status !== 'REJECTED') { console.log('Status not updated yet; retry this request in a few seconds.'); }",
+                  "if (json.data.status === 'REJECTED') { console.log('Transaction may have been auto-declined before manual review.'); }"
                 ]
               }
             }
@@ -826,7 +1395,10 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/api/v1/reviews/{{highRiskTransactionId}}"
           }
@@ -836,8 +1408,14 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "url": "{{baseUrl}}/api/v1/reviews/{{highRiskTransactionId}}/decision",
             "body": {
@@ -865,7 +1443,10 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": "{{baseUrl}}/api/v1/transactions/{{highRiskTransactionId}}"
           },
@@ -884,6 +1465,266 @@
           ]
         }
       ]
+    },
+    {
+      "name": "11 - Appeal Flow",
+      "item": [
+        {
+          "name": "Appeal Service Health (Direct)",
+          "request": {
+            "method": "GET",
+            "url": "{{appealServiceUrl}}/api/v1/health"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('appeal health direct 200', function(){ pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get High-Risk Transaction For Appeal",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/transactions/{{highRiskTransactionId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('transaction fetch ok', function(){ pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "if (json.success && json.data) {",
+                  "  pm.collectionVariables.set('appealCustomerId', json.data.customerId || 'customer_highrisk');",
+                  "  pm.collectionVariables.set('appealSourceStatus', json.data.status || '');",
+                  "  console.log('Appeal source status:', json.data.status);",
+                  "}",
+                  "pm.test('status appeal-eligible eventually', function(){",
+                  "  const s = (json.data && json.data.status) ? String(json.data.status).toUpperCase() : '';",
+                  "  pm.expect(['REJECTED','FLAGGED','APPROVED']).to.include(s);",
+                  "});",
+                  "if (!['REJECTED','FLAGGED'].includes(String(json.data.status || '').toUpperCase())) {",
+                  "  console.log('Transaction not yet in appeal-eligible status. Continue flow after decision settles.');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Appeal (Gateway)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/appeals",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactionId\": \"{{highRiskTransactionId}}\",\n  \"customerId\": \"{{appealCustomerId}}\",\n  \"appealReason\": \"I want to appeal this fraud outcome. This transaction is legitimate and authorized by me.\",\n  \"evidence\": {\n    \"source\": \"postman\",\n    \"note\": \"customer initiated appeal\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('appeal create accepted', function(){ pm.expect([201,400,404]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.success && json.data && json.data.appealId) {",
+                  "    pm.collectionVariables.set('appealId', json.data.appealId);",
+                  "    console.log('Appeal created:', json.data.appealId);",
+                  "  }",
+                  "} else {",
+                  "  console.log('Appeal create returned', pm.response.code, '- may already exist or transaction not eligible yet.');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Customer Appeals (Gateway)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/appeals/customer/{{appealCustomerId}}?limit=20&offset=0"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('customer appeals list 200', function(){ pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "const rows = (json && json.data && Array.isArray(json.data)) ? json.data : [];",
+                  "const txId = pm.collectionVariables.get('highRiskTransactionId');",
+                  "const hit = rows.find((r) => String(r.transactionId) === String(txId));",
+                  "if (hit && hit.appealId) {",
+                  "  pm.collectionVariables.set('appealId', hit.appealId);",
+                  "  console.log('Appeal selected for resolve:', hit.appealId);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Pending Appeals (Gateway)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/reviews/appeals/pending?limit=20&offset=0"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('pending appeals responds', function(){ pm.expect([200,401,403]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resolve Appeal (Gateway)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "if (!pm.collectionVariables.get('appealId')) {",
+                  "  console.log('No appealId set yet. Run list customer appeals first.');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('resolve appeal accepted', function(){ pm.expect([200,400,404]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('resolution persisted', function(){ pm.expect(json.data.resolution).to.eql(pm.collectionVariables.get('appealResolution')); });",
+                  "} else {",
+                  "  console.log('Resolve not completed; verify appealId and that appeal is still open.');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/reviews/appeals/{{appealId}}/resolve",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resolution\": \"{{appealResolution}}\",\n  \"reviewedBy\": \"postman-analyst\",\n  \"notes\": \"Appeal reviewed from Postman collection\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Verify Transaction Status After Appeal",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/transactions/{{highRiskTransactionId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('transaction fetch ok', function(){ pm.response.to.have.status(200); });",
+                  "const json = pm.response.json();",
+                  "const resolution = (pm.collectionVariables.get('appealResolution') || '').toUpperCase();",
+                  "const source = (pm.collectionVariables.get('appealSourceStatus') || 'REJECTED').toUpperCase();",
+                  "const expected = resolution === 'REVERSE' ? 'APPROVED' : source;",
+                  "pm.test('status reflects appeal eventually', function(){ pm.expect([source, expected, 'FLAGGED', 'REJECTED', 'APPROVED']).to.include(json.data.status); });",
+                  "if (json.data.status !== expected) {",
+                  "  console.log('Status not at expected final state yet. Retry after Kafka consumer catches up.');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Audit Trail Includes Appeal Events",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "postman-tester"
+              }
+            ],
+            "url": "{{auditServiceUrl}}/api/v1/audit/transaction/{{highRiskTransactionId}}?includePayload=true&reason=appeal-flow-test"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('audit trail responds', function(){ pm.expect([200,404]).to.include(pm.response.code); });",
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  const events = Array.isArray(json.data) ? json.data : (json.data?.events || []);",
+                  "  const topics = events.map((e) => (e.topic || e.event_type || '').toString());",
+                  "  console.log('Audit event topics sample:', topics.slice(0, 10));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }
+

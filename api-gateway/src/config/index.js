@@ -38,6 +38,7 @@ module.exports = {
     audit: process.env.AUDIT_SERVICE_URL || 'http://audit-service:3007',
     analytics: process.env.ANALYTICS_SERVICE_URL || 'http://analytics-service:3008',
     humanVerification: process.env.HUMAN_VERIFICATION_SERVICE_URL || 'http://human-verification-service:3010',
+    appeal: process.env.APPEAL_SERVICE_URL || 'http://appeal-service:3011',
   },
 
   circuitBreaker: {

@@ -31,6 +31,11 @@ const services = [
     url: 'http://human-verification-service:3010/api-docs.json',
     includePrefixes: ['/api/v1/reviews'],
   },
+  {
+    name: 'appeal-service',
+    url: 'http://appeal-service:3011/api-docs.json',
+    includePrefixes: ['/api/v1/appeals'],
+  },
 ];
 
 const gatewayPaths = {

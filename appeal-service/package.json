@@ -1,7 +1,7 @@
 {
-  "name": "fraud-detection-human-verification-service",
+  "name": "fraud-detection-appeal-service",
   "version": "1.0.0",
-  "description": "Manual review service for flagged transactions",
+  "description": "Customer appeal service for disputed fraud outcomes",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
@@ -10,8 +10,8 @@
   },
   "keywords": [
     "fraud-detection",
-    "manual-review",
-    "human-verification"
+    "appeals",
+    "customer-disputes"
   ],
   "author": "ESD G05 T05",
   "license": "SMU",
@@ -21,7 +21,7 @@
     "@opentelemetry/resources": "^2.5.1",
     "@opentelemetry/sdk-node": "^0.212.0",
     "@opentelemetry/semantic-conventions": "^1.40.0",
-    "axios": "^1.13.2",
+    "axios": "^1.7.9",
     "compression": "^1.7.4",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",

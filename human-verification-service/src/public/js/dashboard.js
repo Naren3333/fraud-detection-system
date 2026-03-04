@@ -1,14 +1,19 @@
 const reviewRows = document.getElementById('reviewRows');
+const appealRows = document.getElementById('appealRows');
 const refreshBtn = document.getElementById('refreshBtn');
 const reviewerInput = document.getElementById('reviewerInput');
 const filterInput = document.getElementById('filterInput');
 const clearFilterBtn = document.getElementById('clearFilterBtn');
 const autoRefreshInput = document.getElementById('autoRefreshInput');
 const rowTemplate = document.getElementById('rowTemplate');
+const appealRowTemplate = document.getElementById('appealRowTemplate');
 const statusFilterGroup = document.getElementById('statusFilterGroup');
 const statusFilterButtons = statusFilterGroup ? [...statusFilterGroup.querySelectorAll('[data-queue-filter]')] : [];
+const appealStatusFilterGroup = document.getElementById('appealStatusFilterGroup');
+const appealStatusFilterButtons = appealStatusFilterGroup ? [...appealStatusFilterGroup.querySelectorAll('[data-appeal-filter]')] : [];
 
-const pendingCount = document.getElementById('pendingCount');
+const pendingReviewCount = document.getElementById('pendingReviewCount');
+const pendingAppealCount = document.getElementById('pendingAppealCount');
 const visibleCount = document.getElementById('visibleCount');
 const dataAvailability = document.getElementById('dataAvailability');
 const dataHint = document.getElementById('dataHint');
@@ -18,9 +23,10 @@ const API_BASE = '/api/v1/reviews';
 const REFRESH_INTERVAL_MS = 15000;
 
 let latestReviews = [];
+let latestAppeals = [];
 let poller = null;
 let activeQueueFilter = 'ALL';
-
+let activeAppealFilter = 'ALL';
 
 const setStatus = (message, isError = false) => {
   if (isError) {
@@ -28,13 +34,14 @@ const setStatus = (message, isError = false) => {
   }
 };
 
-const updateDataStats = (totalCount, visibleRows) => {
-  pendingCount.textContent = totalCount;
-  visibleCount.textContent = visibleRows;
+const updateDataStats = (reviewCount, appealCount, visibleReviewRows) => {
+  pendingReviewCount.textContent = reviewCount;
+  pendingAppealCount.textContent = appealCount;
+  visibleCount.textContent = visibleReviewRows;
 
-  if (totalCount > 0) {
+  if (reviewCount > 0 || appealCount > 0) {
     dataAvailability.textContent = 'YES';
-    dataHint.textContent = `${totalCount} item(s) ready for review`;
+    dataHint.textContent = `${reviewCount} review(s), ${appealCount} appeal(s) ready`;
   } else {
     dataAvailability.textContent = 'NO';
     dataHint.textContent = 'Waiting for pending items';
@@ -50,6 +57,25 @@ const updateQueueFilterUI = () => {
   statusFilterButtons.forEach((button) => {
     button.classList.toggle('active', button.dataset.queueFilter === activeQueueFilter);
   });
+};
+
+const updateAppealFilterUI = () => {
+  appealStatusFilterButtons.forEach((button) => {
+    button.classList.toggle('active', button.dataset.appealFilter === activeAppealFilter);
+  });
+};
+
+const normalizeStatus = (status) => String(status || '').trim().toUpperCase().replace(/\s+/g, '_');
+
+const toTitleCase = (status) => normalizeStatus(status).split('_')
+  .filter(Boolean)
+  .map((token) => token.charAt(0) + token.slice(1).toLowerCase())
+  .join(' ');
+
+const renderStatusPill = (status) => {
+  const normalized = normalizeStatus(status) || 'UNKNOWN';
+  const css = normalized.toLowerCase().replace(/_/g, '-');
+  return `<span class="status-pill status-${css}">${toTitleCase(normalized)}</span>`;
 };
 
 const parseAmount = (row) => {
@@ -78,8 +104,31 @@ const mapRow = (row) => ({
     .toLowerCase(),
 });
 
+const mapAppealRow = (row) => ({
+  appealId: row.appealId,
+  transactionId: row.transactionId || '-',
+  customerId: row.customerId || '-',
+  sourceTransactionStatus: row.sourceTransactionStatus || '-',
+  appealReason: row.appealReason || '-',
+  currentStatus: row.currentStatus || 'OPEN',
+  searchable: [
+    row.appealId,
+    row.transactionId,
+    row.customerId,
+    row.sourceTransactionStatus,
+    row.appealReason,
+    row.currentStatus,
+  ].filter(Boolean).join(' ').toLowerCase(),
+});
+
 const disableRowButtons = (row, disabled) => {
   row.querySelectorAll('[data-decision]').forEach((button) => {
+    button.disabled = disabled;
+  });
+};
+
+const disableAppealButtons = (row, disabled) => {
+  row.querySelectorAll('[data-resolution]').forEach((button) => {
     button.disabled = disabled;
   });
 };
@@ -106,7 +155,32 @@ const submitDecision = async ({ transactionId, decision, notes }) => {
     throw new Error(payload.error || `Failed with status ${response.status}`);
   }
 
-  await loadPendingReviews();
+  await refreshAllQueues();
+};
+
+const submitAppealResolution = async ({ appealId, resolution, notes }) => {
+  const reviewedBy = reviewerInput.value.trim();
+  if (!reviewedBy) {
+    setStatus('Please enter reviewer name before resolving appeals.', true);
+    return;
+  }
+
+  const response = await fetch(`${API_BASE}/appeals/${encodeURIComponent(appealId)}/resolve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      resolution,
+      reviewedBy,
+      notes: notes || `Appeal resolved from dashboard at ${new Date().toISOString()}`,
+    }),
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({ error: 'Unknown error' }));
+    throw new Error(payload.error || `Failed with status ${response.status}`);
+  }
+
+  await refreshAllQueues();
 };
 
 const buildRow = (review) => {
@@ -120,7 +194,7 @@ const buildRow = (review) => {
   row.querySelector('[data-col="amount"]').textContent = mapped.amount;
   row.querySelector('[data-col="riskScore"]').textContent = mapped.riskScore;
   row.querySelector('[data-col="reason"]').textContent = mapped.reason;
-  row.querySelector('[data-col="queueStatus"]').textContent = mapped.queueStatus;
+  row.querySelector('[data-col="queueStatus"]').innerHTML = renderStatusPill(mapped.queueStatus);
 
   const notesInput = row.querySelector('[data-input="notes"]');
 
@@ -144,6 +218,40 @@ const buildRow = (review) => {
   return fragment;
 };
 
+const buildAppealRow = (appeal) => {
+  const mapped = mapAppealRow(appeal);
+  const fragment = appealRowTemplate.content.cloneNode(true);
+  const row = fragment.querySelector('tr');
+
+  row.querySelector('[data-col="appealId"]').textContent = mapped.appealId;
+  row.querySelector('[data-col="transactionId"]').textContent = mapped.transactionId;
+  row.querySelector('[data-col="customerId"]').textContent = mapped.customerId;
+  row.querySelector('[data-col="sourceTransactionStatus"]').innerHTML = renderStatusPill(mapped.sourceTransactionStatus);
+  row.querySelector('[data-col="appealReason"]').textContent = mapped.appealReason;
+  row.querySelector('[data-col="currentStatus"]').innerHTML = renderStatusPill(mapped.currentStatus);
+
+  const notesInput = row.querySelector('[data-input="notes"]');
+
+  row.querySelectorAll('[data-resolution]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      disableAppealButtons(row, true);
+      try {
+        await submitAppealResolution({
+          appealId: mapped.appealId,
+          resolution: button.dataset.resolution,
+          notes: notesInput.value.trim(),
+        });
+      } catch (error) {
+        setStatus(error.message, true);
+      } finally {
+        disableAppealButtons(row, false);
+      }
+    });
+  });
+
+  return fragment;
+};
+
 const renderRows = (reviews) => {
   reviewRows.innerHTML = '';
 
@@ -156,32 +264,55 @@ const renderRows = (reviews) => {
       </td>
     `;
     reviewRows.appendChild(row);
-    updateDataStats(latestReviews.length, 0);
+    updateDataStats(latestReviews.length, latestAppeals.length, 0);
     return;
   }
 
   reviews.forEach((review) => reviewRows.appendChild(buildRow(review)));
-  updateDataStats(latestReviews.length, reviews.length);
+  updateDataStats(latestReviews.length, latestAppeals.length, reviews.length);
+};
+
+const renderAppealRows = (appeals) => {
+  appealRows.innerHTML = '';
+
+  if (!appeals.length) {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td colspan="8" class="empty-state-cell">
+        <div class="status-line">Loaded ${latestAppeals.length} pending appeal(s).</div>
+        <div class="empty-line">No pending appeals right now.</div>
+      </td>
+    `;
+    appealRows.appendChild(row);
+    return;
+  }
+
+  appeals.forEach((appeal) => appealRows.appendChild(buildAppealRow(appeal)));
 };
 
 const applyFilters = () => {
   const keyword = filterInput.value.trim().toLowerCase();
   updateFilterUI();
   updateQueueFilterUI();
+  updateAppealFilterUI();
 
-  const filtered = latestReviews.filter((row) => {
+  const filteredReviews = latestReviews.filter((row) => {
     const mapped = mapRow(row);
     const matchesKeyword = !keyword || mapped.searchable.includes(keyword);
     const matchesStatus = activeQueueFilter === 'ALL' || mapped.queueStatus === activeQueueFilter;
     return matchesKeyword && matchesStatus;
   });
 
-  renderRows(filtered);
-};
+  const filteredAppeals = latestAppeals.filter((row) => {
+    const mapped = mapAppealRow(row);
+    const matchesKeyword = !keyword || mapped.searchable.includes(keyword);
+    const matchesStatus = activeAppealFilter === 'ALL' || normalizeStatus(mapped.currentStatus) === activeAppealFilter;
+    return matchesKeyword && matchesStatus;
+  });
 
-reviewerInput.addEventListener('input', () => {
-  activeReviewer.textContent = reviewerInput.value.trim() || 'Not set';
-});
+  renderRows(filteredReviews);
+  renderAppealRows(filteredAppeals);
+};
 
 const loadPendingReviews = async () => {
   const response = await fetch(`${API_BASE}/pending?limit=50&offset=0`);
@@ -192,6 +323,21 @@ const loadPendingReviews = async () => {
 
   const payload = await response.json();
   latestReviews = payload?.data || [];
+};
+
+const loadPendingAppeals = async () => {
+  const response = await fetch(`${API_BASE}/appeals/pending?limit=50&offset=0`);
+
+  if (!response.ok) {
+    throw new Error(`Unable to load appeals (status ${response.status})`);
+  }
+
+  const payload = await response.json();
+  latestAppeals = payload?.data || [];
+};
+
+const refreshAllQueues = async () => {
+  await Promise.all([loadPendingReviews(), loadPendingAppeals()]);
   applyFilters();
 };
 
@@ -201,7 +347,7 @@ const startPolling = () => {
 
   poller = setInterval(async () => {
     try {
-      await loadPendingReviews();
+      await refreshAllQueues();
     } catch (error) {
       setStatus(error.message, true);
     }
@@ -211,7 +357,7 @@ const startPolling = () => {
 refreshBtn.addEventListener('click', async () => {
   activeReviewer.textContent = reviewerInput.value.trim() || 'Not set';
   try {
-    await loadPendingReviews();
+    await refreshAllQueues();
   } catch (error) {
     setStatus(error.message, true);
   }
@@ -232,6 +378,13 @@ statusFilterButtons.forEach((button) => {
   });
 });
 
+appealStatusFilterButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    activeAppealFilter = button.dataset.appealFilter || 'ALL';
+    applyFilters();
+  });
+});
+
 reviewerInput.addEventListener('input', () => {
   activeReviewer.textContent = reviewerInput.value.trim() || 'Not set';
 });
@@ -239,7 +392,8 @@ reviewerInput.addEventListener('input', () => {
 activeReviewer.textContent = reviewerInput.value.trim() || 'Not set';
 updateFilterUI();
 updateQueueFilterUI();
-loadPendingReviews()
+updateAppealFilterUI();
+refreshAllQueues()
   .then(startPolling)
   .catch((error) => {
     setStatus(error.message, true);

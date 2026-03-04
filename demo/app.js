@@ -5,6 +5,7 @@ const state = {
   session: null,
   user: null,
   transactions: [],
+  appeals: [],
   decisionByTransaction: {},
   selectedTransactionId: null,
   poller: null,
@@ -23,6 +24,7 @@ const apiBaseInput = document.getElementById("apiBaseInput");
 const authStatus = document.getElementById("authStatus");
 const apiStatus = document.getElementById("apiStatus");
 const transferStatus = document.getElementById("transferStatus");
+const appealStatus = document.getElementById("appealStatus");
 const profileStatus = document.getElementById("profileStatus");
 const profileMeta = document.getElementById("profileMeta");
 
@@ -36,6 +38,7 @@ const profileLastName = document.getElementById("profileLastName");
 const profilePhone = document.getElementById("profilePhone");
 
 const transactionRows = document.getElementById("transactionRows");
+const appealRows = document.getElementById("appealRows");
 const explainabilityPanel = document.getElementById("explainabilityPanel");
 const mailList = document.getElementById("mailList");
 const mailPreview = document.getElementById("mailPreview");
@@ -101,6 +104,7 @@ function clearSession() {
   state.session = null;
   state.user = null;
   state.transactions = [];
+  state.appeals = [];
   state.decisionByTransaction = {};
   state.selectedTransactionId = null;
   localStorage.removeItem(SESSION_KEY);
@@ -249,9 +253,12 @@ function renderTransactions(transactions) {
       const merchant = tx.merchantId || tx.merchant_id || "-";
       const css = statusClass(tx.status);
       const status = String(tx.status || "").toUpperCase();
-      const action = status === "FLAGGED"
-        ? `<button class="inline-btn decline-btn" data-id="${tx.id}">Decline</button>`
-        : "-";
+      let action = "-";
+      if (status === "FLAGGED") {
+        action = `<button class="inline-btn decline-btn" data-id="${tx.id}">Decline</button>`;
+      } else if (status === "REJECTED") {
+        action = `<button class="inline-btn appeal-btn" data-id="${tx.id}">Appeal</button>`;
+      }
       return `<tr data-tx-id="${tx.id}">
         <td>${formatDate(date)}</td>
         <td><code>${tx.id}</code></td>
@@ -281,6 +288,37 @@ function renderTransactions(transactions) {
         await loadTransactions();
       } catch (error) {
         setLineStatus(transferStatus, `Failed manual decline for ${txId}: ${error.message}`, true);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+
+  transactionRows.querySelectorAll(".appeal-btn").forEach((btn) => {
+    btn.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      const txId = btn.dataset.id;
+      const reason = prompt("Appeal reason (min 10 chars):", "I believe this transaction was legitimate.");
+      if (!reason) return;
+
+      try {
+        btn.disabled = true;
+        await apiRequest("/appeals", {
+          method: "POST",
+          body: {
+            transactionId: txId,
+            customerId: state.user?.id,
+            appealReason: reason.trim(),
+            evidence: {
+              source: "demo-ui",
+              submittedAt: new Date().toISOString(),
+            },
+          },
+        });
+        setLineStatus(appealStatus, `Appeal submitted for transaction ${txId}.`);
+        await refreshDashboardData();
+      } catch (error) {
+        setLineStatus(appealStatus, `Failed to submit appeal for ${txId}: ${error.message}`, true);
       } finally {
         btn.disabled = false;
       }
@@ -656,6 +694,67 @@ function renderEmails(transactions, userId) {
   });
 }
 
+function renderAppeals(appeals) {
+  if (!appeals.length) {
+    appealRows.innerHTML = "<tr><td colspan='6'>No appeals submitted yet.</td></tr>";
+    return;
+  }
+
+  appealRows.innerHTML = appeals
+    .map((appeal) => {
+      const createdAt = appeal.createdAt || appeal.created_at;
+      const status = String(appeal.currentStatus || appeal.current_status || "-");
+      const resolution = appeal.resolution || "-";
+      const canResolve = status === "OPEN" || status === "UNDER_REVIEW";
+      const action = canResolve
+        ? `<button class="inline-btn appeal-uphold-btn" data-id="${appeal.appealId || appeal.appeal_id}">Uphold</button>
+           <button class="inline-btn appeal-reverse-btn" data-id="${appeal.appealId || appeal.appeal_id}">Reverse</button>`
+        : "-";
+
+      return `<tr>
+        <td>${formatDate(createdAt)}</td>
+        <td><code>${appeal.appealId || appeal.appeal_id}</code></td>
+        <td><code>${appeal.transactionId || appeal.transaction_id}</code></td>
+        <td>${status}</td>
+        <td>${resolution}</td>
+        <td>${action}</td>
+      </tr>`;
+    })
+    .join("");
+
+  appealRows.querySelectorAll(".appeal-uphold-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      await resolveAppealFromDemo(btn.dataset.id, "UPHOLD", btn);
+    });
+  });
+
+  appealRows.querySelectorAll(".appeal-reverse-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      await resolveAppealFromDemo(btn.dataset.id, "REVERSE", btn);
+    });
+  });
+}
+
+async function resolveAppealFromDemo(appealId, resolution, buttonNode) {
+  try {
+    if (buttonNode) buttonNode.disabled = true;
+    await apiRequest(`/reviews/appeals/${encodeURIComponent(appealId)}/resolve`, {
+      method: "POST",
+      body: {
+        resolution,
+        reviewedBy: `demo-analyst-${(state.user?.id || "analyst").slice(0, 10)}`,
+        notes: `Resolved ${resolution} from demo UI`,
+      },
+    });
+    setLineStatus(appealStatus, `Appeal ${appealId} resolved as ${resolution}.`);
+    await refreshDashboardData();
+  } catch (error) {
+    setLineStatus(appealStatus, `Failed resolving appeal ${appealId}: ${error.message}`, true);
+  } finally {
+    if (buttonNode) buttonNode.disabled = false;
+  }
+}
+
 function showAuth() {
   dashboardView.classList.add("hidden");
   authView.classList.remove("hidden");
@@ -762,10 +861,21 @@ async function loadTransactions() {
   renderEmails(transactions, userId);
 }
 
+async function loadAppeals() {
+  const userId = state.user.id;
+  const payload = await apiRequest(`/appeals/customer/${encodeURIComponent(userId)}?limit=50`);
+  const appeals = payload.data || [];
+  state.appeals = appeals;
+  renderAppeals(appeals);
+}
+
 async function refreshDashboardData() {
   try {
     await loadProfile();
-    await loadTransactions();
+    await Promise.all([
+      loadTransactions(),
+      loadAppeals(),
+    ]);
   } catch (error) {
     setLineStatus(apiStatus, error.message, true);
   }
@@ -773,7 +883,10 @@ async function refreshDashboardData() {
 
 async function refreshTransactionsOnly() {
   try {
-    await loadTransactions();
+    await Promise.all([
+      loadTransactions(),
+      loadAppeals(),
+    ]);
   } catch (error) {
     setLineStatus(apiStatus, error.message, true);
   }

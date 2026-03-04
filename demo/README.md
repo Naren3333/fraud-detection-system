@@ -10,6 +10,9 @@ The demo uses our real project APIs via API Gateway.
 - Currency selector (`USD`, `EUR`, `GBP`, `SGD`, `JPY`, `AUD`, `CAD`, `CHF`, `HKD`, `MYR`)
 - Location controls (preset or custom country/city/lat/lng) to make fraud outcomes easier to demo
 - Real transaction status updates from your fraud pipeline (`PENDING`, `APPROVED`, `REJECTED`, `FLAGGED`)
+- Appeal flow on rejected/flagged transactions:
+  - submit customer appeal (`POST /api/v1/appeals`)
+  - analyst resolves appeal via Human Verification (`POST /api/v1/reviews/appeals/:appealId/resolve`)
 - Email inbox preview rendered from real transaction outcomes:
   - `REJECTED` -> declined customer + declined fraud-team templates
   - `FLAGGED` -> flagged fraud-team template
@@ -44,6 +47,10 @@ If needed, change `API Base URL` in the UI (default: `http://localhost:3000/api/
    - top decision reasons
    - trigger type (`HIGH_VALUE`, `GEOGRAPHIC_RISK`, `THRESHOLD_BAND`, etc.)
    - manual review metadata when available
+6. On a `REJECTED` row, click `Appeal` and submit reason.
+7. In `Appeals` panel, resolve with:
+   - `Uphold` (no transaction status change)
+   - `Reverse` (human-verification submits resolution, `appeal.resolved` is published; transaction moves to `APPROVED`)
 
 ## Grading Script
 
@@ -51,12 +58,14 @@ If needed, change `API Base URL` in the UI (default: `http://localhost:3000/api/
 2. Submit one suspicious transfer and show it becomes `FLAGGED`.
 3. Click the flagged row and show explainability reasons/trigger type.
 4. Use `Decline` button on the flagged transaction and show status becomes `REJECTED`.
-5. Show rendered internal email template for the reviewed/declined case.
-6. Open analytics dashboard (`http://localhost:3008`) and point out:
+5. Submit appeal on the rejected transaction and resolve it as `REVERSE`.
+6. Show transaction status updates to `APPROVED` after appeal resolution.
+7. Show rendered internal email template for the reviewed/declined case.
+8. Open analytics dashboard (`http://localhost:3008`) and point out:
    - manual reviews count
    - approved-after-review vs declined-after-review
    - average review turnaround
-7. Close with model evaluation artifacts:
+9. Close with model evaluation artifacts:
    - run `npm run evaluate:model` in `ml-scoring-service`
    - show generated `evaluation.md` and `evaluation.json`.
 

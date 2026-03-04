@@ -112,7 +112,7 @@ Transaction -- "rejected/flagged" --> Appeal
 Appeal -- "appeal.created" --> Kafka
 Appeal -- "appeal.resolved" --> Kafka
 Kafka -- "appeal.resolved" --> Transaction
-Appeal -- "manual re-review request" --> HumanVerify
+HumanVerify -- "appeal analyst actions (pending/resolve)" --> Appeal
 
 %% =========================
 %% DB LINKS
@@ -154,6 +154,7 @@ Analytics -.-> Prometheus
 | ML Scoring Service | 3004 | Live |
 | Decision Engine | 3005 | Live |
 | Human Verification Service | 3010 | Live |
+| Appeal Service | 3011 | Live |
 | Notification Service | 3006 | Live |
 | Audit Service | 3007 | Live |
 | Analytics Service | 3008 | Live |
@@ -313,6 +314,19 @@ fraud-detection-system/
 |   |-- Dockerfile
 |   `-- package.json
 |
+|-- appeal-service/
+|   |-- src/
+|   |   |-- config/           # App config, logger, Kafka
+|   |   |-- db/               # PostgreSQL pool, migrations
+|   |   |-- repositories/     # Appeal DB operations
+|   |   |-- services/         # Appeal business logic + event publishing
+|   |   |-- controllers/      # Appeal HTTP handlers
+|   |   |-- routes/           # Appeal routes + health
+|   |   `-- index.js
+|   |-- .dockerignore
+|   |-- Dockerfile
+|   `-- package.json
+|
 `-- monitoring/
     |-- prometheus.yml        # Prometheus scrape configuration
     `-- grafana/              # Grafana provisioning + dashboards
@@ -377,6 +391,7 @@ Artifacts are written to:
 | user-db | postgres:15-alpine | User storage |
 | transaction-db | postgres:15-alpine | Transaction storage |
 | decision-db | postgres:15-alpine | Decision storage |
+| appeal-db | postgres:15-alpine | Appeal storage |
 | audit-db | postgres:15-alpine | Audit storage |
 | prometheus | prom/prometheus:v2.51.0 | Metrics scraping and storage |
 | grafana | grafana/grafana:10.4.2 | Metrics dashboards and visualization |
@@ -416,10 +431,13 @@ Jaeger and the OpenTelemetry Collector are now included in the Prometheus scrape
 - `transaction.finalised`
 - `transaction.flagged`
 - `transaction.reviewed`
+- `appeal.created`
+- `appeal.resolved`
 - `transaction.reversed`
 - `transaction.dlq`
 - `transaction.decision.dlq`
 - `notification.dlq`
+- `appeal.dlq`
 
 ---
 

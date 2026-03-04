@@ -41,23 +41,31 @@
 
     <section class="stats-grid" id="overview-stats">
       <div class="stat-card cyan">
-        <div class="stat-label">Pending Reviews</div>
-        <div class="stat-value cyan" id="pendingCount">0</div>
+        <div class="stat-label">Pending Flagged Reviews</div>
+        <div class="stat-value cyan" id="pendingReviewCount">0</div>
         <div class="stat-change">Items from queue</div>
       </div>
 
       <div class="stat-card green">
-        <div class="stat-label">Visible After Filter</div>
-        <div class="stat-value green" id="visibleCount">0</div>
-        <div class="stat-change">Rows currently shown</div>
+        <div class="stat-label">Pending Appeals</div>
+        <div class="stat-value green" id="pendingAppealCount">0</div>
+        <div class="stat-change">Awaiting analyst resolution</div>
       </div>
 
       <div class="stat-card orange">
+        <div class="stat-label">Visible Flagged Rows</div>
+        <div class="stat-value orange" id="visibleCount">0</div>
+        <div class="stat-change">Rows currently shown</div>
+      </div>
+
+      <div class="stat-card purple">
         <div class="stat-label">Data Availability</div>
         <div class="stat-value orange" id="dataAvailability">NO</div>
         <div class="stat-change" id="dataHint">Waiting for pending items</div>
       </div>
+    </section>
 
+    <section class="stats-grid" id="reviewer-stats">
       <div class="stat-card purple">
         <div class="stat-label">Active Reviewer</div>
         <div class="stat-value purple" id="activeReviewer">analyst-01</div>
@@ -92,6 +100,33 @@
         </table>
       </div>
     </section>
+
+    <section class="table-card">
+      <div class="chart-title">Appeal Resolution Queue</div>
+      <div class="status-filter" id="appealStatusFilterGroup">
+        <button type="button" class="status-filter-btn active" data-appeal-filter="ALL">All Appeals</button>
+        <button type="button" class="status-filter-btn" data-appeal-filter="OPEN">Open</button>
+        <button type="button" class="status-filter-btn" data-appeal-filter="UNDER_REVIEW">Under Review</button>
+        <button type="button" class="status-filter-btn" data-appeal-filter="RESOLVED">Resolved</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Appeal ID</th>
+              <th>Transaction</th>
+              <th>Customer</th>
+              <th>Source Status</th>
+              <th>Reason</th>
+              <th>Appeal Status</th>
+              <th>Notes</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="appealRows"></tbody>
+        </table>
+      </div>
+    </section>
   </div>
 
   <template id="rowTemplate">
@@ -110,6 +145,26 @@
         <div class="actions">
           <button type="button" data-decision="APPROVED">Approve</button>
           <button type="button" data-decision="DECLINED" class="danger">Decline</button>
+        </div>
+      </td>
+    </tr>
+  </template>
+
+  <template id="appealRowTemplate">
+    <tr>
+      <td data-col="appealId"></td>
+      <td data-col="transactionId"></td>
+      <td data-col="customerId"></td>
+      <td data-col="sourceTransactionStatus"></td>
+      <td data-col="appealReason"></td>
+      <td data-col="currentStatus"></td>
+      <td>
+        <textarea data-input="notes" rows="2" placeholder="Optional appeal resolution notes"></textarea>
+      </td>
+      <td>
+        <div class="actions">
+          <button type="button" data-resolution="UPHOLD">Uphold</button>
+          <button type="button" data-resolution="REVERSE" class="danger">Reverse</button>
         </div>
       </td>
     </tr>

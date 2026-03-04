@@ -22,7 +22,7 @@ docker compose up --build -d
 2. Import `testing/test.json`.
 3. Use collection variables (already embedded in the collection):
    - `baseUrl = http://localhost:3000`
-   - direct service URLs for ports 3001-3008 and 3010 are preconfigured.
+   - direct service URLs for ports 3001-3008, 3010, and 3011 are preconfigured.
    - monitoring URLs are preconfigured (`http://localhost:9099` and `http://localhost:3009`).
 4. Open dashboards in browser:
    - `http://localhost:3008`
@@ -42,6 +42,7 @@ Run folders in this order:
 8. `08 - Audit Service`
 9. `09 - End-to-End Smoke Flow`
 10. `10 - Human Verification Flow`
+11. `11 - Appeal Flow`
 
 ## 4. What Each Folder Validates
 
@@ -160,6 +161,18 @@ Validates manual review backend flow:
 - Verify transaction status transitions after review event is consumed
 - Includes explicit `DECLINED -> REJECTED` mapping check in transaction status
 
+### 11 - Appeal Flow
+
+Validates customer appeal backend flow:
+
+- Appeal service health check (`:3011`)
+- Fetch high-risk transaction and capture source status
+- Submit appeal through API Gateway (`POST /api/v1/appeals`)
+- List customer appeals and analyst pending queue (`GET /api/v1/reviews/appeals/pending`)
+- Resolve appeal through Human Verification (`POST /api/v1/reviews/appeals/:appealId/resolve`)
+- Verify transaction status after appeal resolution event is consumed
+- Verify audit trail endpoint still responds for transaction timeline
+
 ## 5. Async and Reliability Notes
 
 - Fraud scoring and decisioning are event-driven via Kafka and are not synchronous with transaction creation.
@@ -210,3 +223,4 @@ System is healthy when:
 - Audit service endpoints are reachable.
 - Monitoring stack endpoints are reachable (Prometheus and Grafana).
 - Rate limiting returns `429` under burst attempts.
+- Appeal flow can submit/resolve and transaction status updates correctly after `appeal.resolved`.

@@ -23,6 +23,7 @@ module.exports = {
       transactionFinalised: process.env.KAFKA_TOPIC_TRANSACTION_FINALISED || 'transaction.finalised',
       transactionFlagged: process.env.KAFKA_TOPIC_TRANSACTION_FLAGGED || 'transaction.flagged',
       transactionReviewed: process.env.KAFKA_TOPIC_TRANSACTION_REVIEWED || 'transaction.reviewed',
+      appealResolved: process.env.KAFKA_TOPIC_APPEAL_RESOLVED || 'appeal.resolved',
     },
     retry: { attempts: 8, initialRetryTime: 300 },
   },

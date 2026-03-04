@@ -9,6 +9,9 @@ const DECISION_TO_STATUS = {
   DECLINED: 'REJECTED',
   FLAGGED:  'FLAGGED',
 };
+const APPEAL_RESOLUTION_TO_STATUS = {
+  REVERSE: 'APPROVED',
+};
 
 let consumer = null;
 let isRunning = false;
@@ -51,6 +54,7 @@ const start = async () => {
       config.kafka.topics.transactionFinalised,
       config.kafka.topics.transactionFlagged,
       config.kafka.topics.transactionReviewed,
+      config.kafka.topics.appealResolved,
     ],
     fromBeginning: false,
   });
@@ -68,6 +72,7 @@ const start = async () => {
       config.kafka.topics.transactionFinalised,
       config.kafka.topics.transactionFlagged,
       config.kafka.topics.transactionReviewed,
+      config.kafka.topics.appealResolved,
     ],
   });
 };
@@ -108,7 +113,11 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
     }
 
     transactionId = data.transactionId;
-    const decision = data.reviewDecision || data.decision;
+    const appealResolution = data.outcome || data.resolution;
+    const isAppealResolutionTopic = topic === config.kafka.topics.appealResolved;
+    const decision = isAppealResolutionTopic
+      ? appealResolution
+      : (data.reviewDecision || data.decision);
 
     if (!transactionId || !decision) {
       logger.error('Decision message missing transactionId or decision - skipping', {
@@ -120,10 +129,16 @@ const handleMessage = async ({ topic, partition, message, heartbeat }) => {
 
     await heartbeat();
 
-    const newStatus = DECISION_TO_STATUS[decision];
+    const newStatus = isAppealResolutionTopic
+      ? APPEAL_RESOLUTION_TO_STATUS[decision]
+      : DECISION_TO_STATUS[decision];
     if (!newStatus) {
-      logger.error('Unknown decision value - skipping', {
-        transactionId, decision, topic, partition, offset,
+      logger.info('No transaction status update required for event - skipping', {
+        transactionId,
+        decision,
+        topic,
+        partition,
+        offset,
       });
       await commitOffset(topic, partition, offset);
       return;

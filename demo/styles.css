@@ -5,8 +5,8 @@
   --muted: #5f6b73;
   --panel: #ffffff;
   --border: #d6dde1;
-  --accent: #125c4d;
-  --accent-strong: #0d463b;
+  --accent: #3fa77f;
+  --accent-strong: #2d8f6b;
   --warn: #a16207;
   --danger: #9f1239;
   --ok: #166534;
@@ -97,6 +97,18 @@ h3 {
   margin-bottom: 12px;
 }
 
+.api-toggle-row {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+button.compact {
+  margin-top: 0;
+  padding: 8px 12px;
+}
+
 .auth-grid {
   display: grid;
   gap: 14px;
@@ -150,6 +162,13 @@ button:hover {
   background: #fff;
   color: var(--text);
   border: 1px solid var(--border);
+}
+
+.ghost:hover {
+  background: #eef7f2;
+  color: var(--text);
+  border-color: #c6dfd3;
+  transform: translateY(-1px);
 }
 
 .topbar {

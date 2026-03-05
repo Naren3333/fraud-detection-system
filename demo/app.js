@@ -11,6 +11,9 @@ const state = {
   poller: null,
 };
 
+const LOCAL_API_BASE = "http://localhost:3000/api/v1";
+const AZURE_API_BASE = "http://esd-g06-t05.eastasia.cloudapp.azure.com:3000/api/v1";
+
 const authView = document.getElementById("authView");
 const dashboardView = document.getElementById("dashboardView");
 const registerForm = document.getElementById("registerForm");
@@ -21,6 +24,8 @@ const refreshBtn = document.getElementById("refreshBtn");
 const logoutBtn = document.getElementById("logoutBtn");
 
 const apiBaseInput = document.getElementById("apiBaseInput");
+const useLocalApiBtn = document.getElementById("useLocalApiBtn");
+const useAzureApiBtn = document.getElementById("useAzureApiBtn");
 const authStatus = document.getElementById("authStatus");
 const apiStatus = document.getElementById("apiStatus");
 const transferStatus = document.getElementById("transferStatus");
@@ -67,6 +72,18 @@ function getApiBase() {
 
 function saveApiBase() {
   localStorage.setItem(API_BASE_KEY, getApiBase());
+}
+
+function applyApiBase(baseUrl, sourceLabel) {
+  apiBaseInput.value = baseUrl;
+  saveApiBase();
+
+  const message = `API Base set to ${baseUrl} (${sourceLabel}).`;
+  setLineStatus(authStatus, message);
+
+  if (state.user) {
+    apiStatus.textContent = `User: ${state.user.id} | Role: ${state.user.role} | API: ${getApiBase()}`;
+  }
 }
 
 function setLineStatus(node, message, isError = false) {
@@ -1081,6 +1098,12 @@ logoutBtn.addEventListener("click", async () => {
 });
 
 apiBaseInput.addEventListener("change", saveApiBase);
+if (useLocalApiBtn) {
+  useLocalApiBtn.addEventListener("click", () => applyApiBase(LOCAL_API_BASE, "Localhost"));
+}
+if (useAzureApiBtn) {
+  useAzureApiBtn.addEventListener("click", () => applyApiBase(AZURE_API_BASE, "Azure VM"));
+}
 transactionSearch.addEventListener("input", () => renderTransactions(state.transactions));
 emailSearch.addEventListener("input", () => renderEmails(state.transactions, state.user?.id || ""));
 
@@ -1092,6 +1115,8 @@ async function bootstrap() {
   const savedApiBase = localStorage.getItem(API_BASE_KEY);
   if (savedApiBase) {
     apiBaseInput.value = savedApiBase;
+  } else {
+    apiBaseInput.value = LOCAL_API_BASE;
   }
 
   const storedSession = loadJson(SESSION_KEY, null);

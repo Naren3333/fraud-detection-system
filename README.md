@@ -143,7 +143,7 @@ Appeal --> AppealDB
 %% =========================
 %% METRICS (clean hub instead of 10 arrows)
 %% =========================
-MetricsHub[Metrics Exporters<br/>(/metrics)]:::note
+MetricsHub["Metrics exporters (/metrics)"]:::note
 Gateway -.-> MetricsHub
 Decision -.-> MetricsHub
 HumanVerify -.-> MetricsHub

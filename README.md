@@ -11,6 +11,9 @@ Real-time payment fraud detection platform built with Node.js microservices, Kaf
 - Centralized REST API documentation: `http://localhost:3000/api-docs`
 
 ---
+## System Architecture
+
+### 1) Request + Event Flow (Context Diagram)
 
 ```mermaid
 flowchart LR
@@ -21,27 +24,20 @@ flowchart LR
 classDef edge fill:#1f2937,stroke:#94a3b8,color:#fff,stroke-width:1px;
 classDef svc fill:#111827,stroke:#60a5fa,color:#fff,stroke-width:1px;
 classDef bus fill:#0f172a,stroke:#f59e0b,color:#fff,stroke-width:1px;
-classDef db fill:#0b1220,stroke:#34d399,color:#fff,stroke-width:1px;
-classDef obs fill:#0b1220,stroke:#a78bfa,color:#fff,stroke-width:1px;
 
 %% =========================
-%% LAYER 1 – EDGE
+%% EDGE
 %% =========================
-subgraph L1[Edge]
-direction LR
-Client[External Clients]:::edge
-Gateway[API Gateway :3000]:::edge
-Client --> Gateway
-end
+Client[External Clients]:::edge --> Gateway[API Gateway :3000]:::edge
 
 %% =========================
-%% LAYER 2 – CORE SERVICES
+%% CORE SERVICES
 %% =========================
-subgraph L2[Core Services]
+subgraph Core[Core Services]
 direction LR
-User[User Service :3002]:::svc
-Transaction[Transaction Service :3001]:::svc
-Fraud[Fraud Detection :3003]:::svc
+User[User :3002]:::svc
+Transaction[Transaction :3001]:::svc
+Fraud[Fraud :3003]:::svc
 ML[ML Scoring :3004]:::svc
 Decision[Decision Engine :3005]:::svc
 HumanVerify[Human Verification :3010]:::svc
@@ -52,17 +48,74 @@ Analytics[Analytics :3008]:::svc
 end
 
 %% =========================
-%% LAYER 3 – MESSAGING
+%% MESSAGING
 %% =========================
-subgraph L3[Messaging]
-direction TB
 Kafka[(Kafka Cluster)]:::bus
+
+%% =========================
+%% HTTP ROUTES
+%% =========================
+Gateway -- "/auth/*" --> User
+Gateway -- "/transactions/*" --> Transaction
+Gateway -- "/reviews/*" --> HumanVerify
+Gateway -- "/appeals/*" --> Appeal
+Gateway -- "/analytics/*" --> Analytics
+Gateway -- "/audit/*" --> Audit
+
+%% =========================
+%% EVENT FLOW
+%% =========================
+Transaction -- "transaction.created" --> Kafka
+Kafka -- "transaction.created" --> Fraud
+
+Fraud -- "score.request" --> ML
+ML -- "score.result" --> Fraud
+
+Fraud -- "transaction.scored" --> Kafka
+Kafka -- "transaction.scored" --> Decision
+
+Decision -- "transaction.finalised/flagged" --> Kafka
+Kafka -- "transaction.finalised" --> Notification
+Kafka -- "transaction.finalised" --> Transaction
+Kafka -- "transaction.flagged" --> HumanVerify
+
+HumanVerify -- "transaction.reviewed" --> Kafka
+Kafka -- "transaction.reviewed" --> Transaction
+
+Transaction -- "rejected/flagged" --> Appeal
+Appeal -- "appeal.created/resolved" --> Kafka
+Kafka -- "appeal.resolved" --> Transaction
+
+Kafka -- "events" --> Audit
+```
+### 2) Data Stores + Observability (Deployment/Data Diagram)
+```mermaid
+flowchart TB
+
+%% =========================
+%% STYLES
+%% =========================
+classDef svc fill:#111827,stroke:#60a5fa,color:#fff,stroke-width:1px;
+classDef db fill:#0b1220,stroke:#34d399,color:#fff,stroke-width:1px;
+classDef obs fill:#0b1220,stroke:#a78bfa,color:#fff,stroke-width:1px;
+classDef note fill:#0b1220,stroke:#94a3b8,color:#e5e7eb,stroke-dasharray:4 4;
+
+%% =========================
+%% SERVICES (only those with DB relationships shown)
+%% =========================
+subgraph Services[Services]
+direction TB
+Decision[Decision Engine :3005]:::svc
+HumanVerify[Human Verification :3010]:::svc
+Appeal[Appeal Service :3011]:::svc
+Analytics[Analytics :3008]:::svc
+Gateway[API Gateway :3000]:::svc
 end
 
 %% =========================
-%% DATA
+%% DATA STORES
 %% =========================
-subgraph L4[Data Stores]
+subgraph Data[Data Stores]
 direction TB
 DecisionDB[(Postgres decision-db)]:::db
 HumanReviewDB[(Postgres human-review-db)]:::db
@@ -72,7 +125,7 @@ end
 %% =========================
 %% OBSERVABILITY
 %% =========================
-subgraph L5[Observability]
+subgraph Obs[Observability]
 direction TB
 Prometheus[Prometheus :9099]:::obs
 Grafana[Grafana :3009]:::obs
@@ -80,67 +133,23 @@ Prometheus --> Grafana
 end
 
 %% =========================
-%% HTTP ROUTES (clean + top-level)
-%% =========================
-Gateway -- "/auth/*" --> User
-Gateway -- "/transactions/*" --> Transaction
-Gateway -- "/analytics/*" --> Analytics
-Gateway -- "/audit/*" --> Audit
-Gateway -- "/reviews/*" --> HumanVerify
-Gateway -- "/appeals/*" --> Appeal
-
-%% =========================
-%% EVENT FLOWS (grouped)
-%% =========================
-Transaction -- "transaction.created" --> Kafka
-Kafka -- "transaction.created" --> Fraud
-Fraud -- "score.request" --> ML
-ML -- "score.result" --> Fraud
-Fraud -- "transaction.scored" --> Kafka
-Kafka -- "transaction.scored" --> Decision
-
-Decision -- "transaction.finalised" --> Kafka
-Decision -- "transaction.flagged" --> Kafka
-Kafka -- "transaction.finalised" --> Transaction
-Kafka -- "transaction.finalised" --> Notification
-Kafka -- "transaction.flagged" --> HumanVerify
-
-HumanVerify -- "transaction.reviewed" --> Kafka
-Kafka -- "transaction.reviewed" --> Transaction
-
-Transaction -- "rejected/flagged" --> Appeal
-Appeal -- "appeal.created" --> Kafka
-Appeal -- "appeal.resolved" --> Kafka
-Kafka -- "appeal.resolved" --> Transaction
-HumanVerify -- "appeal analyst actions (pending/resolve)" --> Appeal
-
-%% =========================
 %% DB LINKS
 %% =========================
 Decision --> DecisionDB
+Analytics --> DecisionDB
 HumanVerify --> HumanReviewDB
 Appeal --> AppealDB
-Analytics --> DecisionDB
 
 %% =========================
-%% AUDIT EVENTS (reduce clutter: everything -> Audit via events)
+%% METRICS (clean hub instead of 10 arrows)
 %% =========================
-Kafka -- "events" --> Audit
-
-%% =========================
-%% METRICS (compact: group via one label)
-%% =========================
-Gateway -.-> Prometheus
-User -.-> Prometheus
-Transaction -.-> Prometheus
-Fraud -.-> Prometheus
-ML -.-> Prometheus
-Decision -.-> Prometheus
-HumanVerify -.-> Prometheus
-Appeal -.-> Prometheus
-Notification -.-> Prometheus
-Audit -.-> Prometheus
-Analytics -.-> Prometheus
+MetricsHub[Metrics Exporters<br/>(/metrics)]:::note
+Gateway -.-> MetricsHub
+Decision -.-> MetricsHub
+HumanVerify -.-> MetricsHub
+Appeal -.-> MetricsHub
+Analytics -.-> MetricsHub
+MetricsHub -.-> Prometheus
 ```
 
 ## Current Services

@@ -66,11 +66,20 @@ const shutdown = async (signal) => {
   }
 };
 
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT',  () => shutdown('SIGINT'));
+// Handles force exit timer.
+const forceExitTimer = (signal) => {
+  setTimeout(() => {
+    logger.error(`Forced exit after 30s shutdown timeout (signal: ${signal})`);
+    process.exit(1);
+  }, 30000).unref();
+};
+
+process.on('SIGTERM', () => { forceExitTimer('SIGTERM'); shutdown('SIGTERM'); });
+process.on('SIGINT',  () => { forceExitTimer('SIGINT'); shutdown('SIGINT'); });
 
 process.on('uncaughtException', (err) => {
   logger.error('Uncaught exception', { error: err.message, stack: err.stack });
+  forceExitTimer('uncaughtException');
   shutdown('uncaughtException');
 });
 
@@ -79,6 +88,7 @@ process.on('unhandledRejection', (reason) => {
   if (reason?.message === 'The client is closed') return;
 
   logger.error('Unhandled rejection', { reason: String(reason) });
+  forceExitTimer('unhandledRejection');
   shutdown('unhandledRejection');
 });
 

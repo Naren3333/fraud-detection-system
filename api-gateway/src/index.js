@@ -67,27 +67,35 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 // Graceful shutdown
+let isShuttingDown = false;
 const gracefulShutdown = async (signal) => {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
   logger.info(`${signal} received, starting graceful shutdown`);
-
-  server.close(async () => {
-    logger.info('HTTP server closed');
-
-    try {
-      await closeRedisConnection();
-      logger.info('All connections closed successfully');
-      process.exit(0);
-    } catch (error) {
-      logger.error('Error during shutdown:', error);
-      process.exit(1);
-    }
-  });
 
   // Force shutdown after 30 seconds
   setTimeout(() => {
     logger.error('Forced shutdown due to timeout');
     process.exit(1);
-  }, 30000);
+  }, 30000).unref();
+
+  try {
+    await new Promise((resolve) => {
+      if (!server) return resolve();
+      server.close(() => {
+        logger.info('HTTP server closed');
+        resolve();
+      });
+    });
+
+    await closeRedisConnection();
+    logger.info('All connections closed successfully');
+    process.exit(0);
+  } catch (error) {
+    logger.error('Error during shutdown:', error);
+    process.exit(1);
+  }
 };
 
 // Handle shutdown signals
@@ -122,6 +130,10 @@ const startServer = async () => {
         environment: config.env,
         nodeVersion: process.version,
       });
+    });
+    server.on('error', (error) => {
+      logger.error('HTTP server error', { error: error.message });
+      process.exit(1);
     });
 
     // Start metrics server if enabled

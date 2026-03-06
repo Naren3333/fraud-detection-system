@@ -36,30 +36,57 @@ app.use(errorHandler);
 
 let server = null;
 let producer = null;
+let isShuttingDown = false;
 
 // Handles shutdown.
 const shutdown = async (signal) => {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
   logger.info(`${signal} received - shutting down`);
-  if (server) {
-    server.close(() => logger.info('HTTP server closed'));
-  }
+
   try {
-    if (producer) await producer.disconnect();
+    await new Promise((resolve) => {
+      if (!server) return resolve();
+      server.close(() => {
+        logger.info('HTTP server closed');
+        resolve();
+      });
+    });
+
+    try {
+      if (producer) await producer.disconnect();
+    } catch (err) {
+      logger.error('Error disconnecting Kafka producer', { error: err.message });
+    }
+
+    await closePool();
+    logger.info('Graceful shutdown complete');
+    process.exit(0);
   } catch (err) {
-    logger.error('Error disconnecting Kafka producer', { error: err.message });
+    logger.error('Error during shutdown', { error: err.message, stack: err.stack });
+    process.exit(1);
   }
-  await closePool();
-  process.exit(0);
 };
 
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+// Handles force exit timer.
+const forceExitTimer = (signal) => {
+  setTimeout(() => {
+    logger.error(`Forced exit after 30s shutdown timeout (signal: ${signal})`);
+    process.exit(1);
+  }, 30000).unref();
+};
+
+process.on('SIGTERM', () => { forceExitTimer('SIGTERM'); shutdown('SIGTERM'); });
+process.on('SIGINT', () => { forceExitTimer('SIGINT'); shutdown('SIGINT'); });
 process.on('uncaughtException', (err) => {
   logger.error('Uncaught exception', { error: err.message, stack: err.stack });
+  forceExitTimer('uncaughtException');
   shutdown('uncaughtException');
 });
 process.on('unhandledRejection', (reason) => {
   logger.error('Unhandled rejection', { reason: String(reason) });
+  forceExitTimer('unhandledRejection');
   shutdown('unhandledRejection');
 });
 
@@ -74,6 +101,11 @@ const bootstrap = async () => {
       env: config.env,
       node: process.version,
     });
+  });
+
+  server.on('error', (err) => {
+    logger.error('HTTP server error', { error: err.message });
+    process.exit(1);
   });
 };
 

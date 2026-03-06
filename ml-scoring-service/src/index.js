@@ -125,11 +125,13 @@ process.on('SIGINT', () => { forceExitTimer('SIGINT'); shutdown('SIGINT'); });
 
 process.on('uncaughtException', (err) => {
   logger.error('Uncaught exception', { error: err.message, stack: err.stack });
+  forceExitTimer('uncaughtException');
   shutdown('uncaughtException');
 });
 
 process.on('unhandledRejection', (reason) => {
   logger.error('Unhandled promise rejection', { reason: String(reason) });
+  forceExitTimer('unhandledRejection');
   shutdown('unhandledRejection');
 });
 

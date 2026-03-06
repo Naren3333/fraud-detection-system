@@ -6,6 +6,7 @@ module.exports = {
   serviceName: process.env.SERVICE_NAME || 'human-verification-service',
   serviceVersion: process.env.SERVICE_VERSION || '1.0.0',
   logLevel: process.env.LOG_LEVEL || 'info',
+  enableBrowserIsolation: process.env.ENABLE_BROWSER_ISOLATION === 'true',
 
   db: {
     host: process.env.DB_HOST || 'localhost',

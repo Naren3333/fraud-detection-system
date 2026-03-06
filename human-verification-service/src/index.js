@@ -21,7 +21,10 @@ const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 
 const app = express();
 
-app.use(helmet());
+app.use(helmet({
+  crossOriginOpenerPolicy: config.enableBrowserIsolation,
+  originAgentCluster: config.enableBrowserIsolation,
+}));
 app.use(cors());
 app.use(compression());
 app.use(express.json({ limit: '1mb' }));

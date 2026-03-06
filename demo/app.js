@@ -7,6 +7,7 @@ const state = {
   transactions: [],
   appeals: [],
   decisionByTransaction: {},
+  transactionDetailsById: {},
   selectedTransactionId: null,
   poller: null,
 };
@@ -45,6 +46,9 @@ const profilePhone = document.getElementById("profilePhone");
 const transactionRows = document.getElementById("transactionRows");
 const appealRows = document.getElementById("appealRows");
 const explainabilityPanel = document.getElementById("explainabilityPanel");
+const explainabilityForm = document.getElementById("explainabilityForm");
+const explainabilityTransactionId = document.getElementById("explainabilityTransactionId");
+const explainabilityStatus = document.getElementById("explainabilityStatus");
 const mailList = document.getElementById("mailList");
 const mailPreview = document.getElementById("mailPreview");
 const transactionSearch = document.getElementById("transactionSearch");
@@ -100,6 +104,10 @@ function formatDate(value) {
   return new Date(value).toLocaleString();
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function normalizeUser(user) {
   return {
     id: user.user_id || user.userId,
@@ -123,6 +131,7 @@ function clearSession() {
   state.transactions = [];
   state.appeals = [];
   state.decisionByTransaction = {};
+  state.transactionDetailsById = {};
   state.selectedTransactionId = null;
   localStorage.removeItem(SESSION_KEY);
 }
@@ -259,8 +268,7 @@ function renderTransactions(transactions) {
 
   if (!filtered.length) {
     transactionRows.innerHTML = "<tr><td colspan='6'>No transactions match your search.</td></tr>";
-    state.selectedTransactionId = null;
-    void renderExplainability(null);
+    void renderExplainability(state.selectedTransactionId);
     return;
   }
 
@@ -348,28 +356,54 @@ function renderTransactions(transactions) {
     });
   });
 
-  const selectedId = filtered.some((tx) => tx.id === state.selectedTransactionId)
-    ? state.selectedTransactionId
-    : filtered[0].id;
-  state.selectedTransactionId = selectedId;
-
   transactionRows.querySelectorAll("tr[data-tx-id]").forEach((row) => {
-    if (row.dataset.txId === selectedId) {
+    if (row.dataset.txId === state.selectedTransactionId) {
       row.classList.add("tx-selected");
     }
     row.addEventListener("click", () => {
-      state.selectedTransactionId = row.dataset.txId;
-      transactionRows.querySelectorAll("tr[data-tx-id]").forEach((r) => r.classList.remove("tx-selected"));
-      row.classList.add("tx-selected");
-      void renderExplainability(row.dataset.txId);
+      void selectTransactionForExplainability(row.dataset.txId);
     });
   });
 
-  void renderExplainability(selectedId);
+  void renderExplainability(state.selectedTransactionId);
 }
 
 function transactionById(transactionId) {
-  return state.transactions.find((tx) => tx.id === transactionId) || null;
+  return state.transactions.find((tx) => tx.id === transactionId) || state.transactionDetailsById[transactionId] || null;
+}
+
+function updateSelectedTransactionUi(transactionId) {
+  transactionRows.querySelectorAll("tr[data-tx-id]").forEach((row) => {
+    row.classList.toggle("tx-selected", row.dataset.txId === transactionId);
+  });
+}
+
+function setSelectedTransactionId(transactionId) {
+  state.selectedTransactionId = transactionId || null;
+  if (explainabilityTransactionId) {
+    explainabilityTransactionId.value = transactionId || "";
+  }
+  updateSelectedTransactionUi(state.selectedTransactionId);
+}
+
+async function ensureTransactionLoaded(transactionId) {
+  if (!transactionId || transactionById(transactionId) || transactionId in state.transactionDetailsById) {
+    return;
+  }
+
+  try {
+    const payload = await apiRequest(`/transactions/${encodeURIComponent(transactionId)}`);
+    const tx = payload?.data || null;
+    if (tx?.id) {
+      state.transactionDetailsById[tx.id] = tx;
+    }
+  } catch (error) {
+    if (String(error.message || "").toLowerCase().includes("not found")) {
+      state.transactionDetailsById[transactionId] = null;
+      return;
+    }
+    throw error;
+  }
 }
 
 function inferManualTriggerType(decision) {
@@ -394,9 +428,21 @@ function reasonList(reasonText) {
     .slice(0, 4);
 }
 
+function resolveDisplayedOutcome(tx, decision) {
+  const txStatus = String(tx?.status || "").toUpperCase();
+  if (txStatus === "APPROVED" || txStatus === "REJECTED" || txStatus === "FLAGGED") {
+    return txStatus;
+  }
+
+  const decisionValue = String(decision?.decision || "").toUpperCase();
+  if (decisionValue === "DECLINED") return "REJECTED";
+  if (decisionValue === "APPROVED" || decisionValue === "FLAGGED") return decisionValue;
+  return txStatus || decisionValue || "PENDING";
+}
+
 function buildExplainabilityHtml(tx, decision) {
   if (!tx) {
-    return "<p class='muted'>Select a transaction row to load explainability details.</p>";
+    return "<p class='muted'>Enter a transaction ID or click a transaction row to load explainability details.</p>";
   }
 
   if (!decision) {
@@ -416,6 +462,7 @@ function buildExplainabilityHtml(tx, decision) {
   const reviewedAt = factors.manualReview?.reviewedAt
     ? formatDate(factors.manualReview.reviewedAt)
     : "-";
+  const displayedOutcome = resolveDisplayedOutcome(tx, decision);
 
   const reasonsHtml = reasons.length
     ? `<ul class="explainability-list">${reasons.map((r) => `<li>${escapeHtml(r)}</li>`).join("")}</ul>`
@@ -429,7 +476,7 @@ function buildExplainabilityHtml(tx, decision) {
       </div>
       <div class="explainability-item">
         <p class="label">Decision</p>
-        <p class="value"><strong>${escapeHtml(String(decision.decision || tx.status || "PENDING"))}</strong></p>
+        <p class="value"><strong>${escapeHtml(displayedOutcome)}</strong></p>
       </div>
       <div class="explainability-item">
         <p class="label">Scores</p>
@@ -494,21 +541,52 @@ async function prefetchDecisionDetails(transactions) {
 async function renderExplainability(transactionId) {
   if (!explainabilityPanel) return;
 
-  const tx = transactionById(transactionId);
-  if (!tx) {
-    explainabilityPanel.innerHTML = "<p class='muted'>Select a transaction row to load explainability details.</p>";
-    return;
+  if (!transactionId) {
+    explainabilityPanel.innerHTML = "<p class='muted'>Enter a transaction ID or click a transaction row to load explainability details.</p>";
+    return { found: false, tx: null, decision: null };
   }
 
   explainabilityPanel.innerHTML = "<p class='muted'>Loading explainability...</p>";
 
   try {
+    await ensureTransactionLoaded(transactionId);
     await ensureDecisionLoaded(transactionId);
+    const tx = transactionById(transactionId);
     const decision = state.decisionByTransaction[transactionId] || null;
+    if (!tx && !decision) {
+      explainabilityPanel.innerHTML = `<p class="status-error">Transaction <code>${escapeHtml(transactionId)}</code> was not found.</p>`;
+      return { found: false, tx: null, decision: null };
+    }
     explainabilityPanel.innerHTML = buildExplainabilityHtml(tx, decision);
+    return { found: true, tx, decision };
   } catch (error) {
     explainabilityPanel.innerHTML = `<p class="status-error">Failed to load explainability: ${escapeHtml(error.message)}</p>`;
+    return { found: false, tx: null, decision: null, error };
   }
+}
+
+async function selectTransactionForExplainability(transactionId) {
+  const normalizedId = String(transactionId || "").trim();
+  if (!normalizedId) {
+    setSelectedTransactionId(null);
+    setLineStatus(explainabilityStatus, "Enter a transaction ID to load explainability.", true);
+    void renderExplainability(null);
+    return;
+  }
+
+  setSelectedTransactionId(normalizedId);
+  setLineStatus(explainabilityStatus, `Loading decision for ${normalizedId}...`);
+
+  const result = await renderExplainability(normalizedId);
+  if (result?.error) {
+    setLineStatus(explainabilityStatus, result.error.message, true);
+    return;
+  }
+  if (!result?.found) {
+    setLineStatus(explainabilityStatus, `Transaction ${normalizedId} was not found.`, true);
+    return;
+  }
+  setLineStatus(explainabilityStatus, `Showing explainability for ${normalizedId}.`);
 }
 
 function escapeHtml(str) {
@@ -761,7 +839,7 @@ function renderAppeals(appeals) {
 async function resolveAppealFromDemo(appealId, resolution, buttonNode) {
   try {
     if (buttonNode) buttonNode.disabled = true;
-    await apiRequest(`/reviews/appeals/${encodeURIComponent(appealId)}/resolve`, {
+    const payload = await apiRequest(`/reviews/appeals/${encodeURIComponent(appealId)}/resolve`, {
       method: "POST",
       body: {
         resolution,
@@ -769,8 +847,25 @@ async function resolveAppealFromDemo(appealId, resolution, buttonNode) {
         notes: `Resolved ${resolution} from demo UI`,
       },
     });
-    setLineStatus(appealStatus, `Appeal ${appealId} resolved as ${resolution}.`);
+    const resolvedAppeal = payload?.data || null;
+    const transactionId = resolvedAppeal?.transactionId || resolvedAppeal?.transaction_id || null;
+
+    setLineStatus(appealStatus, `Appeal ${appealId} resolved as ${resolution}. Waiting for transaction status update...`);
+
+    if (resolution === "REVERSE" && transactionId) {
+      const updatedTx = await waitForTransactionStatus(transactionId, "APPROVED").catch(() => null);
+      await refreshDashboardData();
+
+      if (String(updatedTx?.status || "").toUpperCase() === "APPROVED") {
+        setLineStatus(appealStatus, `Appeal ${appealId} reversed successfully. Transaction ${transactionId} is now APPROVED.`);
+      } else {
+        setLineStatus(appealStatus, `Appeal ${appealId} resolved as REVERSE, but transaction ${transactionId} has not updated to APPROVED yet.`, true);
+      }
+      return;
+    }
+
     await refreshDashboardData();
+    setLineStatus(appealStatus, `Appeal ${appealId} resolved as ${resolution}.`);
   } catch (error) {
     setLineStatus(appealStatus, `Failed resolving appeal ${appealId}: ${error.message}`, true);
   } finally {
@@ -882,6 +977,28 @@ async function loadTransactions() {
   renderSummary(transactions);
   renderTransactions(transactions);
   renderEmails(transactions, userId);
+}
+
+async function waitForTransactionStatus(transactionId, expectedStatus, timeoutMs = 15000, pollMs = 1000) {
+  const expected = String(expectedStatus || "").toUpperCase();
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    const payload = await apiRequest(`/transactions/${encodeURIComponent(transactionId)}`);
+    const tx = payload?.data || null;
+
+    if (tx?.id) {
+      state.transactionDetailsById[tx.id] = tx;
+    }
+
+    if (String(tx?.status || "").toUpperCase() === expected) {
+      return tx;
+    }
+
+    await sleep(pollMs);
+  }
+
+  return null;
 }
 
 async function loadAppeals() {
@@ -1106,6 +1223,12 @@ if (useAzureApiBtn) {
 }
 transactionSearch.addEventListener("input", () => renderTransactions(state.transactions));
 emailSearch.addEventListener("input", () => renderEmails(state.transactions, state.user?.id || ""));
+if (explainabilityForm) {
+  explainabilityForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await selectTransactionForExplainability(explainabilityTransactionId.value);
+  });
+}
 
 locationPresetSelect.addEventListener("change", () => {
   customLocationFields.classList.toggle("hidden", locationPresetSelect.value !== "custom");

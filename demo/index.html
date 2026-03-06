@@ -191,8 +191,13 @@
       <section class="panel section-gap">
         <h3>Decision Explainability</h3>
         <p class="muted">Real-time reasons from decision-engine (`/api/v1/decisions/:transactionId`).</p>
+        <form id="explainabilityForm" class="explainability-controls">
+          <input id="explainabilityTransactionId" type="text" placeholder="Enter transaction ID">
+          <button id="explainabilityLookupBtn" type="submit" class="ghost">Load Decision</button>
+        </form>
+        <p id="explainabilityStatus" class="status-line"></p>
         <div id="explainabilityPanel" class="explainability-panel">
-          <p class="muted">Select a transaction row to load explainability details.</p>
+          <p class="muted">Enter a transaction ID or click a transaction row to load explainability details.</p>
         </div>
       </section>
 

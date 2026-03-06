@@ -327,6 +327,23 @@ tr.tx-selected td {
   background: #eef8f5;
 }
 
+.explainability-controls {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  margin-top: 8px;
+}
+
+.explainability-controls input {
+  margin-top: 0;
+  flex: 1;
+}
+
+.explainability-controls button {
+  margin-top: 0;
+  white-space: nowrap;
+}
+
 .explainability-panel {
   margin-top: 8px;
   border: 1px solid #edf1f3;
@@ -434,6 +451,11 @@ tr.tx-selected td {
 
   .span-2 {
     grid-column: auto;
+  }
+
+  .explainability-controls {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .explainability-grid {

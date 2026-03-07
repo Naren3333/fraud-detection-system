@@ -15,6 +15,7 @@ const colors = {
 let currentTimeRange = '24h';
 let charts = {};
 let ws = null;
+const analyticsBasePath = window.location.pathname.startsWith('/analytics') ? '/analytics' : '';
 document.addEventListener('DOMContentLoaded', () => {
   initWebSocket();
   loadDashboard();
@@ -23,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Handles init web socket.
 function initWebSocket() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${protocol}//${window.location.host}/ws`;
+  const wsUrl = `${protocol}//${window.location.host}${analyticsBasePath}/ws`;
 
   ws = new WebSocket(wsUrl);
 

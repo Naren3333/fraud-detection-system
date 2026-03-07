@@ -196,13 +196,20 @@ Main entrypoints:
 - Prometheus UI: `http://localhost:9099`
 - Jaeger UI (Tracing): `http://localhost:16686`
 
-Azure HTTPS dashboard:
+Azure HTTPS entrypoint:
 
-- Set `HUMAN_VERIFICATION_PUBLIC_HOST` to your VM DNS name, for example `esd-g06-t05.eastasia.cloudapp.azure.com`
+- Set `PUBLIC_HOST` to your VM DNS name, for example `esd-g06-t05.eastasia.cloudapp.azure.com`
 - Start the proxy profile: `docker compose --profile azure-proxy up -d human-verification-proxy`
-- Open `https://<your-host>/`
+- Open these URLs:
+  - Human Verification: `https://<your-host>/`
+  - Analytics Dashboard: `https://<your-host>/analytics/`
+  - API Gateway Docs: `https://<your-host>/api-docs`
 
-This terminates TLS on `80/443` and proxies requests to the internal `human-verification-service` on port `3010`, so the dashboard HTML, CSS, JS, and `/api/v1/reviews` calls all stay on the same HTTPS origin.
+This terminates TLS on `80/443` and routes requests as follows:
+- `/` -> `human-verification-service:3010`
+- `/api/v1/reviews*` -> `human-verification-service:3010`
+- `/analytics/*` and `/analytics/ws` -> `analytics-service:3008`
+- `/api/*` and `/api-docs*` -> `api-gateway:3000`
 
 ---
 

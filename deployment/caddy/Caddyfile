@@ -1,4 +1,20 @@
-{$HUMAN_VERIFICATION_PUBLIC_HOST} {
+{$PUBLIC_HOST} {
   encode gzip
+
+  @reviews path /api/v1/reviews*
+  reverse_proxy @reviews human-verification-service:3010
+
+  @analyticsWs path /analytics/ws*
+  reverse_proxy @analyticsWs analytics-service:3008
+
+  @api path /api/* /api-docs* /api-docs.json
+  reverse_proxy @api api-gateway:3000
+
+  redir /analytics /analytics/ 308
+
+  handle_path /analytics/* {
+    reverse_proxy analytics-service:3008
+  }
+
   reverse_proxy human-verification-service:3010
 }

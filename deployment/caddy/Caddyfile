@@ -17,6 +17,9 @@
   redir /human-service /human-verification/ 308
   redir /human-verification /human-verification/ 308
   redir /analytics /analytics/ 308
+  redir /jaeger /jaeger/ 308
+  redir /grafana /grafana/ 308
+  redir /prometheus /prometheus/ 308
 
   handle_path /human-verification/* {
     reverse_proxy human-verification-service:3010
@@ -24,5 +27,17 @@
 
   handle_path /analytics/* {
     reverse_proxy analytics-service:3008
+  }
+
+  handle /jaeger/* {
+    reverse_proxy jaeger:16686
+  }
+
+  handle /grafana/* {
+    reverse_proxy grafana:3009
+  }
+
+  handle /prometheus/* {
+    reverse_proxy prometheus:9090
   }
 }

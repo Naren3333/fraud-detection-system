@@ -871,6 +871,7 @@ services:
       - "16686:16686"
     command:
       - "--set=extensions.jaeger_query.ui.config_file=/etc/jaeger/ui-config.json"
+      - "--set=extensions.jaeger_query.base_path=${JAEGER_BASE_PATH:-/}"
       - "--set=extensions.jaeger_storage.metric_backends.prometheus_backend.prometheus.endpoint=http://prometheus:9090"
       - "--set=extensions.jaeger_storage.metric_backends.prometheus_backend.prometheus.normalize_calls=true"
       - "--set=extensions.jaeger_storage.metric_backends.prometheus_backend.prometheus.normalize_duration=true"
@@ -904,6 +905,7 @@ services:
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
       - '--web.enable-lifecycle'
+      - '--web.external-url=${PROMETHEUS_EXTERNAL_URL:-http://localhost:9099/}'
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
@@ -924,6 +926,8 @@ services:
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
     environment:
       GF_PATHS_CONFIG: /etc/grafana/grafana.ini
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3009/}
+      GF_SERVER_SERVE_FROM_SUB_PATH: ${GRAFANA_SERVE_FROM_SUB_PATH:-false}
     depends_on:
       - prometheus
     restart: unless-stopped

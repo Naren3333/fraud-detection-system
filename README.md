@@ -198,12 +198,18 @@ Main entrypoints:
 
 Azure HTTPS entrypoint:
 
-- Set `PUBLIC_HOST` to your VM DNS name, for example `esd-g06-t05.eastasia.cloudapp.azure.com`
+- Create a root `.env` file once on the VM. `docker compose` loads it automatically.
+- You can start from `.env.example`:
+  - `cp .env.example .env`
+- Edit `.env` if your VM host differs from the example value.
 - Start the proxy profile: `docker compose --profile azure-proxy up -d human-verification-proxy`
 - Open these URLs:
   - Human Verification: `https://<your-host>/human-verification/`
   - Analytics Dashboard: `https://<your-host>/analytics/`
   - API Gateway Docs: `https://<your-host>/api-docs`
+  - Jaeger: `https://<your-host>/jaeger/`
+  - Grafana: `https://<your-host>/grafana/`
+  - Prometheus: `https://<your-host>/prometheus/`
 
 This terminates TLS on `80/443` and routes requests as follows:
 - `/` -> redirects to `/human-verification/`
@@ -212,6 +218,9 @@ This terminates TLS on `80/443` and routes requests as follows:
 - `/api/v1/reviews*` -> `human-verification-service:3010`
 - `/api/v1/analytics*` -> `analytics-service:3008`
 - `/analytics/*` and `/analytics/ws` -> `analytics-service:3008`
+- `/jaeger/*` -> `jaeger:16686`
+- `/grafana/*` -> `grafana:3009`
+- `/prometheus/*` -> `prometheus:9090`
 - `/api/*` and `/api-docs*` -> `api-gateway:3000`
 
 ---

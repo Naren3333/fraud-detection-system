@@ -13,7 +13,8 @@ const state = {
 };
 
 const LOCAL_API_BASE = "http://localhost:3000/api/v1";
-const AZURE_API_BASE = "http://esd-g06-t05.eastasia.cloudapp.azure.com:3000/api/v1";
+const AZURE_HOST = "esd-g06-t05.eastasia.cloudapp.azure.com";
+const AZURE_API_BASE = `https://${AZURE_HOST}/api/v1`;
 
 const authView = document.getElementById("authView");
 const dashboardView = document.getElementById("dashboardView");
@@ -69,20 +70,53 @@ function saveJson(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+function normalizeApiBase(baseUrl) {
+  const fallback = LOCAL_API_BASE;
+  const raw = String(baseUrl || "").trim();
+  if (!raw) return fallback;
+
+  const normalized = raw.replace(/\/+$/, "");
+
+  try {
+    const parsed = new URL(normalized);
+    const host = parsed.hostname.toLowerCase();
+
+    if (host === AZURE_HOST) {
+      return AZURE_API_BASE;
+    }
+
+    if (host === "localhost" && parsed.port === "3000") {
+      return LOCAL_API_BASE;
+    }
+
+    if (!parsed.pathname || parsed.pathname === "/") {
+      parsed.pathname = "/api/v1";
+    } else if (!parsed.pathname.endsWith("/api/v1")) {
+      parsed.pathname = `${parsed.pathname.replace(/\/+$/, "")}/api/v1`;
+    }
+
+    return parsed.toString().replace(/\/+$/, "");
+  } catch {
+    return normalized;
+  }
+}
+
 function getApiBase() {
-  const raw = apiBaseInput.value.trim() || "http://localhost:3000/api/v1";
-  return raw.replace(/\/$/, "");
+  return normalizeApiBase(apiBaseInput.value || LOCAL_API_BASE);
 }
 
 function saveApiBase() {
-  localStorage.setItem(API_BASE_KEY, getApiBase());
+  const normalized = getApiBase();
+  apiBaseInput.value = normalized;
+  localStorage.setItem(API_BASE_KEY, normalized);
 }
 
 function applyApiBase(baseUrl, sourceLabel) {
-  apiBaseInput.value = baseUrl;
+  const normalized = normalizeApiBase(baseUrl);
+  apiBaseInput.value = normalized;
   saveApiBase();
 
-  const message = `API Base set to ${baseUrl} (${sourceLabel}).`;
+  const message = `API Base set to ${normalized} (${sourceLabel}).`;
   setLineStatus(authStatus, message);
 
   if (state.user) {
@@ -1237,10 +1271,11 @@ locationPresetSelect.addEventListener("change", () => {
 async function bootstrap() {
   const savedApiBase = localStorage.getItem(API_BASE_KEY);
   if (savedApiBase) {
-    apiBaseInput.value = savedApiBase;
+    apiBaseInput.value = normalizeApiBase(savedApiBase);
   } else {
     apiBaseInput.value = LOCAL_API_BASE;
   }
+  saveApiBase();
 
   const storedSession = loadJson(SESSION_KEY, null);
   customLocationFields.classList.toggle("hidden", locationPresetSelect.value !== "custom");

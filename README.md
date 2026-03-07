@@ -201,13 +201,15 @@ Azure HTTPS entrypoint:
 - Set `PUBLIC_HOST` to your VM DNS name, for example `esd-g06-t05.eastasia.cloudapp.azure.com`
 - Start the proxy profile: `docker compose --profile azure-proxy up -d human-verification-proxy`
 - Open these URLs:
-  - Human Verification: `https://<your-host>/`
+  - Human Verification: `https://<your-host>/human-service/`
   - Analytics Dashboard: `https://<your-host>/analytics/`
   - API Gateway Docs: `https://<your-host>/api-docs`
 
 This terminates TLS on `80/443` and routes requests as follows:
-- `/` -> `human-verification-service:3010`
+- `/` -> redirects to `/human-service/`
+- `/human-service/*` -> `human-verification-service:3010`
 - `/api/v1/reviews*` -> `human-verification-service:3010`
+- `/api/v1/analytics*` -> `analytics-service:3008`
 - `/analytics/*` and `/analytics/ws` -> `analytics-service:3008`
 - `/api/*` and `/api-docs*` -> `api-gateway:3000`
 

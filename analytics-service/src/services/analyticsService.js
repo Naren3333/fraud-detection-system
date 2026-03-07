@@ -10,6 +10,11 @@ class AnalyticsService {
     this.lastAggregation = null;
   }
 
+  _formatAverage(value) {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed.toFixed(1) : 0;
+  }
+
   
   // Handles get dashboard metrics.
   async getDashboardMetrics(timeRange = '24h') {
@@ -82,7 +87,7 @@ class AnalyticsService {
       approved: parseInt(stats.approved) || 0,
       declined: parseInt(stats.declined) || 0,
       flagged: parseInt(stats.flagged) || 0,
-      avgRiskScore: parseFloat(stats.avg_risk_score)?.toFixed(1) || 0,
+      avgRiskScore: this._formatAverage(stats.avg_risk_score),
       maxRiskScore: parseInt(stats.max_risk_score) || 0,
       overrides: parseInt(stats.overrides) || 0,
       timestamp: new Date().toISOString(),
@@ -124,9 +129,9 @@ class AnalyticsService {
       approvalRate: total > 0 ? ((approved / total) * 100).toFixed(1) : 0,
       declineRate: total > 0 ? ((declined / total) * 100).toFixed(1) : 0,
       flagRate: total > 0 ? ((flagged / total) * 100).toFixed(1) : 0,
-      avgRiskScore: parseFloat(stats.avg_risk_score)?.toFixed(1) || 0,
-      avgMlScore: parseFloat(stats.avg_ml_score)?.toFixed(1) || 0,
-      avgRuleScore: parseFloat(stats.avg_rule_score)?.toFixed(1) || 0,
+      avgRiskScore: this._formatAverage(stats.avg_risk_score),
+      avgMlScore: this._formatAverage(stats.avg_ml_score),
+      avgRuleScore: this._formatAverage(stats.avg_rule_score),
       fraudFlaggedCount: parseInt(stats.fraud_flagged_count) || 0,
       overrideCount: parseInt(stats.override_count) || 0,
       uniqueCustomers: parseInt(stats.unique_customers) || 0,
@@ -153,7 +158,7 @@ class AnalyticsService {
     return result.rows.map(row => ({
       decision: row.decision,
       count: parseInt(row.count),
-      avgRiskScore: parseFloat(row.avg_risk_score)?.toFixed(1) || 0,
+      avgRiskScore: this._formatAverage(row.avg_risk_score),
       minRiskScore: parseInt(row.min_risk_score) || 0,
       maxRiskScore: parseInt(row.max_risk_score) || 0,
     }));
@@ -221,7 +226,7 @@ class AnalyticsService {
       }
       timeSeries[bucket][row.decision.toLowerCase()] = parseInt(row.count);
       timeSeries[bucket].total += parseInt(row.count);
-      timeSeries[bucket].avgRiskScore = parseFloat(row.avg_risk_score)?.toFixed(1) || 0;
+      timeSeries[bucket].avgRiskScore = this._formatAverage(row.avg_risk_score);
     }
 
     return Object.values(timeSeries);
@@ -250,7 +255,7 @@ class AnalyticsService {
       transactionCount: parseInt(row.transaction_count),
       declinedCount: parseInt(row.declined_count) || 0,
       flaggedCount: parseInt(row.flagged_count) || 0,
-      avgRiskScore: parseFloat(row.avg_risk_score)?.toFixed(1) || 0,
+      avgRiskScore: this._formatAverage(row.avg_risk_score),
     }));
   }
 
@@ -275,7 +280,7 @@ class AnalyticsService {
       merchantId: row.merchant_id,
       transactionCount: parseInt(row.transaction_count),
       declinedCount: parseInt(row.declined_count) || 0,
-      avgRiskScore: parseFloat(row.avg_risk_score)?.toFixed(1) || 0,
+      avgRiskScore: this._formatAverage(row.avg_risk_score),
     }));
   }
 

@@ -1,0 +1,4 @@
+{$HUMAN_VERIFICATION_PUBLIC_HOST} {
+  encode gzip
+  reverse_proxy human-verification-service:3010
+}

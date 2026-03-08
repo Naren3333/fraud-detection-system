@@ -1,25 +1,61 @@
 const colors = {
-  bg: '#282a36',
-  currentLine: '#44475a',
-  foreground: '#f8f8f2',
-  comment: '#6272a4',
-  cyan: '#8be9fd',
-  green: '#50fa7b',
-  orange: '#ffb86c',
-  pink: '#ff79c6',
-  purple: '#bd93f9',
-  red: '#ff5555',
-  yellow: '#f1fa8c',
+  bg: '#0a1831',
+  surface: '#102648',
+  border: 'rgba(132, 160, 205, 0.22)',
+  foreground: '#f5f7fb',
+  comment: '#8ea3c8',
+  mutedStrong: '#c5d0e5',
+  cyan: '#4ec3d4',
+  green: '#74d7a0',
+  orange: '#f3ae5f',
+  purple: '#98a2ff',
+  red: '#ea6b60',
+  yellow: '#f7d279',
 };
 
 let currentTimeRange = '24h';
 let charts = {};
 let ws = null;
+
+if (window.Chart) {
+  Chart.defaults.color = colors.foreground;
+  Chart.defaults.borderColor = colors.border;
+  Chart.defaults.font.family = "'Trebuchet MS', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif";
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   initWebSocket();
   loadDashboard();
   setInterval(() => loadDashboard(), 60000);
 });
+
+function setWsStatus(label, stateClass) {
+  document.querySelectorAll('.js-ws-status').forEach((node) => {
+    node.textContent = label;
+    node.classList.remove('connected', 'disconnected', 'error');
+    node.classList.add(stateClass);
+  });
+}
+
+function buildAxis(stacked = false) {
+  return {
+    stacked,
+    ticks: { color: colors.comment },
+    grid: { color: colors.border, drawBorder: false },
+  };
+}
+
+function buildTooltip() {
+  return {
+    backgroundColor: colors.surface,
+    titleColor: colors.foreground,
+    bodyColor: colors.mutedStrong,
+    borderColor: colors.border,
+    borderWidth: 1,
+    padding: 10,
+  };
+}
+
 // Handles init web socket.
 function initWebSocket() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -29,8 +65,7 @@ function initWebSocket() {
 
   ws.onopen = () => {
     console.log('WebSocket connected');
-    document.getElementById('ws-status').textContent = 'Connected';
-    document.getElementById('ws-status').style.color = colors.green;
+    setWsStatus('Connected', 'connected');
   };
 
   ws.onmessage = (event) => {
@@ -40,16 +75,15 @@ function initWebSocket() {
 
   ws.onerror = (error) => {
     console.error('WebSocket error:', error);
-    document.getElementById('ws-status').textContent = 'Error';
-    document.getElementById('ws-status').style.color = colors.red;
+    setWsStatus('Error', 'error');
   };
 
   ws.onclose = () => {
     console.log('WebSocket disconnected');
-    document.getElementById('ws-status').textContent = 'Disconnected';
-    document.getElementById('ws-status').style.color = colors.orange;
+    setWsStatus('Disconnected', 'disconnected');
     setTimeout(initWebSocket, 5000);
   };
+
   setInterval(() => {
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'ping' }));
@@ -79,8 +113,11 @@ function updateRealTimeStats(stats) {
   document.getElementById('rt-approved').textContent = stats.approved || 0;
   document.getElementById('rt-declined').textContent = stats.declined || 0;
   document.getElementById('rt-flagged').textContent = stats.flagged || 0;
-  document.getElementById('rt-avg-score').textContent = stats.avgRiskScore || 0;
+
+  const avgRiskScore = Number(stats.avgRiskScore || 0);
+  document.getElementById('rt-avg-score').textContent = Number.isFinite(avgRiskScore) ? avgRiskScore.toFixed(1) : '0.0';
 }
+
 // Handles load dashboard.
 async function loadDashboard() {
   try {
@@ -105,10 +142,10 @@ async function loadDashboard() {
 // Handles update overview stats.
 function updateOverviewStats(stats) {
   document.getElementById('total-transactions').textContent = stats.totalTransactions.toLocaleString();
-  document.getElementById('approval-rate').textContent = stats.approvalRate + '%';
-  document.getElementById('decline-rate').textContent = stats.declineRate + '%';
-  document.getElementById('flag-rate').textContent = stats.flagRate + '%';
-  
+  document.getElementById('approval-rate').textContent = `${stats.approvalRate}%`;
+  document.getElementById('decline-rate').textContent = `${stats.declineRate}%`;
+  document.getElementById('flag-rate').textContent = `${stats.flagRate}%`;
+
   document.getElementById('approved-count').textContent = `${stats.approved.toLocaleString()} approved`;
   document.getElementById('declined-count').textContent = `${stats.declined.toLocaleString()} declined`;
   document.getElementById('flagged-count').textContent = `${stats.flagged.toLocaleString()} flagged`;
@@ -153,9 +190,10 @@ function updateAppealImpact(stats) {
 
 // Handles update decision breakdown.
 function updateDecisionBreakdown(decisions) {
-  const approved = decisions.find(d => d.decision === 'APPROVED');
-  const declined = decisions.find(d => d.decision === 'DECLINED');
-  const flagged = decisions.find(d => d.decision === 'FLAGGED');
+  const approved = decisions.find((d) => d.decision === 'APPROVED');
+  const declined = decisions.find((d) => d.decision === 'DECLINED');
+  const flagged = decisions.find((d) => d.decision === 'FLAGGED');
+
   if (charts.decisionPie) {
     charts.decisionPie.destroy();
   }
@@ -172,18 +210,20 @@ function updateDecisionBreakdown(decisions) {
           flagged?.count || 0,
         ],
         backgroundColor: [colors.green, colors.red, colors.orange],
-        borderColor: colors.bg,
+        borderColor: colors.surface,
         borderWidth: 3,
       }],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      cutout: '64%',
       plugins: {
         legend: {
           position: 'bottom',
-          labels: { color: colors.foreground, font: { size: 14 } },
+          labels: { color: colors.mutedStrong, font: { size: 12 } },
         },
+        tooltip: buildTooltip(),
       },
     },
   });
@@ -195,8 +235,8 @@ function updateTimeSeriesChart(timeSeries) {
     charts.timeSeries.destroy();
   }
 
-  const labels = timeSeries.map(ts => new Date(ts.timestamp).toLocaleString('en-US', { 
-    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+  const labels = timeSeries.map((ts) => new Date(ts.timestamp).toLocaleString('en-US', {
+    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
   }));
 
   const ctx = document.getElementById('timeSeriesChart').getContext('2d');
@@ -207,26 +247,32 @@ function updateTimeSeriesChart(timeSeries) {
       datasets: [
         {
           label: 'Approved',
-          data: timeSeries.map(ts => ts.approved || 0),
+          data: timeSeries.map((ts) => ts.approved || 0),
           borderColor: colors.green,
-          backgroundColor: colors.green + '30',
-          tension: 0.4,
+          backgroundColor: `${colors.green}22`,
+          pointRadius: 2,
+          pointHoverRadius: 4,
+          tension: 0.35,
           fill: true,
         },
         {
           label: 'Declined',
-          data: timeSeries.map(ts => ts.declined || 0),
+          data: timeSeries.map((ts) => ts.declined || 0),
           borderColor: colors.red,
-          backgroundColor: colors.red + '30',
-          tension: 0.4,
+          backgroundColor: `${colors.red}22`,
+          pointRadius: 2,
+          pointHoverRadius: 4,
+          tension: 0.35,
           fill: true,
         },
         {
           label: 'Flagged',
-          data: timeSeries.map(ts => ts.flagged || 0),
+          data: timeSeries.map((ts) => ts.flagged || 0),
           borderColor: colors.orange,
-          backgroundColor: colors.orange + '30',
-          tension: 0.4,
+          backgroundColor: `${colors.orange}22`,
+          pointRadius: 2,
+          pointHoverRadius: 4,
+          tension: 0.35,
           fill: true,
         },
       ],
@@ -238,18 +284,13 @@ function updateTimeSeriesChart(timeSeries) {
       plugins: {
         legend: {
           position: 'top',
-          labels: { color: colors.foreground, font: { size: 12 } },
+          labels: { color: colors.mutedStrong, font: { size: 12 } },
         },
+        tooltip: buildTooltip(),
       },
       scales: {
-        x: {
-          ticks: { color: colors.comment },
-          grid: { color: colors.currentLine },
-        },
-        y: {
-          ticks: { color: colors.comment },
-          grid: { color: colors.currentLine },
-        },
+        x: buildAxis(),
+        y: buildAxis(),
       },
     },
   });
@@ -261,10 +302,10 @@ function updateRiskScoreChart(riskScores) {
     charts.riskScore.destroy();
   }
 
-  const labels = riskScores.map(rs => rs.range);
-  const approved = riskScores.map(rs => rs.approved || 0);
-  const declined = riskScores.map(rs => rs.declined || 0);
-  const flagged = riskScores.map(rs => rs.flagged || 0);
+  const labels = riskScores.map((rs) => rs.range);
+  const approved = riskScores.map((rs) => rs.approved || 0);
+  const declined = riskScores.map((rs) => rs.declined || 0);
+  const flagged = riskScores.map((rs) => rs.flagged || 0);
 
   const ctx = document.getElementById('riskScoreChart').getContext('2d');
   charts.riskScore = new Chart(ctx, {
@@ -276,16 +317,19 @@ function updateRiskScoreChart(riskScores) {
           label: 'Approved',
           data: approved,
           backgroundColor: colors.green,
+          borderRadius: 2,
         },
         {
           label: 'Declined',
           data: declined,
           backgroundColor: colors.red,
+          borderRadius: 2,
         },
         {
           label: 'Flagged',
           data: flagged,
           backgroundColor: colors.orange,
+          borderRadius: 2,
         },
       ],
     },
@@ -295,23 +339,17 @@ function updateRiskScoreChart(riskScores) {
       plugins: {
         legend: {
           position: 'top',
-          labels: { color: colors.foreground, font: { size: 12 } },
+          labels: { color: colors.mutedStrong, font: { size: 12 } },
         },
+        tooltip: buildTooltip(),
       },
       scales: {
-        x: {
-          stacked: true,
-          ticks: { color: colors.comment },
-          grid: { color: colors.currentLine },
-        },
-        y: {
-          stacked: true,
-          ticks: { color: colors.comment },
-          grid: { color: colors.currentLine },
-        },
+        x: buildAxis(true),
+        y: buildAxis(true),
       },
     },
   });
+
   if (charts.performance) {
     charts.performance.destroy();
   }
@@ -325,8 +363,10 @@ function updateRiskScoreChart(riskScores) {
         label: 'Avg Processing Time (ms)',
         data: [45, 52, 48, 55, 49, 47],
         borderColor: colors.cyan,
-        backgroundColor: colors.cyan + '30',
-        tension: 0.4,
+        backgroundColor: `${colors.cyan}20`,
+        pointRadius: 2,
+        pointHoverRadius: 4,
+        tension: 0.35,
         fill: true,
       }],
     },
@@ -336,18 +376,13 @@ function updateRiskScoreChart(riskScores) {
       plugins: {
         legend: {
           position: 'top',
-          labels: { color: colors.foreground, font: { size: 12 } },
+          labels: { color: colors.mutedStrong, font: { size: 12 } },
         },
+        tooltip: buildTooltip(),
       },
       scales: {
-        x: {
-          ticks: { color: colors.comment },
-          grid: { color: colors.currentLine },
-        },
-        y: {
-          ticks: { color: colors.comment },
-          grid: { color: colors.currentLine },
-        },
+        x: buildAxis(),
+        y: buildAxis(),
       },
     },
   });
@@ -361,10 +396,10 @@ function updateTopCustomers(customers) {
     return;
   }
 
-  tbody.innerHTML = customers.map(c => `
+  tbody.innerHTML = customers.map((c) => `
     <tr>
       <td>${c.customerId}</td>
-      <td>${c.transactionCount}</td>
+      <td>${c.transactionCount.toLocaleString()}</td>
       <td><span style="color: ${colors.red}">${c.declinedCount}</span></td>
       <td><span style="color: ${colors.orange}">${c.flaggedCount}</span></td>
       <td>${c.avgRiskScore}</td>
@@ -380,21 +415,27 @@ function updateTopMerchants(merchants) {
     return;
   }
 
-  tbody.innerHTML = merchants.map(m => `
+  tbody.innerHTML = merchants.map((m) => `
     <tr>
       <td>${m.merchantId}</td>
-      <td>${m.transactionCount}</td>
+      <td>${m.transactionCount.toLocaleString()}</td>
       <td><span style="color: ${colors.red}">${m.declinedCount}</span></td>
       <td>${m.avgRiskScore}</td>
     </tr>
   `).join('');
 }
+
 // Handles set time range.
-function setTimeRange(range) {
+function setTimeRange(range, trigger) {
   currentTimeRange = range;
-  document.querySelectorAll('.time-btn').forEach(btn => {
+  document.querySelectorAll('.time-btn').forEach((btn) => {
     btn.classList.remove('active');
   });
-  event.target.classList.add('active');
+
+  const activeButton = trigger || document.querySelector(`.time-btn[data-range="${range}"]`);
+  if (activeButton) {
+    activeButton.classList.add('active');
+  }
+
   loadDashboard();
 }

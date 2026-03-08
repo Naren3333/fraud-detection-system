@@ -10,10 +10,17 @@ const state = {
   transactionDetailsById: {},
   selectedTransactionId: null,
   poller: null,
+  apiFailureCount: 0,
 };
 
-const LOCAL_API_BASE = "http://localhost:3000/api/v1";
-const AZURE_API_BASE = "http://esd-g06-t05.eastasia.cloudapp.azure.com:3000/api/v1";
+const API_PORT = "3000";
+const API_TIMEOUT_MS = 10000;
+const POLL_INTERVAL_MS = 5000;
+const AZURE_HOST = "esd-g06-t05.eastasia.cloudapp.azure.com";
+const CURRENT_HOST = window.location.hostname || "localhost";
+const LOCAL_API_BASE = buildApiBase("localhost");
+const AZURE_API_BASE = buildApiBase(AZURE_HOST);
+const DEFAULT_API_BASE = isLocalHost(CURRENT_HOST) ? LOCAL_API_BASE : buildApiBase(CURRENT_HOST);
 
 const authView = document.getElementById("authView");
 const dashboardView = document.getElementById("dashboardView");
@@ -69,24 +76,84 @@ function saveJson(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+function getPreferredProtocol() {
+  return window.location.protocol === "https:" ? "https:" : "http:";
+}
+
+function isLocalHost(hostname) {
+  const host = String(hostname || "").trim().toLowerCase();
+  return host === "localhost" || host === "127.0.0.1";
+}
+
+function buildApiBase(hostname, port = API_PORT) {
+  const protocol = getPreferredProtocol();
+  return `${protocol}//${hostname}:${port}/api/v1`;
+}
+
+function normalizeApiBase(baseUrl) {
+  const fallback = DEFAULT_API_BASE;
+  const raw = String(baseUrl || "").trim();
+  if (!raw) return fallback;
+
+  let normalized = raw.replace(/\/+$/, "");
+
+  if (/^:\d+(\/|$)/.test(normalized)) {
+    normalized = `${getPreferredProtocol()}//${CURRENT_HOST}${normalized}`;
+  } else if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(normalized)) {
+    normalized = `${getPreferredProtocol()}//${normalized.replace(/^\/+/, "")}`;
+  }
+
+  try {
+    const parsed = new URL(normalized);
+    const host = parsed.hostname.toLowerCase();
+
+    if (!parsed.port && (isLocalHost(host) || host === AZURE_HOST || host === CURRENT_HOST.toLowerCase())) {
+      parsed.port = API_PORT;
+    }
+
+    if (host === AZURE_HOST) {
+      return buildApiBase(AZURE_HOST, parsed.port || API_PORT);
+    }
+
+    if (isLocalHost(host) && (!parsed.port || parsed.port === API_PORT)) {
+      return LOCAL_API_BASE;
+    }
+
+    if (!parsed.pathname || parsed.pathname === "/") {
+      parsed.pathname = "/api/v1";
+    } else if (!parsed.pathname.endsWith("/api/v1")) {
+      parsed.pathname = `${parsed.pathname.replace(/\/+$/, "")}/api/v1`;
+    }
+
+    return parsed.toString().replace(/\/+$/, "");
+  } catch {
+    return fallback;
+  }
+}
+
 function getApiBase() {
-  const raw = apiBaseInput.value.trim() || "http://localhost:3000/api/v1";
-  return raw.replace(/\/$/, "");
+  return normalizeApiBase(apiBaseInput.value || DEFAULT_API_BASE);
 }
 
 function saveApiBase() {
-  localStorage.setItem(API_BASE_KEY, getApiBase());
+  const normalized = getApiBase();
+  apiBaseInput.value = normalized;
+  localStorage.setItem(API_BASE_KEY, normalized);
 }
 
 function applyApiBase(baseUrl, sourceLabel) {
-  apiBaseInput.value = baseUrl;
+  const normalized = normalizeApiBase(baseUrl);
+  apiBaseInput.value = normalized;
   saveApiBase();
+  state.apiFailureCount = 0;
 
-  const message = `API Base set to ${baseUrl} (${sourceLabel}).`;
+  const message = `API Base set to ${normalized} (${sourceLabel}).`;
   setLineStatus(authStatus, message);
 
   if (state.user) {
     apiStatus.textContent = `User: ${state.user.id} | Role: ${state.user.role} | API: ${getApiBase()}`;
+    startPolling();
+    void refreshDashboardData();
   }
 }
 
@@ -126,6 +193,7 @@ function setSession(session) {
 }
 
 function clearSession() {
+  stopPolling();
   state.session = null;
   state.user = null;
   state.transactions = [];
@@ -133,13 +201,33 @@ function clearSession() {
   state.decisionByTransaction = {};
   state.transactionDetailsById = {};
   state.selectedTransactionId = null;
+  state.apiFailureCount = 0;
   localStorage.removeItem(SESSION_KEY);
+}
+
+function stopPolling() {
+  if (!state.poller) return;
+  clearInterval(state.poller);
+  state.poller = null;
+}
+
+function startPolling() {
+  if (state.poller) return;
+  state.poller = setInterval(refreshTransactionsOnly, POLL_INTERVAL_MS);
+}
+
+function recordApiConnectivityFailure() {
+  state.apiFailureCount += 1;
+  if (state.apiFailureCount >= 3) {
+    stopPolling();
+  }
 }
 
 async function apiRequest(path, options = {}) {
   const method = options.method || "GET";
   const needsAuth = options.auth !== false;
   const allowRefreshRetry = options.retry !== false;
+  const apiBase = getApiBase();
 
   const headers = {
     "Content-Type": "application/json",
@@ -153,11 +241,33 @@ async function apiRequest(path, options = {}) {
     headers.Authorization = `Bearer ${state.session.accessToken}`;
   }
 
-  const response = await fetch(`${getApiBase()}${path}`, {
-    method,
-    headers,
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+
+  let response;
+  try {
+    response = await fetch(`${apiBase}${path}`, {
+      method,
+      headers,
+      body: options.body ? JSON.stringify(options.body) : undefined,
+      signal: controller.signal,
+    });
+    state.apiFailureCount = 0;
+  } catch (error) {
+    recordApiConnectivityFailure();
+
+    const reason = error.name === "AbortError"
+      ? `Timed out reaching API Gateway at ${apiBase}`
+      : `Could not reach API Gateway at ${apiBase}`;
+
+    if (!state.poller && state.user) {
+      setLineStatus(apiStatus, `${reason}. Auto-refresh paused.`, true);
+    }
+
+    throw new Error(reason);
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   let payload = null;
   try {
@@ -876,10 +986,7 @@ async function resolveAppealFromDemo(appealId, resolution, buttonNode) {
 function showAuth() {
   dashboardView.classList.add("hidden");
   authView.classList.remove("hidden");
-  if (state.poller) {
-    clearInterval(state.poller);
-    state.poller = null;
-  }
+  stopPolling();
 }
 
 function showDashboard() {
@@ -1048,10 +1155,7 @@ async function handleLoginFlow(email, password) {
 
   showDashboard();
   await refreshDashboardData();
-  if (!state.poller) {
-    // Poll transaction updates only; avoid hammering /auth routes.
-    state.poller = setInterval(refreshTransactionsOnly, 5000);
-  }
+  startPolling();
 }
 
 registerForm.addEventListener("submit", async (event) => {
@@ -1195,7 +1299,11 @@ transferForm.addEventListener("submit", async (event) => {
   }
 });
 
-refreshBtn.addEventListener("click", refreshDashboardData);
+refreshBtn.addEventListener("click", async () => {
+  state.apiFailureCount = 0;
+  startPolling();
+  await refreshDashboardData();
+});
 
 logoutBtn.addEventListener("click", async () => {
   try {
@@ -1237,10 +1345,11 @@ locationPresetSelect.addEventListener("change", () => {
 async function bootstrap() {
   const savedApiBase = localStorage.getItem(API_BASE_KEY);
   if (savedApiBase) {
-    apiBaseInput.value = savedApiBase;
+    apiBaseInput.value = normalizeApiBase(savedApiBase);
   } else {
-    apiBaseInput.value = LOCAL_API_BASE;
+    apiBaseInput.value = DEFAULT_API_BASE;
   }
+  saveApiBase();
 
   const storedSession = loadJson(SESSION_KEY, null);
   customLocationFields.classList.toggle("hidden", locationPresetSelect.value !== "custom");
@@ -1254,7 +1363,7 @@ async function bootstrap() {
   try {
     showDashboard();
     await refreshDashboardData();
-    state.poller = setInterval(refreshTransactionsOnly, 5000);
+    startPolling();
   } catch {
     clearSession();
     showAuth();

@@ -9,12 +9,16 @@ This guide matches the current Postman collection:
 - Docker Desktop
 - Docker Compose
 - Postman
+- Node.js 18+ for the automated API test scripts
 
 Start the platform from project root:
 
 ```bash
 docker compose up --build -d
 ```
+
+The stack now reads secrets and host port bindings from `.env`.
+A development `.env` is provided locally, and `.env.example` documents the expected variables.
 
 ## 2. Import Collection
 
@@ -27,6 +31,95 @@ docker compose up --build -d
 4. Open dashboards in browser:
    - `http://localhost:3008`
    - `http://localhost:3009`
+
+## 2A. Automated Smoke Health Check
+
+Run a quick reachability check across the main entrypoints:
+
+```bash
+cd testing
+npm run smoke:health
+```
+
+The script checks:
+
+- API Gateway live health
+- Analytics service live health
+- Prometheus health
+- Grafana health
+- Jaeger UI reachability
+
+Optional environment variables:
+
+- `E2E_BASE_URL` (default: `http://localhost:3000/api/v1`)
+- `SMOKE_ANALYTICS_HEALTH_URL`
+- `SMOKE_PROMETHEUS_HEALTH_URL`
+- `SMOKE_GRAFANA_HEALTH_URL`
+- `SMOKE_JAEGER_URL`
+- `SMOKE_REQUEST_TIMEOUT_MS`
+
+## 2B. Automated Guard / Negative-Path Test
+
+Run a fast API regression for common failure and auth guard cases:
+
+```bash
+cd testing
+npm run test:guards
+```
+
+The script covers:
+
+- fresh registration succeeds
+- duplicate registration is rejected
+- invalid login is rejected
+- valid login succeeds
+- unauthenticated profile access is blocked
+- unauthenticated transaction access is blocked
+- invalid transaction payload is rejected
+- missing decision returns `404`
+- logout succeeds
+
+Optional environment variables:
+
+- `E2E_BASE_URL` (default: `http://localhost:3000/api/v1`)
+- `GUARD_AUTH_BASE_URL` (default: `http://localhost:3002/api/v1/auth`)
+- `GUARD_TEST_PASSWORD`
+- `GUARD_REQUEST_TIMEOUT_MS`
+
+## 2C. Automated Happy-Path Test
+
+Run the API-level end-to-end regression flow:
+
+```bash
+cd testing
+npm run e2e:happy-path
+```
+
+The script covers:
+
+- register
+- login
+- profile fetch
+- high-value transaction creation
+- decision persistence
+- manual review decline
+- appeal submission
+- appeal reversal
+- analytics verification
+
+Optional environment variables:
+
+- `E2E_BASE_URL` (default: `http://localhost:3000/api/v1`)
+- `E2E_PASSWORD`
+- `E2E_REQUEST_TIMEOUT_MS`
+- `E2E_POLL_TIMEOUT_MS`
+- `E2E_POLL_INTERVAL_MS`
+
+Suggested run order for the automated Node scripts:
+
+1. `npm run smoke:health`
+2. `npm run test:guards`
+3. `npm run e2e:happy-path`
 
 ## 3. Collection Structure (Run Order)
 
@@ -214,6 +307,8 @@ docker compose down -v
 
 System is healthy when:
 
+- Smoke health checks pass for gateway, analytics, Prometheus, Grafana, and Jaeger.
+- Guard tests reject invalid or unauthenticated access correctly.
 - Health endpoints are green across all services.
 - Auth lifecycle works end-to-end (including password change).
 - Transaction create/read/idempotency behave correctly.

@@ -22,6 +22,17 @@ The demo uses our real project APIs via API Gateway.
 - Your stack is running (`docker compose up --build`)
 - API Gateway reachable at `http://localhost:3000`
 
+## Runtime config
+
+The demo no longer hardcodes API hosts in `app.js`.
+
+- Runtime config lives in `demo/config.js`
+- `apiBase` can point to any gateway URL, for example:
+  - `http://localhost:3000/api/v1`
+  - `http://your-hostname:3000/api/v1`
+  - `/api/v1` if the demo is reverse-proxied behind the same origin as the gateway
+- If `apiBase` is left empty, the demo derives a sensible default from the current hostname
+
 ## Run demo UI
 
 From demo folder :
@@ -34,7 +45,7 @@ Open:
 
 - `http://localhost:8080/`
 
-If needed, change `API Base URL` in the UI (default: `http://localhost:3000/api/v1`).
+If needed, change `API Base URL` in the UI or edit `demo/config.js`.
 
 ## Demo flow suggestion
 

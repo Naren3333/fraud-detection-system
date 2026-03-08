@@ -13,14 +13,19 @@ const state = {
   apiFailureCount: 0,
 };
 
-const API_PORT = "3000";
-const API_TIMEOUT_MS = 10000;
-const POLL_INTERVAL_MS = 5000;
-const AZURE_HOST = "esd-g06-t05.eastasia.cloudapp.azure.com";
+const runtimeConfig = window.__DEMO_CONFIG__ || {};
+const API_PORT = String(runtimeConfig.apiPort || "3000");
+const API_TIMEOUT_MS = Number(runtimeConfig.apiTimeoutMs || 10000);
+const POLL_INTERVAL_MS = Number(runtimeConfig.pollIntervalMs || 5000);
+const AZURE_HOST = String(runtimeConfig.azureHost || "esd-g06-t05.eastasia.cloudapp.azure.com").trim();
 const CURRENT_HOST = window.location.hostname || "localhost";
 const LOCAL_API_BASE = buildApiBase("localhost");
 const AZURE_API_BASE = buildApiBase(AZURE_HOST);
-const DEFAULT_API_BASE = isLocalHost(CURRENT_HOST) ? LOCAL_API_BASE : buildApiBase(CURRENT_HOST);
+const AUTO_API_BASE = isLocalHost(CURRENT_HOST) ? LOCAL_API_BASE : buildApiBase(CURRENT_HOST);
+const CONFIGURED_API_BASE = typeof runtimeConfig.apiBase === "string" ? runtimeConfig.apiBase.trim() : "";
+const DEFAULT_API_BASE = CONFIGURED_API_BASE
+  ? normalizeApiBase(CONFIGURED_API_BASE, AUTO_API_BASE)
+  : AUTO_API_BASE;
 
 const authView = document.getElementById("authView");
 const dashboardView = document.getElementById("dashboardView");
@@ -90,8 +95,8 @@ function buildApiBase(hostname, port = API_PORT) {
   return `${protocol}//${hostname}:${port}/api/v1`;
 }
 
-function normalizeApiBase(baseUrl) {
-  const fallback = DEFAULT_API_BASE;
+function normalizeApiBase(baseUrl, fallbackBase = DEFAULT_API_BASE) {
+  const fallback = fallbackBase;
   const raw = String(baseUrl || "").trim();
   if (!raw) return fallback;
 

@@ -51,13 +51,13 @@ services:
       zookeeper:
         condition: service_healthy
     ports:
-      - "9092:9092"       # internal
-      - "9093:9093"       # external (host access for testing)
+      - "${INFRA_BIND_HOST:-127.0.0.1}:${KAFKA_INTERNAL_HOST_PORT:-9092}:9092"
+      - "${INFRA_BIND_HOST:-127.0.0.1}:${KAFKA_EXTERNAL_HOST_PORT:-9093}:9093"
     environment:
       KAFKA_BROKER_ID:                        1
       KAFKA_ZOOKEEPER_CONNECT:                zookeeper:2181
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP:   INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS:             INTERNAL://kafka:9092,EXTERNAL://localhost:9093
+      KAFKA_ADVERTISED_LISTENERS:             INTERNAL://kafka:9092,EXTERNAL://${KAFKA_EXTERNAL_ADVERTISED_HOST:-localhost}:${KAFKA_EXTERNAL_HOST_PORT:-9093}
       KAFKA_INTER_BROKER_LISTENER_NAME:       INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
@@ -105,7 +105,7 @@ services:
     container_name: redis
     networks: [fraud-net]
     ports:
-      - "6379:6379"
+      - "${INFRA_BIND_HOST:-127.0.0.1}:${REDIS_HOST_PORT:-6379}:6379"
     command: >
       redis-server
       --maxmemory 256mb
@@ -125,13 +125,13 @@ services:
     container_name: transaction-db
     networks: [fraud-net]
     environment:
-      POSTGRES_DB:       transaction_db
-      POSTGRES_USER:     txn_user
-      POSTGRES_PASSWORD: txn_password
+      POSTGRES_DB:       ${TRANSACTION_DB_NAME:-transaction_db}
+      POSTGRES_USER:     ${TRANSACTION_DB_USER:-txn_user}
+      POSTGRES_PASSWORD: ${TRANSACTION_DB_PASSWORD}
     volumes:
       - transaction-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U txn_user -d transaction_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${TRANSACTION_DB_USER:-txn_user} -d ${TRANSACTION_DB_NAME:-transaction_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -143,8 +143,8 @@ services:
     container_name: transaction-service
     networks: [fraud-net]
     ports:
-      - "3001:3001"
-      - "9091:9091"
+      - "${INTERNAL_SERVICE_BIND_HOST:-127.0.0.1}:${TRANSACTION_SERVICE_HOST_PORT:-3001}:3001"
+      - "${INTERNAL_SERVICE_BIND_HOST:-127.0.0.1}:${TRANSACTION_METRICS_HOST_PORT:-9091}:9091"
     depends_on:
       transaction-db:
         condition: service_healthy
@@ -164,9 +164,9 @@ services:
       # DB
       DB_HOST:               transaction-db
       DB_PORT:               5432
-      DB_NAME:               transaction_db
-      DB_USER:               txn_user
-      DB_PASSWORD:           txn_password
+      DB_NAME:               ${TRANSACTION_DB_NAME:-transaction_db}
+      DB_USER:               ${TRANSACTION_DB_USER:-txn_user}
+      DB_PASSWORD:           ${TRANSACTION_DB_PASSWORD}
       # Kafka
       KAFKA_BROKERS:         kafka:9092
       KAFKA_CLIENT_ID:       transaction-service
@@ -179,7 +179,7 @@ services:
       REDIS_PORT:            6379
       REDIS_DB:              1
       # JWT (must match API Gateway)
-      JWT_SECRET:            super-secret-change-in-prod
+      JWT_SECRET:            ${PLATFORM_JWT_SECRET}
     command: >
       sh -c "node src/db/migrate.js && node src/index.js"
     restart: unless-stopped
@@ -197,8 +197,8 @@ services:
     container_name: api-gateway
     networks: [fraud-net]
     ports:
-      - "3000:3000"
-      - "9090:9090"
+      - "${GATEWAY_BIND_HOST:-0.0.0.0}:${API_GATEWAY_HOST_PORT:-3000}:3000"
+      - "${INTERNAL_SERVICE_BIND_HOST:-127.0.0.1}:${API_GATEWAY_METRICS_HOST_PORT:-9090}:9090"
     depends_on:
       redis:
         condition: service_healthy
@@ -215,7 +215,7 @@ services:
       PORT:                         3000
       SERVICE_NAME:                 api-gateway
       LOG_LEVEL:                    info
-      JWT_SECRET:                   super-secret-change-in-prod
+      JWT_SECRET:                   ${PLATFORM_JWT_SECRET}
       JWT_EXPIRES_IN:               24h
       JWT_ISSUER:                   fraud-detection-platform
       REDIS_HOST:                   redis
@@ -244,13 +244,13 @@ services:
     container_name: user-db
     networks: [fraud-net]
     environment:
-      POSTGRES_DB: user_db
-      POSTGRES_USER: user_admin
-      POSTGRES_PASSWORD: user_password
+      POSTGRES_DB: ${USER_DB_NAME:-user_db}
+      POSTGRES_USER: ${USER_DB_USER:-user_admin}
+      POSTGRES_PASSWORD: ${USER_DB_PASSWORD}
     volumes:
       - user-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user_admin -d user_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${USER_DB_USER:-user_admin} -d ${USER_DB_NAME:-user_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -262,7 +262,7 @@ services:
     container_name: user-service
     networks: [fraud-net]
     ports:
-      - "3002:3002"
+      - "${INTERNAL_SERVICE_BIND_HOST:-127.0.0.1}:${USER_SERVICE_HOST_PORT:-3002}:3002"
     depends_on:
       user-db:
         condition: service_healthy
@@ -278,14 +278,14 @@ services:
       # DB
       DB_HOST:               user-db
       DB_PORT:               5432
-      DB_NAME:               user_db
-      DB_USER:               user_admin
-      DB_PASSWORD:           user_password
+      DB_NAME:               ${USER_DB_NAME:-user_db}
+      DB_USER:               ${USER_DB_USER:-user_admin}
+      DB_PASSWORD:           ${USER_DB_PASSWORD}
       # JWT (must match API Gateway)
-      JWT_SECRET:            super-secret-change-in-prod
+      JWT_SECRET:            ${PLATFORM_JWT_SECRET}
       JWT_EXPIRES_IN:        24h
       JWT_ISSUER:            fraud-detection-platform
-      JWT_REFRESH_SECRET:    super-secret-refresh-token
+      JWT_REFRESH_SECRET:    ${PLATFORM_JWT_REFRESH_SECRET}
       JWT_REFRESH_EXPIRES_IN: 7d
       # Redis
       REDIS_HOST:            redis
@@ -312,7 +312,7 @@ services:
       container_name: fraud-detection-service
       networks: [fraud-net]
       ports:
-        - "3003:3003"
+        - "${INTERNAL_SERVICE_BIND_HOST:-127.0.0.1}:${FRAUD_DETECTION_SERVICE_HOST_PORT:-3003}:3003"
       depends_on:
         kafka:
           condition: service_healthy
@@ -362,8 +362,8 @@ services:
     container_name: ml-scoring-service
     networks: [fraud-net]
     ports:
-      - "3004:3004"
-      - "9094:9094"  # Prometheus metrics
+      - "${INTERNAL_SERVICE_BIND_HOST:-127.0.0.1}:${ML_SCORING_SERVICE_HOST_PORT:-3004}:3004"
+      - "${INTERNAL_SERVICE_BIND_HOST:-127.0.0.1}:${ML_SCORING_METRICS_HOST_PORT:-9094}:9094"
     depends_on:
       redis:
         condition: service_healthy
@@ -411,13 +411,13 @@ services:
     container_name: decision-db
     networks: [fraud-net]
     environment:
-      POSTGRES_DB:       decision_db
-      POSTGRES_USER:     decision_admin
-      POSTGRES_PASSWORD: decision_password
+      POSTGRES_DB:       ${DECISION_DB_NAME:-decision_db}
+      POSTGRES_USER:     ${DECISION_DB_USER:-decision_admin}
+      POSTGRES_PASSWORD: ${DECISION_DB_PASSWORD}
     volumes:
       - decision-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U decision_admin -d decision_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${DECISION_DB_USER:-decision_admin} -d ${DECISION_DB_NAME:-decision_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -431,8 +431,8 @@ services:
     container_name: decision-engine-service
     networks: [fraud-net]
     ports:
-      - "3005:3005"
-      - "9095:9095"  # Prometheus metrics
+      - "${INTERNAL_SERVICE_BIND_HOST:-127.0.0.1}:${DECISION_ENGINE_SERVICE_HOST_PORT:-3005}:3005"
+      - "${INTERNAL_SERVICE_BIND_HOST:-127.0.0.1}:${DECISION_ENGINE_METRICS_HOST_PORT:-9095}:9095"
     depends_on:
       decision-db:
         condition: service_healthy
@@ -451,9 +451,9 @@ services:
       # Database
       DB_HOST:               decision-db
       DB_PORT:               5432
-      DB_NAME:               decision_db
-      DB_USER:               decision_admin
-      DB_PASSWORD:           decision_password
+      DB_NAME:               ${DECISION_DB_NAME:-decision_db}
+      DB_USER:               ${DECISION_DB_USER:-decision_admin}
+      DB_PASSWORD:           ${DECISION_DB_PASSWORD}
       DB_MAX_CONNECTIONS:    20
       # Kafka
       KAFKA_BROKERS:         kafka:9092
@@ -500,8 +500,8 @@ services:
     container_name: notification-service
     networks: [fraud-net]
     ports:
-      - "3006:3006"
-      - "9096:9096"  # Prometheus metrics
+      - "${INTERNAL_SERVICE_BIND_HOST:-127.0.0.1}:${NOTIFICATION_SERVICE_HOST_PORT:-3006}:3006"
+      - "${INTERNAL_SERVICE_BIND_HOST:-127.0.0.1}:${NOTIFICATION_METRICS_HOST_PORT:-9096}:9096"
     depends_on:
       kafka:
         condition: service_healthy
@@ -564,13 +564,13 @@ services:
     container_name: human-review-db
     networks: [fraud-net]
     environment:
-      POSTGRES_DB:       human_review_db
-      POSTGRES_USER:     review_admin
-      POSTGRES_PASSWORD: review_password
+      POSTGRES_DB:       ${HUMAN_REVIEW_DB_NAME:-human_review_db}
+      POSTGRES_USER:     ${HUMAN_REVIEW_DB_USER:-review_admin}
+      POSTGRES_PASSWORD: ${HUMAN_REVIEW_DB_PASSWORD}
     volumes:
       - human-review-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U review_admin -d human_review_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${HUMAN_REVIEW_DB_USER:-review_admin} -d ${HUMAN_REVIEW_DB_NAME:-human_review_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -584,7 +584,7 @@ services:
     container_name: human-verification-service
     networks: [fraud-net]
     ports:
-      - "3010:3010"
+      - "${INTERNAL_SERVICE_BIND_HOST:-127.0.0.1}:${HUMAN_VERIFICATION_SERVICE_HOST_PORT:-3010}:3010"
     depends_on:
       human-review-db:
         condition: service_healthy
@@ -603,9 +603,9 @@ services:
       # Database
       DB_HOST:               human-review-db
       DB_PORT:               5432
-      DB_NAME:               human_review_db
-      DB_USER:               review_admin
-      DB_PASSWORD:           review_password
+      DB_NAME:               ${HUMAN_REVIEW_DB_NAME:-human_review_db}
+      DB_USER:               ${HUMAN_REVIEW_DB_USER:-review_admin}
+      DB_PASSWORD:           ${HUMAN_REVIEW_DB_PASSWORD}
       # Kafka
       KAFKA_BROKERS:         kafka:9092
       KAFKA_CLIENT_ID:       human-verification-service
@@ -632,7 +632,7 @@ services:
     container_name: analytics-service
     networks: [fraud-net]
     ports:
-      - "3008:3008"  # Dashboard + API
+      - "${ANALYTICS_BIND_HOST:-0.0.0.0}:${ANALYTICS_SERVICE_HOST_PORT:-3008}:3008"
     depends_on:
       decision-db:
         condition: service_healthy
@@ -651,17 +651,17 @@ services:
       # Database (read-only access to decision DB)
       DB_HOST:               decision-db
       DB_PORT:               5432
-      DB_NAME:               decision_db
-      DB_USER:               decision_admin
-      DB_PASSWORD:           decision_password
+      DB_NAME:               ${DECISION_DB_NAME:-decision_db}
+      DB_USER:               ${DECISION_DB_USER:-decision_admin}
+      DB_PASSWORD:           ${DECISION_DB_PASSWORD}
       DB_MAX_CONNECTIONS:    10
       # Appeal DB (read-only)
       APPEAL_DB_ENABLED:     true
       APPEAL_DB_HOST:        appeal-db
       APPEAL_DB_PORT:        5432
-      APPEAL_DB_NAME:        appeal_db
-      APPEAL_DB_USER:        appeal_admin
-      APPEAL_DB_PASSWORD:    appeal_password
+      APPEAL_DB_NAME:        ${APPEAL_DB_NAME:-appeal_db}
+      APPEAL_DB_USER:        ${APPEAL_DB_USER:-appeal_admin}
+      APPEAL_DB_PASSWORD:    ${APPEAL_DB_PASSWORD}
       APPEAL_DB_MAX_CONNECTIONS: 10
       # Redis (time-series metrics)
       REDIS_HOST:            redis
@@ -690,13 +690,13 @@ services:
     container_name: audit-db
     networks: [fraud-net]
     environment:
-      POSTGRES_DB:       audit_db
-      POSTGRES_USER:     audit_admin
-      POSTGRES_PASSWORD: audit_password
+      POSTGRES_DB:       ${AUDIT_DB_NAME:-audit_db}
+      POSTGRES_USER:     ${AUDIT_DB_USER:-audit_admin}
+      POSTGRES_PASSWORD: ${AUDIT_DB_PASSWORD}
     volumes:
       - audit-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U audit_admin -d audit_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${AUDIT_DB_USER:-audit_admin} -d ${AUDIT_DB_NAME:-audit_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -710,8 +710,8 @@ services:
     container_name: audit-service
     networks: [fraud-net]
     ports:
-      - "3007:3007"
-      - "9097:9097"  # Prometheus metrics
+      - "${INTERNAL_SERVICE_BIND_HOST:-127.0.0.1}:${AUDIT_SERVICE_HOST_PORT:-3007}:3007"
+      - "${INTERNAL_SERVICE_BIND_HOST:-127.0.0.1}:${AUDIT_METRICS_HOST_PORT:-9097}:9097"
     depends_on:
       audit-db:
         condition: service_healthy
@@ -730,9 +730,9 @@ services:
       # Database
       DB_HOST:               audit-db
       DB_PORT:               5432
-      DB_NAME:               audit_db
-      DB_USER:               audit_admin
-      DB_PASSWORD:           audit_password
+      DB_NAME:               ${AUDIT_DB_NAME:-audit_db}
+      DB_USER:               ${AUDIT_DB_USER:-audit_admin}
+      DB_PASSWORD:           ${AUDIT_DB_PASSWORD}
       DB_MAX_CONNECTIONS:    20
       # Kafka (subscribe to ALL topics)
       KAFKA_BROKERS:         kafka:9092
@@ -763,10 +763,10 @@ services:
     volumes:
       - ./monitoring/otel-collector-config.yml:/etc/otel-collector-config.yml:ro
     ports:
-      - "4317:4317"
-      - "4318:4318"
-      - "13133:13133"
-      - "8889:8889"
+      - "${INFRA_BIND_HOST:-127.0.0.1}:${OTEL_GRPC_HOST_PORT:-4317}:4317"
+      - "${INFRA_BIND_HOST:-127.0.0.1}:${OTEL_HTTP_HOST_PORT:-4318}:4318"
+      - "${INFRA_BIND_HOST:-127.0.0.1}:${OTEL_HEALTH_HOST_PORT:-13133}:13133"
+      - "${INFRA_BIND_HOST:-127.0.0.1}:${OTEL_METRICS_HOST_PORT:-8889}:8889"
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:13133/"]
       interval: 15s
@@ -780,13 +780,13 @@ services:
     container_name: appeal-db
     networks: [fraud-net]
     environment:
-      POSTGRES_DB:       appeal_db
-      POSTGRES_USER:     appeal_admin
-      POSTGRES_PASSWORD: appeal_password
+      POSTGRES_DB:       ${APPEAL_DB_NAME:-appeal_db}
+      POSTGRES_USER:     ${APPEAL_DB_USER:-appeal_admin}
+      POSTGRES_PASSWORD: ${APPEAL_DB_PASSWORD}
     volumes:
       - appeal-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U appeal_admin -d appeal_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${APPEAL_DB_USER:-appeal_admin} -d ${APPEAL_DB_NAME:-appeal_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -800,7 +800,7 @@ services:
     container_name: appeal-service
     networks: [fraud-net]
     ports:
-      - "3011:3011"
+      - "${INTERNAL_SERVICE_BIND_HOST:-127.0.0.1}:${APPEAL_SERVICE_HOST_PORT:-3011}:3011"
     depends_on:
       appeal-db:
         condition: service_healthy
@@ -821,9 +821,9 @@ services:
       # Database
       DB_HOST:               appeal-db
       DB_PORT:               5432
-      DB_NAME:               appeal_db
-      DB_USER:               appeal_admin
-      DB_PASSWORD:           appeal_password
+      DB_NAME:               ${APPEAL_DB_NAME:-appeal_db}
+      DB_USER:               ${APPEAL_DB_USER:-appeal_admin}
+      DB_PASSWORD:           ${APPEAL_DB_PASSWORD}
       DB_MAX_CONNECTIONS:    20
       # Dependencies
       TRANSACTION_SERVICE_URL: http://transaction-service:3001
@@ -847,7 +847,7 @@ services:
     container_name: jaeger
     networks: [fraud-net]
     ports:
-      - "16686:16686"
+      - "${OBSERVABILITY_BIND_HOST:-0.0.0.0}:${JAEGER_HOST_PORT:-16686}:16686"
     command:
       - "--set=extensions.jaeger_query.ui.config_file=/etc/jaeger/ui-config.json"
       - "--set=extensions.jaeger_storage.metric_backends.prometheus_backend.prometheus.endpoint=http://prometheus:9090"
@@ -872,7 +872,7 @@ services:
     container_name: prometheus
     networks: [fraud-net]
     ports:
-      - "9099:9090"
+      - "${OBSERVABILITY_BIND_HOST:-0.0.0.0}:${PROMETHEUS_HOST_PORT:-9099}:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
@@ -895,7 +895,7 @@ services:
     container_name: grafana
     networks: [fraud-net]
     ports:
-      - "3009:3009"
+      - "${OBSERVABILITY_BIND_HOST:-0.0.0.0}:${GRAFANA_HOST_PORT:-3009}:3009"
     volumes:
       - grafana-data:/var/lib/grafana
       - ./monitoring/grafana/grafana.ini:/etc/grafana/grafana.ini:ro

@@ -1,0 +1,9 @@
+{
+  "name": "fraud-detection-testing",
+  "private": true,
+  "scripts": {
+    "smoke:health": "node ./smoke-health.js",
+    "test:guards": "node ./api-guards.js",
+    "e2e:happy-path": "node ./e2e-happy-path.js"
+  }
+}

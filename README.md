@@ -181,6 +181,9 @@ MetricsHub -.-> Prometheus
 ## Quick Start
 
 ```bash
+# Review env-backed defaults
+# .env.example documents all required values
+
 # Start all services
 docker compose up --build
 
@@ -195,6 +198,12 @@ Main entrypoints:
 - Grafana Dashboard: `http://localhost:3009`
 - Prometheus UI: `http://localhost:9099`
 - Jaeger UI (Tracing): `http://localhost:16686`
+
+Notes:
+
+- Docker Compose now reads secrets and host port bindings from `.env`
+- Internal service ports are bound to `127.0.0.1` by default to reduce accidental public exposure
+- Public-facing entrypoints remain the gateway and selected dashboards unless you override bind hosts in `.env`
 
 ---
 
@@ -368,6 +377,19 @@ Use Postman collection: `testing/test.json`.
 2. Import `testing/test.json` in Postman.
 3. Run folders in order from `01` to `09`.
 4. Visit analytics dashboard UI at `http://localhost:3008` and Grafana at `http://localhost:3009` during/after tests.
+
+Automated Node-based test paths:
+
+```bash
+cd testing
+npm run smoke:health
+npm run test:guards
+npm run e2e:happy-path
+```
+
+- `smoke:health` checks gateway and observability endpoints are reachable.
+- `test:guards` validates auth and validation failure paths.
+- `e2e:happy-path` runs the main end-to-end business flow.
 
 Detailed guide: `testing/TESTING.md`.
 

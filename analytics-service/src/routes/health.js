@@ -1,7 +1,8 @@
 const router = require('express').Router();
-const { query } = require('../config/db');
 const { getClient } = require('../config/redis');
 const logger = require('../config/logger');
+const eventConsumerService = require('../services/eventConsumerService');
+const projectionStore = require('../services/projectionStore');
 
 /**
  * @openapi
@@ -27,18 +28,30 @@ router.get('/health', async (req, res) => {
 
   let degraded = false;
   try {
-    await query('SELECT 1');
-    health.dependencies.database = { status: 'healthy' };
-  } catch (err) {
-    health.dependencies.database = { status: 'unhealthy', error: err.message };
-    degraded = true;
-  }
-  try {
     const redis = getClient();
     await redis.ping();
-    health.dependencies.redis = { status: 'healthy' };
+    health.dependencies.redis = { status: 'healthy', storage: 'projection-store' };
   } catch (err) {
     health.dependencies.redis = { status: 'unhealthy', error: err.message };
+    degraded = true;
+  }
+
+  const consumerStatus = eventConsumerService.getStatus();
+  health.dependencies.kafka = {
+    status: consumerStatus.enabled
+      ? (consumerStatus.running ? 'healthy' : 'unhealthy')
+      : 'disabled',
+    ...consumerStatus,
+  };
+  if (consumerStatus.enabled && !consumerStatus.running) {
+    degraded = true;
+  }
+
+  try {
+    health.projections = await projectionStore.getProjectionSummary();
+  } catch (err) {
+    logger.error('Analytics projection health failed', { error: err.message });
+    health.projections = { status: 'unavailable', error: err.message };
     degraded = true;
   }
 

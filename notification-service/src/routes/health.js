@@ -1,4 +1,5 @@
 const router = require('express').Router();
+const config = require('../config');
 const emailService = require('../services/emailService');
 const smsService = require('../services/smsService');
 const logger = require('../config/logger');
@@ -33,10 +34,13 @@ router.get('/health', async (req, res) => {
   try {
     const emailHealthy = await emailService.verifyConnection();
     health.dependencies.email = {
-      status: emailHealthy ? 'healthy' : 'degraded',
-      enabled: true,
+      status: config.email.enabled ? (emailHealthy ? 'healthy' : 'degraded') : 'disabled',
+      enabled: config.email.enabled,
+      provider: config.email.provider,
+      mode: config.email.provider === 'mock' ? 'mock' : 'external',
+      fromAddress: config.email.from.address,
     };
-    if (!emailHealthy) degraded = true;
+    if (config.email.enabled && !emailHealthy) degraded = true;
   } catch (err) {
     logger.error('Email health check failed', { error: err.message });
     health.dependencies.email = { status: 'unhealthy', error: err.message };
@@ -45,10 +49,13 @@ router.get('/health', async (req, res) => {
   try {
     const smsHealthy = await smsService.verifyConnection();
     health.dependencies.sms = {
-      status: smsHealthy ? 'healthy' : 'degraded',
-      enabled: true,
+      status: config.sms.enabled ? (smsHealthy ? 'healthy' : 'degraded') : 'disabled',
+      enabled: config.sms.enabled,
+      provider: config.sms.provider,
+      mode: config.sms.provider === 'mock' ? 'mock' : 'external',
+      sender: config.sms.twilio.phoneNumber || config.contacts.fraudTeam.phone,
     };
-    if (!smsHealthy) degraded = true;
+    if (config.sms.enabled && !smsHealthy) degraded = true;
   } catch (err) {
     logger.error('SMS health check failed', { error: err.message });
     health.dependencies.sms = { status: 'unhealthy', error: err.message };
@@ -57,6 +64,14 @@ router.get('/health', async (req, res) => {
   health.dependencies.kafka = {
     status: 'healthy',
     note: 'Consumer crash triggers process restart',
+  };
+  health.notificationProviders = {
+    realProviderEnabled: (config.email.enabled && config.email.provider !== 'mock')
+      || (config.sms.enabled && config.sms.provider !== 'mock'),
+    customerFallbackEmail: config.contacts.customer.fallbackEmail,
+    customerFallbackPhone: config.contacts.customer.fallbackPhone,
+    fraudTeamEmail: config.contacts.fraudTeam.email,
+    fraudTeamPhone: config.contacts.fraudTeam.phone,
   };
 
   health.status = degraded ? 'degraded' : 'healthy';
@@ -80,8 +95,10 @@ router.get('/health/ready', async (req, res) => {
   try {
     const emailHealthy = await emailService.verifyConnection();
     const smsHealthy = await smsService.verifyConnection();
+    const emailAvailable = config.email.enabled && emailHealthy;
+    const smsAvailable = config.sms.enabled && smsHealthy;
 
-    if (!emailHealthy && !smsHealthy) {
+    if (!emailAvailable && !smsAvailable) {
       return res.status(503).json({
         status: 'not_ready',
         timestamp: new Date().toISOString(),

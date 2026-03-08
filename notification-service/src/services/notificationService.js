@@ -6,7 +6,6 @@ const { renderDeclinedCustomerEmail, renderDeclinedFraudTeamEmail, renderFlagged
 const { retryWithBackoff } = require('../utils/retry');
 
 class NotificationService {
-  
   // Handles process decision.
   async processDecision(decisionEvent) {
     const { decision, transactionId, customerId } = decisionEvent;
@@ -50,8 +49,8 @@ class NotificationService {
   _getDeclinedNotifications(event) {
     const notifications = [];
     const { transactionId, customerId, originalTransaction, fraudAnalysis, decision, decisionReason, decisionFactors } = event;
-    const customerEmail = `${customerId}@customer.com`;
-    const customerPhone = '+1234567890';
+    const customerEmail = this._resolveCustomerEmail(event);
+    const customerPhone = this._resolveCustomerPhone(event);
     const templateData = {
       transactionId,
       customerId,
@@ -59,7 +58,7 @@ class NotificationService {
       amount: originalTransaction?.amount || 0,
       currency: originalTransaction?.currency || 'USD',
       location: originalTransaction?.location?.country || 'Unknown',
-      timestamp: new Date().toISOString(),
+      timestamp: event.decidedAt || new Date().toISOString(),
       riskScore: fraudAnalysis?.riskScore || 0,
       mlScore: fraudAnalysis?.mlResults?.score || 0,
       fraudFlagged: fraudAnalysis?.flagged ? 'Yes' : 'No',
@@ -93,7 +92,7 @@ class NotificationService {
       notifications.push({
         type: 'email',
         recipient: 'fraud_team',
-        to: config.mock.fraudTeamEmail,
+        to: this._resolveFraudTeamEmail(),
         subject: emailContent.subject,
         text: emailContent.text,
         html: emailContent.html,
@@ -125,7 +124,7 @@ class NotificationService {
       notifications.push({
         type: 'email',
         recipient: 'fraud_team',
-        to: config.mock.fraudTeamEmail,
+        to: this._resolveFraudTeamEmail(),
         subject: emailContent.subject,
         text: emailContent.text,
         html: emailContent.html,
@@ -136,7 +135,7 @@ class NotificationService {
       notifications.push({
         type: 'sms',
         recipient: 'fraud_team',
-        to: config.mock.fraudTeamSms,
+        to: this._resolveFraudTeamPhone(),
         body: `[Manual Review] Transaction ${transactionId.substring(0, 8)} flagged. Amount: $${templateData.amount}. Risk: ${templateData.riskScore}/100. Review now.`,
         metadata: { transactionId, decision },
       });
@@ -201,6 +200,28 @@ class NotificationService {
     }
 
     return result;
+  }
+
+  _resolveCustomerEmail(event) {
+    return event.customerEmail
+      || event.originalTransaction?.metadata?.notificationEmail
+      || event.originalTransaction?.metadata?.customerEmail
+      || config.contacts.customer.fallbackEmail;
+  }
+
+  _resolveCustomerPhone(event) {
+    return event.customerPhone
+      || event.originalTransaction?.metadata?.notificationPhone
+      || event.originalTransaction?.metadata?.customerPhone
+      || config.contacts.customer.fallbackPhone;
+  }
+
+  _resolveFraudTeamEmail() {
+    return config.contacts.fraudTeam.email;
+  }
+
+  _resolveFraudTeamPhone() {
+    return config.contacts.fraudTeam.phone;
   }
 }
 

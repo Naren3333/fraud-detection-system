@@ -4,6 +4,7 @@
   "scripts": {
     "smoke:health": "node ./smoke-health.js",
     "test:guards": "node ./api-guards.js",
-    "e2e:happy-path": "node ./e2e-happy-path.js"
+    "e2e:happy-path": "node ./e2e-happy-path.js",
+    "proof:notification": "node ./notification-provider-proof.js"
   }
 }

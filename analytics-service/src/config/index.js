@@ -7,28 +7,6 @@ module.exports = {
   serviceVersion: process.env.SERVICE_VERSION || '1.0.0',
   logLevel: process.env.LOG_LEVEL || 'info',
 
-  db: {
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT, 10) || 5432,
-    database: process.env.DB_NAME || 'decision_db',
-    user: process.env.DB_USER || 'decision_admin',
-    password: process.env.DB_PASSWORD || 'decision_password',
-    max: parseInt(process.env.DB_MAX_CONNECTIONS, 10) || 10,
-    idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT, 10) || 30000,
-    connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT, 10) || 2000,
-  },
-  appealDb: {
-    enabled: process.env.APPEAL_DB_ENABLED !== 'false',
-    host: process.env.APPEAL_DB_HOST || 'appeal-db',
-    port: parseInt(process.env.APPEAL_DB_PORT, 10) || 5432,
-    database: process.env.APPEAL_DB_NAME || 'appeal_db',
-    user: process.env.APPEAL_DB_USER || 'appeal_admin',
-    password: process.env.APPEAL_DB_PASSWORD || 'appeal_password',
-    max: parseInt(process.env.APPEAL_DB_MAX_CONNECTIONS, 10) || 10,
-    idleTimeoutMillis: parseInt(process.env.APPEAL_DB_IDLE_TIMEOUT, 10) || 30000,
-    connectionTimeoutMillis: parseInt(process.env.APPEAL_DB_CONNECTION_TIMEOUT, 10) || 2000,
-  },
-
   redis: {
     host: process.env.REDIS_HOST || 'localhost',
     port: parseInt(process.env.REDIS_PORT, 10) || 6379,
@@ -42,14 +20,26 @@ module.exports = {
     brokers: (process.env.KAFKA_BROKERS || 'localhost:9092').split(','),
     clientId: process.env.KAFKA_CLIENT_ID || 'analytics-service',
     groupId: process.env.KAFKA_GROUP_ID || 'analytics-group',
-    enableConsumer: process.env.KAFKA_ENABLE_CONSUMER === 'true',
-    topics: (process.env.KAFKA_TOPICS || 'transaction.finalised,transaction.flagged').split(','),
+    enableConsumer: process.env.KAFKA_ENABLE_CONSUMER !== 'false',
+    topics: (process.env.KAFKA_TOPICS || 'transaction.finalised,transaction.flagged,transaction.reviewed,appeal.created,appeal.resolved')
+      .split(',')
+      .map((topic) => topic.trim())
+      .filter(Boolean),
+    sessionTimeout: parseInt(process.env.KAFKA_CONSUMER_SESSION_TIMEOUT, 10) || 30000,
+    heartbeatInterval: parseInt(process.env.KAFKA_CONSUMER_HEARTBEAT_INTERVAL, 10) || 3000,
+    retry: {
+      initialRetryTime: parseInt(process.env.KAFKA_RETRY_INITIAL_DELAY_MS, 10) || 100,
+      retries: parseInt(process.env.KAFKA_RETRY_MAX_ATTEMPTS, 10) || 8,
+      multiplier: parseInt(process.env.KAFKA_RETRY_MULTIPLIER, 10) || 2,
+      maxRetryTime: parseInt(process.env.KAFKA_RETRY_MAX_DELAY_MS, 10) || 30000,
+    },
   },
 
   analytics: {
     retentionHours: parseInt(process.env.METRICS_RETENTION_HOURS, 10) || 168,
     aggregationIntervalSeconds: parseInt(process.env.METRICS_AGGREGATION_INTERVAL_SECONDS, 10) || 60,
     enableRealTimeUpdates: process.env.ENABLE_REAL_TIME_UPDATES !== 'false',
+    projectionPrefix: process.env.ANALYTICS_PROJECTION_PREFIX || 'analytics',
   },
 
   websocket: {

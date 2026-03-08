@@ -87,6 +87,8 @@ Appeal -- "appeal.created/resolved" --> Kafka
 Kafka -- "appeal.resolved" --> Transaction
 
 Kafka -- "events" --> Audit
+Kafka -- "transaction.finalised/flagged/reviewed" --> Analytics
+Kafka -- "appeal.created/resolved" --> Analytics
 ```
 ### 2) Data Stores + Observability (Deployment/Data Diagram)
 ```mermaid
@@ -120,6 +122,7 @@ direction TB
 DecisionDB[(Postgres decision-db)]:::db
 HumanReviewDB[(Postgres human-review-db)]:::db
 AppealDB[(Postgres appeal-db)]:::db
+RedisProjection[(Redis analytics projection)]:::db
 end
 
 %% =========================
@@ -136,9 +139,9 @@ end
 %% DB LINKS
 %% =========================
 Decision --> DecisionDB
-Analytics --> DecisionDB
 HumanVerify --> HumanReviewDB
 Appeal --> AppealDB
+Analytics --> RedisProjection
 
 %% =========================
 %% METRICS (clean hub instead of 10 arrows)
@@ -204,6 +207,7 @@ Notes:
 - Docker Compose now reads secrets and host port bindings from `.env`
 - Internal service ports are bound to `127.0.0.1` by default to reduce accidental public exposure
 - Public-facing entrypoints remain the gateway and selected dashboards unless you override bind hosts in `.env`
+- Analytics now builds its dashboard from its own Redis projection fed by Kafka events instead of reading other services' databases
 
 ---
 
@@ -241,17 +245,32 @@ cd testing
 npm run smoke:health
 npm run test:guards
 npm run e2e:happy-path
+npm run proof:notification
 ```
 
 - `smoke:health` checks gateway and observability endpoints are reachable.
 - `test:guards` validates auth and validation failure paths.
 - `e2e:happy-path` runs the main end-to-end business flow.
+- `proof:notification` reports whether notification delivery is still using mocks or a real SMTP/Twilio provider.
 
 CI coverage:
 
 - GitHub Actions boots the full Docker Compose stack and runs the smoke, guard, and happy-path suites on pushes and pull requests.
 
 Detailed guide: `testing/TESTING.md`.
+
+### Proving The External Service Requirement
+
+The notification service supports both mock mode for local runs and real SMTP/Twilio providers for grading.
+
+1. Set provider variables in `.env`:
+   - `EMAIL_PROVIDER=smtp` with the `EMAIL_SMTP_*` variables
+   - or `SMS_PROVIDER=twilio` with the `TWILIO_*` variables
+2. Restart the stack: `docker compose up --build -d`
+3. Run `cd testing && npm run proof:notification`
+4. To fail unless a real external provider is active, set the `REQUIRE_REAL_NOTIFICATION_PROVIDER` environment variable to `true`
+
+`http://localhost:3006/api/v1/health` now reports provider mode, sender configuration, fallback recipients, and whether a real external provider is enabled.
 
 ---
 

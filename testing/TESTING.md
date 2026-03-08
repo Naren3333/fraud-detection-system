@@ -117,11 +117,45 @@ Optional environment variables:
 - `E2E_POLL_TIMEOUT_MS`
 - `E2E_POLL_INTERVAL_MS`
 
+## 2D. Notification Provider Proof
+
+Use this to show whether the notification service is still in mock mode or is connected to a real external provider.
+
+```bash
+cd testing
+npm run proof:notification
+```
+
+To make the command fail unless a real SMTP or Twilio provider is enabled and healthy:
+
+```powershell
+cd testing
+$env:REQUIRE_REAL_NOTIFICATION_PROVIDER='true'
+npm.cmd run proof:notification
+```
+
+Optional environment variables:
+
+- `NOTIFICATION_PROOF_URL` (default: `http://localhost:3006/api/v1/health`)
+- `NOTIFICATION_PROOF_TIMEOUT_MS`
+- `REQUIRE_REAL_NOTIFICATION_PROVIDER`
+
+Before using strict mode, set provider variables in `.env` and restart the stack:
+
+- `EMAIL_PROVIDER=smtp` plus `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT`, `EMAIL_SMTP_USER`, `EMAIL_SMTP_PASSWORD`
+- or `SMS_PROVIDER=twilio` plus `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER`
+- optional demo recipients:
+  - `NOTIFICATION_CUSTOMER_FALLBACK_EMAIL`
+  - `NOTIFICATION_CUSTOMER_FALLBACK_PHONE`
+  - `NOTIFICATION_FRAUD_TEAM_EMAIL`
+  - `NOTIFICATION_FRAUD_TEAM_PHONE`
+
 Suggested run order for the automated Node scripts:
 
 1. `npm run smoke:health`
 2. `npm run test:guards`
 3. `npm run e2e:happy-path`
+4. `npm run proof:notification`
 
 ## 3. Collection Structure (Run Order)
 

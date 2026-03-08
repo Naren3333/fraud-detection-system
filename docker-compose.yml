@@ -527,14 +527,27 @@ services:
       RETRY_INITIAL_DELAY_MS: 1000
       RETRY_BACKOFF_MULTIPLIER: 2
       RETRY_MAX_DELAY_MS:    10000
-      # Email (Mock mode - logs only)
-      EMAIL_ENABLED:         true
-      EMAIL_PROVIDER:        mock
-      EMAIL_FROM_ADDRESS:    noreply@frauddetection.com
-      EMAIL_FROM_NAME:       Fraud Detection System
-      # SMS (Mock mode - logs only)
-      SMS_ENABLED:           true
-      SMS_PROVIDER:          mock
+      # Email
+      EMAIL_ENABLED:         ${EMAIL_ENABLED:-true}
+      EMAIL_PROVIDER:        ${EMAIL_PROVIDER:-mock}
+      EMAIL_SMTP_HOST:       ${EMAIL_SMTP_HOST:-smtp.gmail.com}
+      EMAIL_SMTP_PORT:       ${EMAIL_SMTP_PORT:-587}
+      EMAIL_SMTP_SECURE:     ${EMAIL_SMTP_SECURE:-false}
+      EMAIL_SMTP_USER:       ${EMAIL_SMTP_USER:-}
+      EMAIL_SMTP_PASSWORD:   ${EMAIL_SMTP_PASSWORD:-}
+      EMAIL_FROM_ADDRESS:    ${EMAIL_FROM_ADDRESS:-noreply@frauddetection.com}
+      EMAIL_FROM_NAME:       ${EMAIL_FROM_NAME:-Fraud Detection System}
+      # SMS
+      SMS_ENABLED:           ${SMS_ENABLED:-true}
+      SMS_PROVIDER:          ${SMS_PROVIDER:-mock}
+      TWILIO_ACCOUNT_SID:    ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN:     ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_PHONE_NUMBER:   ${TWILIO_PHONE_NUMBER:-}
+      # Notification recipients
+      NOTIFICATION_CUSTOMER_FALLBACK_EMAIL: ${NOTIFICATION_CUSTOMER_FALLBACK_EMAIL:-demo-customer@frauddetection.com}
+      NOTIFICATION_CUSTOMER_FALLBACK_PHONE: ${NOTIFICATION_CUSTOMER_FALLBACK_PHONE:-+15550000000}
+      NOTIFICATION_FRAUD_TEAM_EMAIL: ${NOTIFICATION_FRAUD_TEAM_EMAIL:-fraud-team@frauddetection.com}
+      NOTIFICATION_FRAUD_TEAM_PHONE: ${NOTIFICATION_FRAUD_TEAM_PHONE:-+15550000001}
       # Notification Rules
       NOTIFY_ON_APPROVED:    false
       NOTIFY_ON_DECLINED:    true
@@ -634,10 +647,10 @@ services:
     ports:
       - "${ANALYTICS_BIND_HOST:-0.0.0.0}:${ANALYTICS_SERVICE_HOST_PORT:-3008}:3008"
     depends_on:
-      decision-db:
+      kafka:
         condition: service_healthy
-      appeal-db:
-        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     environment:
@@ -648,22 +661,7 @@ services:
       SERVICE_NAME:          analytics-service
       SERVICE_VERSION:       1.0.0
       LOG_LEVEL:             info
-      # Database (read-only access to decision DB)
-      DB_HOST:               decision-db
-      DB_PORT:               5432
-      DB_NAME:               ${DECISION_DB_NAME:-decision_db}
-      DB_USER:               ${DECISION_DB_USER:-decision_admin}
-      DB_PASSWORD:           ${DECISION_DB_PASSWORD}
-      DB_MAX_CONNECTIONS:    10
-      # Appeal DB (read-only)
-      APPEAL_DB_ENABLED:     true
-      APPEAL_DB_HOST:        appeal-db
-      APPEAL_DB_PORT:        5432
-      APPEAL_DB_NAME:        ${APPEAL_DB_NAME:-appeal_db}
-      APPEAL_DB_USER:        ${APPEAL_DB_USER:-appeal_admin}
-      APPEAL_DB_PASSWORD:    ${APPEAL_DB_PASSWORD}
-      APPEAL_DB_MAX_CONNECTIONS: 10
-      # Redis (time-series metrics)
+      # Redis projection store
       REDIS_HOST:            redis
       REDIS_PORT:            6379
       REDIS_DB:              5
@@ -674,8 +672,13 @@ services:
       # WebSocket
       WS_ENABLED:            true
       WS_HEARTBEAT_INTERVAL: 30000
-      # Kafka (optional, for real-time streaming)
-      KAFKA_ENABLE_CONSUMER: false
+      ANALYTICS_PROJECTION_PREFIX: ${ANALYTICS_PROJECTION_PREFIX:-analytics}
+      # Kafka
+      KAFKA_BROKERS:         kafka:9092
+      KAFKA_CLIENT_ID:       analytics-service
+      KAFKA_GROUP_ID:        analytics-group
+      KAFKA_ENABLE_CONSUMER: ${ANALYTICS_KAFKA_ENABLE_CONSUMER:-true}
+      KAFKA_TOPICS:          ${ANALYTICS_KAFKA_TOPICS:-transaction.finalised,transaction.flagged,transaction.reviewed,appeal.created,appeal.resolved}
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3008/api/v1/health/live"]
       interval: 30s

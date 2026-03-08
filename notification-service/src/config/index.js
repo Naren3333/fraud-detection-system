@@ -84,8 +84,14 @@ module.exports = {
     port: parseInt(process.env.METRICS_PORT, 10) || 9096,
     prefix: 'notification',
   },
-  mock: {
-    fraudTeamEmail: 'fraud-team@frauddetection.com',
-    fraudTeamSms: '+1234567890',
+  contacts: {
+    customer: {
+      fallbackEmail: process.env.NOTIFICATION_CUSTOMER_FALLBACK_EMAIL || 'demo-customer@frauddetection.com',
+      fallbackPhone: process.env.NOTIFICATION_CUSTOMER_FALLBACK_PHONE || '+15550000000',
+    },
+    fraudTeam: {
+      email: process.env.NOTIFICATION_FRAUD_TEAM_EMAIL || 'fraud-team@frauddetection.com',
+      phone: process.env.NOTIFICATION_FRAUD_TEAM_PHONE || '+15550000001',
+    },
   },
 };

@@ -1,20 +1,15 @@
-const { query, queryAppeal } = require('../config/db');
-const { getClient: getRedis } = require('../config/redis');
-const logger = require('../config/logger');
-const config = require('../config');
-
+const projectionStore = require('./projectionStore');
 
 class AnalyticsService {
-  constructor() {
-    this.metricsCache = new Map();
-    this.lastAggregation = null;
-  }
-
-  
   // Handles get dashboard metrics.
   async getDashboardMetrics(timeRange = '24h') {
     const now = new Date();
     const since = this._getTimeRangeDate(timeRange);
+    const [allTransactions, allAppeals] = await Promise.all([
+      projectionStore.listTransactions(),
+      projectionStore.listAppeals(),
+    ]);
+    const transactions = allTransactions.filter((record) => this._isOnOrAfter(record.decidedAt, since));
 
     const [
       overviewStats,
@@ -27,15 +22,15 @@ class AnalyticsService {
       analystImpact,
       appealImpact,
     ] = await Promise.all([
-      this._getOverviewStats(since),
-      this._getDecisionBreakdown(since),
-      this._getRiskScoreDistribution(since),
-      this._getTimeSeriesData(timeRange),
-      this._getTopCustomers(since, 10),
-      this._getTopMerchants(since, 10),
-      this._getGeographicDistribution(since),
-      this._getAnalystImpactStats(since),
-      this._getAppealImpactStats(since),
+      this._getOverviewStats(transactions),
+      this._getDecisionBreakdown(transactions),
+      this._getRiskScoreDistribution(transactions),
+      this._getTimeSeriesData(transactions, timeRange),
+      this._getTopCustomers(transactions, 10),
+      this._getTopMerchants(transactions, 10),
+      this._getGeographicDistribution(transactions),
+      this._getAnalystImpactStats(transactions),
+      this._getAppealImpactStats(allAppeals, since),
     ]);
 
     return {
@@ -56,282 +51,263 @@ class AnalyticsService {
     };
   }
 
-  
   // Handles get real time stats.
   async getRealTimeStats() {
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-
-    const sql = `
-      SELECT 
-        COUNT(*) as total_decisions,
-        COUNT(*) FILTER (WHERE decision = 'APPROVED') as approved,
-        COUNT(*) FILTER (WHERE decision = 'DECLINED') as declined,
-        COUNT(*) FILTER (WHERE decision = 'FLAGGED') as flagged,
-        AVG(risk_score) as avg_risk_score,
-        MAX(risk_score) as max_risk_score,
-        COUNT(*) FILTER (WHERE override_applied = true) as overrides
-      FROM decisions
-      WHERE decided_at >= $1
-    `;
-
-    const result = await query(sql, [fiveMinutesAgo]);
-    const stats = result.rows[0];
+    const transactions = await projectionStore.listTransactions();
+    const recentTransactions = transactions.filter((record) => this._isOnOrAfter(record.decidedAt, fiveMinutesAgo));
+    const approved = recentTransactions.filter((record) => record.decision === 'APPROVED');
+    const declined = recentTransactions.filter((record) => record.decision === 'DECLINED');
+    const flagged = recentTransactions.filter((record) => record.decision === 'FLAGGED');
+    const scores = recentTransactions.map((record) => this._safeNumber(record.riskScore)).filter(Number.isFinite);
 
     return {
-      totalDecisions: parseInt(stats.total_decisions) || 0,
-      approved: parseInt(stats.approved) || 0,
-      declined: parseInt(stats.declined) || 0,
-      flagged: parseInt(stats.flagged) || 0,
-      avgRiskScore: parseFloat(stats.avg_risk_score)?.toFixed(1) || 0,
-      maxRiskScore: parseInt(stats.max_risk_score) || 0,
-      overrides: parseInt(stats.overrides) || 0,
+      totalDecisions: recentTransactions.length,
+      approved: approved.length,
+      declined: declined.length,
+      flagged: flagged.length,
+      avgRiskScore: this._average(scores, 1),
+      maxRiskScore: scores.length ? Math.max(...scores) : 0,
+      overrides: recentTransactions.filter((record) => record.overrideApplied).length,
       timestamp: new Date().toISOString(),
     };
   }
 
   // Handles get overview stats.
-  async _getOverviewStats(since) {
-    const sql = `
-      SELECT 
-        COUNT(*) as total_transactions,
-        COUNT(*) FILTER (WHERE decision = 'APPROVED') as approved,
-        COUNT(*) FILTER (WHERE decision = 'DECLINED') as declined,
-        COUNT(*) FILTER (WHERE decision = 'FLAGGED') as flagged,
-        AVG(risk_score) as avg_risk_score,
-        AVG(ml_score) as avg_ml_score,
-        AVG(rule_score) as avg_rule_score,
-        COUNT(*) FILTER (WHERE fraud_flagged = true) as fraud_flagged_count,
-        COUNT(*) FILTER (WHERE override_applied = true) as override_count,
-        COUNT(DISTINCT customer_id) as unique_customers,
-        COUNT(DISTINCT merchant_id) as unique_merchants
-      FROM decisions
-      WHERE decided_at >= $1
-    `;
-
-    const result = await query(sql, [since]);
-    const stats = result.rows[0];
-
-    const total = parseInt(stats.total_transactions) || 0;
-    const approved = parseInt(stats.approved) || 0;
-    const declined = parseInt(stats.declined) || 0;
-    const flagged = parseInt(stats.flagged) || 0;
+  async _getOverviewStats(transactions) {
+    const total = transactions.length;
+    const approved = transactions.filter((record) => record.decision === 'APPROVED').length;
+    const declined = transactions.filter((record) => record.decision === 'DECLINED').length;
+    const flagged = transactions.filter((record) => record.decision === 'FLAGGED').length;
+    const riskScores = transactions.map((record) => this._safeNumber(record.riskScore)).filter(Number.isFinite);
+    const mlScores = transactions.map((record) => this._safeNumber(record.mlScore)).filter(Number.isFinite);
+    const ruleScores = transactions.map((record) => this._safeNumber(record.ruleScore)).filter(Number.isFinite);
+    const uniqueCustomers = new Set(transactions.map((record) => record.customerId).filter(Boolean));
+    const uniqueMerchants = new Set(transactions.map((record) => record.merchantId).filter(Boolean));
 
     return {
       totalTransactions: total,
       approved,
       declined,
       flagged,
-      approvalRate: total > 0 ? ((approved / total) * 100).toFixed(1) : 0,
-      declineRate: total > 0 ? ((declined / total) * 100).toFixed(1) : 0,
-      flagRate: total > 0 ? ((flagged / total) * 100).toFixed(1) : 0,
-      avgRiskScore: parseFloat(stats.avg_risk_score)?.toFixed(1) || 0,
-      avgMlScore: parseFloat(stats.avg_ml_score)?.toFixed(1) || 0,
-      avgRuleScore: parseFloat(stats.avg_rule_score)?.toFixed(1) || 0,
-      fraudFlaggedCount: parseInt(stats.fraud_flagged_count) || 0,
-      overrideCount: parseInt(stats.override_count) || 0,
-      uniqueCustomers: parseInt(stats.unique_customers) || 0,
-      uniqueMerchants: parseInt(stats.unique_merchants) || 0,
+      approvalRate: total > 0 ? Number(((approved / total) * 100).toFixed(1)) : 0,
+      declineRate: total > 0 ? Number(((declined / total) * 100).toFixed(1)) : 0,
+      flagRate: total > 0 ? Number(((flagged / total) * 100).toFixed(1)) : 0,
+      avgRiskScore: this._average(riskScores, 1),
+      avgMlScore: this._average(mlScores, 1),
+      avgRuleScore: this._average(ruleScores, 1),
+      fraudFlaggedCount: transactions.filter((record) => record.fraudFlagged).length,
+      overrideCount: transactions.filter((record) => record.overrideApplied).length,
+      uniqueCustomers: uniqueCustomers.size,
+      uniqueMerchants: uniqueMerchants.size,
     };
   }
 
   // Handles get decision breakdown.
-  async _getDecisionBreakdown(since) {
-    const sql = `
-      SELECT 
+  async _getDecisionBreakdown(transactions) {
+    return ['APPROVED', 'DECLINED', 'FLAGGED'].map((decision) => {
+      const filtered = transactions.filter((record) => record.decision === decision);
+      const scores = filtered.map((record) => this._safeNumber(record.riskScore)).filter(Number.isFinite);
+      return {
         decision,
-        COUNT(*) as count,
-        AVG(risk_score) as avg_risk_score,
-        MIN(risk_score) as min_risk_score,
-        MAX(risk_score) as max_risk_score
-      FROM decisions
-      WHERE decided_at >= $1
-      GROUP BY decision
-    `;
-
-    const result = await query(sql, [since]);
-    
-    return result.rows.map(row => ({
-      decision: row.decision,
-      count: parseInt(row.count),
-      avgRiskScore: parseFloat(row.avg_risk_score)?.toFixed(1) || 0,
-      minRiskScore: parseInt(row.min_risk_score) || 0,
-      maxRiskScore: parseInt(row.max_risk_score) || 0,
-    }));
+        count: filtered.length,
+        avgRiskScore: this._average(scores, 1),
+        minRiskScore: scores.length ? Math.min(...scores) : 0,
+        maxRiskScore: scores.length ? Math.max(...scores) : 0,
+      };
+    });
   }
 
   // Handles get risk score distribution.
-  async _getRiskScoreDistribution(since) {
-    const sql = `
-      SELECT 
-        CASE 
-          WHEN risk_score < 20 THEN '0-19'
-          WHEN risk_score < 40 THEN '20-39'
-          WHEN risk_score < 60 THEN '40-59'
-          WHEN risk_score < 80 THEN '60-79'
-          ELSE '80-100'
-        END as score_range,
-        COUNT(*) as count,
-        decision
-      FROM decisions
-      WHERE decided_at >= $1
-      GROUP BY score_range, decision
-      ORDER BY score_range, decision
-    `;
+  async _getRiskScoreDistribution(transactions) {
+    const buckets = [
+      { range: '0-19', min: 0, maxExclusive: 20, approved: 0, declined: 0, flagged: 0, total: 0 },
+      { range: '20-39', min: 20, maxExclusive: 40, approved: 0, declined: 0, flagged: 0, total: 0 },
+      { range: '40-59', min: 40, maxExclusive: 60, approved: 0, declined: 0, flagged: 0, total: 0 },
+      { range: '60-79', min: 60, maxExclusive: 80, approved: 0, declined: 0, flagged: 0, total: 0 },
+      { range: '80-100', min: 80, maxExclusive: Infinity, approved: 0, declined: 0, flagged: 0, total: 0 },
+    ];
 
-    const result = await query(sql, [since]);
-    const distribution = {};
-    for (const row of result.rows) {
-      if (!distribution[row.score_range]) {
-        distribution[row.score_range] = { range: row.score_range, total: 0 };
+    transactions.forEach((record) => {
+      const riskScore = this._safeNumber(record.riskScore);
+      const bucket = buckets.find((candidate) => riskScore >= candidate.min && riskScore < candidate.maxExclusive);
+      if (!bucket) {
+        return;
       }
-      distribution[row.score_range][row.decision.toLowerCase()] = parseInt(row.count);
-      distribution[row.score_range].total += parseInt(row.count);
-    }
 
-    return Object.values(distribution);
+      const key = String(record.decision || '').toLowerCase();
+      if (key && Object.prototype.hasOwnProperty.call(bucket, key)) {
+        bucket[key] += 1;
+      }
+      bucket.total += 1;
+    });
+
+    return buckets.map(({ range, approved, declined, flagged, total }) => ({
+      range,
+      approved,
+      declined,
+      flagged,
+      total,
+    }));
   }
 
   // Handles get time series data.
-  async _getTimeSeriesData(timeRange) {
-    const bucketSeconds = timeRange === '1h' ? 5 * 60 :
-      timeRange === '24h' ? 60 * 60 :
-      timeRange === '7d' ? 6 * 60 * 60 :
-      24 * 60 * 60;
+  async _getTimeSeriesData(transactions, timeRange) {
+    const bucketMs = timeRange === '1h' ? 5 * 60 * 1000
+      : timeRange === '24h' ? 60 * 60 * 1000
+        : timeRange === '7d' ? 6 * 60 * 60 * 1000
+          : 24 * 60 * 60 * 1000;
 
-    const since = this._getTimeRangeDate(timeRange);
+    const buckets = new Map();
 
-    const sql = `
-      SELECT 
-        to_timestamp(floor(extract(epoch FROM decided_at) / $1) * $1) as time_bucket,
-        decision,
-        COUNT(*) as count,
-        AVG(risk_score) as avg_risk_score
-      FROM decisions
-      WHERE decided_at >= $2
-      GROUP BY time_bucket, decision
-      ORDER BY time_bucket ASC
-    `;
-
-    const result = await query(sql, [bucketSeconds, since]);
-    const timeSeries = {};
-    for (const row of result.rows) {
-      const bucket = new Date(row.time_bucket).toISOString();
-      if (!timeSeries[bucket]) {
-        timeSeries[bucket] = { timestamp: bucket, total: 0 };
+    transactions.forEach((record) => {
+      const decidedAt = this._asDate(record.decidedAt);
+      if (!decidedAt) {
+        return;
       }
-      timeSeries[bucket][row.decision.toLowerCase()] = parseInt(row.count);
-      timeSeries[bucket].total += parseInt(row.count);
-      timeSeries[bucket].avgRiskScore = parseFloat(row.avg_risk_score)?.toFixed(1) || 0;
-    }
 
-    return Object.values(timeSeries);
+      const bucketTime = new Date(Math.floor(decidedAt.getTime() / bucketMs) * bucketMs).toISOString();
+      if (!buckets.has(bucketTime)) {
+        buckets.set(bucketTime, {
+          timestamp: bucketTime,
+          approved: 0,
+          declined: 0,
+          flagged: 0,
+          total: 0,
+          riskScores: [],
+        });
+      }
+
+      const bucket = buckets.get(bucketTime);
+      const key = String(record.decision || '').toLowerCase();
+      if (key && Object.prototype.hasOwnProperty.call(bucket, key)) {
+        bucket[key] += 1;
+      }
+      bucket.total += 1;
+      bucket.riskScores.push(this._safeNumber(record.riskScore));
+    });
+
+    return Array.from(buckets.values())
+      .sort((left, right) => left.timestamp.localeCompare(right.timestamp))
+      .map((bucket) => ({
+        timestamp: bucket.timestamp,
+        approved: bucket.approved,
+        declined: bucket.declined,
+        flagged: bucket.flagged,
+        total: bucket.total,
+        avgRiskScore: this._average(bucket.riskScores.filter(Number.isFinite), 1),
+      }));
   }
 
   // Handles get top customers.
-  async _getTopCustomers(since, limit) {
-    const sql = `
-      SELECT 
-        customer_id,
-        COUNT(*) as transaction_count,
-        COUNT(*) FILTER (WHERE decision = 'DECLINED') as declined_count,
-        COUNT(*) FILTER (WHERE decision = 'FLAGGED') as flagged_count,
-        AVG(risk_score) as avg_risk_score
-      FROM decisions
-      WHERE decided_at >= $1
-      GROUP BY customer_id
-      ORDER BY transaction_count DESC
-      LIMIT $2
-    `;
+  async _getTopCustomers(transactions, limit) {
+    const customers = new Map();
 
-    const result = await query(sql, [since, limit]);
-    
-    return result.rows.map(row => ({
-      customerId: row.customer_id,
-      transactionCount: parseInt(row.transaction_count),
-      declinedCount: parseInt(row.declined_count) || 0,
-      flaggedCount: parseInt(row.flagged_count) || 0,
-      avgRiskScore: parseFloat(row.avg_risk_score)?.toFixed(1) || 0,
-    }));
+    transactions.forEach((record) => {
+      if (!record.customerId) {
+        return;
+      }
+
+      const current = customers.get(record.customerId) || {
+        customerId: record.customerId,
+        transactionCount: 0,
+        declinedCount: 0,
+        flaggedCount: 0,
+        riskScores: [],
+      };
+
+      current.transactionCount += 1;
+      if (record.decision === 'DECLINED') {
+        current.declinedCount += 1;
+      }
+      if (record.decision === 'FLAGGED') {
+        current.flaggedCount += 1;
+      }
+      current.riskScores.push(this._safeNumber(record.riskScore));
+      customers.set(record.customerId, current);
+    });
+
+    return Array.from(customers.values())
+      .sort((left, right) => right.transactionCount - left.transactionCount || right.flaggedCount - left.flaggedCount)
+      .slice(0, limit)
+      .map((record) => ({
+        customerId: record.customerId,
+        transactionCount: record.transactionCount,
+        declinedCount: record.declinedCount,
+        flaggedCount: record.flaggedCount,
+        avgRiskScore: this._average(record.riskScores.filter(Number.isFinite), 1),
+      }));
   }
 
   // Handles get top merchants.
-  async _getTopMerchants(since, limit) {
-    const sql = `
-      SELECT 
-        merchant_id,
-        COUNT(*) as transaction_count,
-        COUNT(*) FILTER (WHERE decision = 'DECLINED') as declined_count,
-        AVG(risk_score) as avg_risk_score
-      FROM decisions
-      WHERE decided_at >= $1 AND merchant_id IS NOT NULL
-      GROUP BY merchant_id
-      ORDER BY transaction_count DESC
-      LIMIT $2
-    `;
+  async _getTopMerchants(transactions, limit) {
+    const merchants = new Map();
 
-    const result = await query(sql, [since, limit]);
-    
-    return result.rows.map(row => ({
-      merchantId: row.merchant_id,
-      transactionCount: parseInt(row.transaction_count),
-      declinedCount: parseInt(row.declined_count) || 0,
-      avgRiskScore: parseFloat(row.avg_risk_score)?.toFixed(1) || 0,
-    }));
+    transactions.forEach((record) => {
+      if (!record.merchantId) {
+        return;
+      }
+
+      const current = merchants.get(record.merchantId) || {
+        merchantId: record.merchantId,
+        transactionCount: 0,
+        declinedCount: 0,
+        riskScores: [],
+      };
+
+      current.transactionCount += 1;
+      if (record.decision === 'DECLINED') {
+        current.declinedCount += 1;
+      }
+      current.riskScores.push(this._safeNumber(record.riskScore));
+      merchants.set(record.merchantId, current);
+    });
+
+    return Array.from(merchants.values())
+      .sort((left, right) => right.transactionCount - left.transactionCount || right.declinedCount - left.declinedCount)
+      .slice(0, limit)
+      .map((record) => ({
+        merchantId: record.merchantId,
+        transactionCount: record.transactionCount,
+        declinedCount: record.declinedCount,
+        avgRiskScore: this._average(record.riskScores.filter(Number.isFinite), 1),
+      }));
   }
 
   // Handles get geographic distribution.
-  async _getGeographicDistribution(since) {
-    return [
-      { country: 'US', count: 0, declined: 0 },
-      { country: 'GB', count: 0, declined: 0 },
-      { country: 'SG', count: 0, declined: 0 },
-    ];
+  async _getGeographicDistribution(transactions) {
+    const countries = new Map();
+
+    transactions.forEach((record) => {
+      const country = record.country || 'Unknown';
+      const current = countries.get(country) || {
+        country,
+        count: 0,
+        declined: 0,
+      };
+
+      current.count += 1;
+      if (record.decision === 'DECLINED') {
+        current.declined += 1;
+      }
+      countries.set(country, current);
+    });
+
+    return Array.from(countries.values())
+      .sort((left, right) => right.count - left.count)
+      .slice(0, 10);
   }
 
   // Handles get analyst impact stats.
-  async _getAnalystImpactStats(since) {
-    const sql = `
-      WITH manual_reviews AS (
-        SELECT
-          d.transaction_id,
-          d.decision AS final_decision,
-          d.decided_at,
-          d.decision_factors,
-          CASE
-            WHEN (d.decision_factors->'manualReview'->>'reviewedAt') ~ '^[0-9]{4}-'
-              THEN (d.decision_factors->'manualReview'->>'reviewedAt')::timestamptz
-            ELSE d.decided_at
-          END AS reviewed_at
-        FROM decisions d
-        WHERE d.decided_at >= $1
-          AND (
-            d.override_type = 'MANUAL_REVIEW'
-            OR d.decision_factors->>'manualReviewApplied' = 'true'
-          )
-      ),
-      flagged_first AS (
-        SELECT
-          dh.transaction_id,
-          MIN(dh.recorded_at) AS first_flagged_at
-        FROM decision_history dh
-        WHERE dh.decision = 'FLAGGED'
-        GROUP BY dh.transaction_id
-      )
-      SELECT
-        COUNT(*) AS total_manual_reviews,
-        COUNT(*) FILTER (WHERE mr.final_decision = 'APPROVED') AS approved_after_review,
-        COUNT(*) FILTER (WHERE mr.final_decision = 'DECLINED') AS declined_after_review,
-        AVG(EXTRACT(EPOCH FROM (mr.reviewed_at - ff.first_flagged_at))) AS avg_turnaround_seconds
-      FROM manual_reviews mr
-      LEFT JOIN flagged_first ff ON ff.transaction_id = mr.transaction_id
-    `;
-
-    const { rows } = await query(sql, [since]);
-    const stats = rows[0] || {};
-    const totalManualReviews = parseInt(stats.total_manual_reviews) || 0;
-    const approvedAfterReview = parseInt(stats.approved_after_review) || 0;
-    const declinedAfterReview = parseInt(stats.declined_after_review) || 0;
-    const avgTurnaroundSeconds = Number(parseFloat(stats.avg_turnaround_seconds) || 0);
+  async _getAnalystImpactStats(transactions) {
+    const manualReviews = transactions.filter((record) => record.manualReview?.applied);
+    const approvedAfterReview = manualReviews.filter((record) => record.decision === 'APPROVED').length;
+    const declinedAfterReview = manualReviews.filter((record) => record.decision === 'DECLINED').length;
+    const turnaroundSeconds = manualReviews
+      .map((record) => this._calculateTurnaroundSeconds(record.flaggedAt, record.manualReview?.reviewedAt))
+      .filter((value) => value !== null);
+    const totalManualReviews = manualReviews.length;
+    const avgTurnaroundSeconds = this._average(turnaroundSeconds, 1);
 
     return {
       totalManualReviews,
@@ -343,54 +319,29 @@ class AnalyticsService {
       declinedAfterReviewRate: totalManualReviews > 0
         ? Number(((declinedAfterReview / totalManualReviews) * 100).toFixed(1))
         : 0,
-      avgReviewTurnaroundSeconds: Number(avgTurnaroundSeconds.toFixed(1)),
+      avgReviewTurnaroundSeconds: avgTurnaroundSeconds,
       avgReviewTurnaroundMinutes: Number((avgTurnaroundSeconds / 60).toFixed(2)),
     };
   }
 
   // Handles get appeal impact stats.
-  async _getAppealImpactStats(since) {
-    try {
-      const sql = `
-        SELECT
-          COUNT(*) FILTER (WHERE created_at >= $1) AS appeals_created,
-          COUNT(*) FILTER (WHERE current_status IN ('OPEN', 'UNDER_REVIEW')) AS appeals_pending,
-          COUNT(*) FILTER (WHERE current_status = 'RESOLVED' AND resolved_at >= $1) AS appeals_resolved,
-          COUNT(*) FILTER (WHERE resolution = 'UPHOLD' AND resolved_at >= $1) AS upheld_count,
-          COUNT(*) FILTER (WHERE resolution = 'REVERSE' AND resolved_at >= $1) AS reversed_count,
-          COUNT(DISTINCT transaction_id) FILTER (WHERE created_at >= $1) AS unique_transactions_appealed
-        FROM appeals
-      `;
+  async _getAppealImpactStats(appeals, since) {
+    const appealsCreated = appeals.filter((record) => this._isOnOrAfter(record.createdAt, since));
+    const appealsPending = appeals.filter((record) => ['OPEN', 'UNDER_REVIEW'].includes(String(record.currentStatus || '').toUpperCase()));
+    const appealsResolved = appeals.filter((record) => String(record.currentStatus || '').toUpperCase() === 'RESOLVED' && this._isOnOrAfter(record.resolvedAt, since));
+    const upheldCount = appealsResolved.filter((record) => String(record.resolution || record.outcome || '').toUpperCase() === 'UPHOLD').length;
+    const reversedCount = appealsResolved.filter((record) => String(record.resolution || record.outcome || '').toUpperCase() === 'REVERSE').length;
 
-      const { rows } = await queryAppeal(sql, [since]);
-      const stats = rows[0] || {};
-      const appealsResolved = parseInt(stats.appeals_resolved) || 0;
-      const reversedCount = parseInt(stats.reversed_count) || 0;
-      const upheldCount = parseInt(stats.upheld_count) || 0;
-
-      return {
-        appealsCreated: parseInt(stats.appeals_created) || 0,
-        appealsPending: parseInt(stats.appeals_pending) || 0,
-        appealsResolved,
-        upheldCount,
-        reversedCount,
-        uniqueTransactionsAppealed: parseInt(stats.unique_transactions_appealed) || 0,
-        reverseRate: appealsResolved > 0 ? Number(((reversedCount / appealsResolved) * 100).toFixed(1)) : 0,
-        upholdRate: appealsResolved > 0 ? Number(((upheldCount / appealsResolved) * 100).toFixed(1)) : 0,
-      };
-    } catch (err) {
-      logger.warn('Appeal impact stats unavailable', { error: err.message });
-      return {
-        appealsCreated: 0,
-        appealsPending: 0,
-        appealsResolved: 0,
-        upheldCount: 0,
-        reversedCount: 0,
-        uniqueTransactionsAppealed: 0,
-        reverseRate: 0,
-        upholdRate: 0,
-      };
-    }
+    return {
+      appealsCreated: appealsCreated.length,
+      appealsPending: appealsPending.length,
+      appealsResolved: appealsResolved.length,
+      upheldCount,
+      reversedCount,
+      uniqueTransactionsAppealed: new Set(appealsCreated.map((record) => record.transactionId).filter(Boolean)).size,
+      reverseRate: appealsResolved.length > 0 ? Number(((reversedCount / appealsResolved.length) * 100).toFixed(1)) : 0,
+      upholdRate: appealsResolved.length > 0 ? Number(((upheldCount / appealsResolved.length) * 100).toFixed(1)) : 0,
+    };
   }
 
   // Handles get time range date.
@@ -408,6 +359,45 @@ class AnalyticsService {
       default:
         return new Date(now.getTime() - 24 * 60 * 60 * 1000);
     }
+  }
+
+  _isOnOrAfter(value, since) {
+    const date = this._asDate(value);
+    return Boolean(date && date >= since);
+  }
+
+  _asDate(value) {
+    if (!value) {
+      return null;
+    }
+
+    const date = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  _safeNumber(value) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  _average(values, decimals = 0) {
+    if (!values.length) {
+      return 0;
+    }
+
+    const total = values.reduce((sum, value) => sum + value, 0);
+    return Number((total / values.length).toFixed(decimals));
+  }
+
+  _calculateTurnaroundSeconds(fromValue, toValue) {
+    const from = this._asDate(fromValue);
+    const to = this._asDate(toValue);
+    if (!from || !to) {
+      return null;
+    }
+
+    const diffSeconds = (to.getTime() - from.getTime()) / 1000;
+    return diffSeconds >= 0 ? diffSeconds : null;
   }
 }
 

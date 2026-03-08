@@ -13,8 +13,8 @@ const swaggerUi = require('swagger-ui-express');
 const config = require('./config');
 const swaggerSpec = require('./config/swagger');
 const logger = require('./config/logger');
-const { createPool, closePool } = require('./config/db');
 const { createClient, closeClient } = require('./config/redis');
+const eventConsumerService = require('./services/eventConsumerService');
 const websocketService = require('./services/websocketService');
 const routes = require('./routes');
 
@@ -89,17 +89,17 @@ const shutdown = async (signal) => {
   });
 
   try {
+    await eventConsumerService.stop();
+    logger.info('Analytics Kafka consumer stopped');
+  } catch (err) {
+    logger.error('Error stopping analytics Kafka consumer', { error: err.message });
+  }
+
+  try {
     await closeClient();
     logger.info('Redis connection closed');
   } catch (err) {
     logger.error('Error closing Redis', { error: err.message });
-  }
-
-  try {
-    await closePool();
-    logger.info('Database pool closed');
-  } catch (err) {
-    logger.error('Error closing database', { error: err.message });
   }
 
   logger.info('Graceful shutdown complete');
@@ -136,13 +136,11 @@ const bootstrap = async () => {
       node: process.version,
     });
 
-    // Database pool (read-only access to decision DB)
-    createPool();
-    logger.info('Database pool initialized');
-
-    // Redis (for caching)
+    // Redis projection store
     await createClient();
     logger.info('Redis initialized');
+
+    await eventConsumerService.start();
 
     // WebSocket service
     websocketService.initialize(server);

@@ -2,6 +2,7 @@ const BASE_URL = String(process.env.E2E_BASE_URL || 'http://localhost:3000/api/v
 const ANALYTICS_HEALTH_URL = process.env.SMOKE_ANALYTICS_HEALTH_URL || 'http://localhost:3008/api/v1/health/live';
 const PROMETHEUS_HEALTH_URL = process.env.SMOKE_PROMETHEUS_HEALTH_URL || 'http://localhost:9099/-/healthy';
 const GRAFANA_HEALTH_URL = process.env.SMOKE_GRAFANA_HEALTH_URL || 'http://localhost:3009/api/health';
+const OTEL_HEALTH_URL = process.env.SMOKE_OTEL_HEALTH_URL || 'http://localhost:13133/';
 const JAEGER_URL = process.env.SMOKE_JAEGER_URL || 'http://localhost:16686/';
 const REQUEST_TIMEOUT_MS = Number(process.env.SMOKE_REQUEST_TIMEOUT_MS || 5000);
 
@@ -10,6 +11,7 @@ const targets = [
   { name: 'analytics-service', url: ANALYTICS_HEALTH_URL, expectedStatuses: [200] },
   { name: 'prometheus', url: PROMETHEUS_HEALTH_URL, expectedStatuses: [200] },
   { name: 'grafana', url: GRAFANA_HEALTH_URL, expectedStatuses: [200] },
+  { name: 'otel-collector', url: OTEL_HEALTH_URL, expectedStatuses: [200] },
   { name: 'jaeger', url: JAEGER_URL, expectedStatuses: [200] },
 ];
 

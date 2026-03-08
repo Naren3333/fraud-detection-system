@@ -391,6 +391,10 @@ npm run e2e:happy-path
 - `test:guards` validates auth and validation failure paths.
 - `e2e:happy-path` runs the main end-to-end business flow.
 
+CI coverage:
+
+- GitHub Actions boots the full Docker Compose stack and runs the smoke, guard, and happy-path suites on pushes and pull requests.
+
 Detailed guide: `testing/TESTING.md`.
 
 ---

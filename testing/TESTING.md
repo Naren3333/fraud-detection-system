@@ -47,6 +47,7 @@ The script checks:
 - Analytics service live health
 - Prometheus health
 - Grafana health
+- OpenTelemetry Collector health
 - Jaeger UI reachability
 
 Optional environment variables:
@@ -55,6 +56,7 @@ Optional environment variables:
 - `SMOKE_ANALYTICS_HEALTH_URL`
 - `SMOKE_PROMETHEUS_HEALTH_URL`
 - `SMOKE_GRAFANA_HEALTH_URL`
+- `SMOKE_OTEL_HEALTH_URL`
 - `SMOKE_JAEGER_URL`
 - `SMOKE_REQUEST_TIMEOUT_MS`
 
@@ -307,7 +309,7 @@ docker compose down -v
 
 System is healthy when:
 
-- Smoke health checks pass for gateway, analytics, Prometheus, Grafana, and Jaeger.
+- Smoke health checks pass for gateway, analytics, Prometheus, Grafana, the OpenTelemetry Collector, and Jaeger.
 - Guard tests reject invalid or unauthenticated access correctly.
 - Health endpoints are green across all services.
 - Auth lifecycle works end-to-end (including password change).

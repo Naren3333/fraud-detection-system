@@ -768,7 +768,7 @@ services:
       - "${INFRA_BIND_HOST:-127.0.0.1}:${OTEL_HEALTH_HOST_PORT:-13133}:13133"
       - "${INFRA_BIND_HOST:-127.0.0.1}:${OTEL_METRICS_HOST_PORT:-8889}:8889"
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:13133/"]
+      test: ["CMD", "/otelcol-contrib", "validate", "--config=/etc/otel-collector-config.yml"]
       interval: 15s
       timeout: 5s
       retries: 3

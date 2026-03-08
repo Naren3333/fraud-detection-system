@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Prepare environment file
+        run: cp .env.example .env
+
+      - name: Validate Docker Compose configuration
+        run: docker compose config
+
+      - name: Start stack
+        run: docker compose up --build -d
+
+      - name: Wait for smoke health checks
+        run: |
+          timeout 600 bash -lc 'until node testing/smoke-health.js; do
+            echo "Smoke checks not ready yet; retrying in 10s"
+            docker compose ps
+            sleep 10
+          done'
+
+      - name: Run guard suite
+        run: node testing/api-guards.js
+
+      - name: Run happy-path suite
+        run: node testing/e2e-happy-path.js
+
+      - name: Show container status on failure
+        if: failure()
+        run: docker compose ps
+
+      - name: Show recent container logs on failure
+        if: failure()
+        run: docker compose logs --tail=150
+
+      - name: Tear down stack
+        if: always()
+        run: docker compose down -v

@@ -1,93 +1,69 @@
-
 # Human Verification Service
 
-Backend-only analyst review service for `FLAGGED` transactions and customer appeals.
+This service handles manual review for flagged transactions and analyst resolution for customer appeals.
 
-## Data Flow
+## Main Flow
 
-1. Consumes from Kafka topic: `transaction.flagged`
-2. Stores pending items in table: `manual_reviews`
-3. Reviewer submits decision via API
-4. Publishes reviewed event to Kafka topic: `transaction.reviewed`
-5. For appeals, proxies analyst actions to Appeal Service and triggers `appeal.resolved`
+1. Consume flagged transactions from Kafka topic `transaction.flagged`.
+2. Store review items in the `manual_reviews` table.
+3. Accept analyst decisions through the review API.
+4. Publish review results to Kafka topic `transaction.reviewed`.
+5. Forward appeal resolutions to the Appeal Service.
 
-## API Endpoints
+## Main Endpoints
 
--`GET /api/v1/reviews/pending?limit=20&offset=0`
+- `GET /api/v1/reviews/pending`
+- `GET /api/v1/reviews/:transactionId`
+- `POST /api/v1/reviews/:transactionId/decision`
+- `GET /api/v1/reviews/appeals/pending`
+- `POST /api/v1/reviews/appeals/:appealId/resolve`
+- `GET /` for the built-in review dashboard
 
--`GET /api/v1/reviews/:transactionId`
-
--`POST /api/v1/reviews/:transactionId/decision`
-
--`GET /api/v1/reviews/appeals/pending?limit=20&offset=0`
-
--`POST /api/v1/reviews/appeals/:appealId/resolve`
-
-- Dashboard: `GET /` (human review UI using the above APIs)
-- Dashboard supports pending queue view, client-side filtering, decision notes, and approve/decline actions.
-
-### Submit Decision Payload
+## Example Review Payload
 
 ```json
-
 {
-
   "decision": "APPROVED",
-
   "reviewedBy": "analyst-01",
-
   "notes": "False positive, approve"
-
 }
-
 ```
 
-Allowed `decision` values:
+Allowed values:
 
--`APPROVED`
+- Review decision: `APPROVED`, `DECLINED`
+- Appeal resolution: `UPHOLD`, `REVERSE`
 
--`DECLINED`
+## Environment Variables
 
-Allowed `resolution` values for appeals:
+Main settings from `.env`:
 
--`UPHOLD`
+- `KAFKA_INPUT_TOPIC_FLAGGED`
+- `KAFKA_OUTPUT_TOPIC_REVIEWED`
+- `APPEAL_SERVICE_URL`
+- `APPEAL_SERVICE_TIMEOUT_MS`
+- `DB_HOST`
+- `DB_PORT`
+- `DB_NAME`
+- `DB_USER`
+- `DB_PASSWORD`
 
--`REVERSE`
+## Run
 
-## Important Integration Points
+The usual project flow is to start it from the repository root:
 
-### Where data comes from
+```bash
+docker compose up --build -d
+```
 
-- Decision Engine publishes flagged events:
+Service URLs:
 
-  -`decision-engine-service/src/consumers/transactionConsumer.js`
+- Dashboard: `http://localhost:3010/`
+- Swagger UI: `http://localhost:3010/api-docs`
+- Health: `http://localhost:3010/api/v1/health`
 
-  - topic `transaction.flagged`
+## Notes
 
-### Where reviewed decision is sent
-
-- This service publishes to `transaction.reviewed`
-
-### Where transaction status is updated
-
-- Transaction Service consumer applies reviewed decisions:
-
-  -`transaction-service/src/kafka/decisionConsumer.js`
-
-  - update status via `transactionRepository.updateStatus(...)`
-
-## Env knobs
-
-Set in `.env`:
-
--`KAFKA_INPUT_TOPIC_FLAGGED`
-
--`KAFKA_OUTPUT_TOPIC_REVIEWED`
-
--`DB_*`
-
--`KAFKA_*`
-
--`APPEAL_SERVICE_URL`
-
--`APPEAL_SERVICE_TIMEOUT_MS`
+- The API routes are mounted under `/api/v1`.
+- The service publishes transaction review outcomes for the Transaction Service to apply.
+- Appeal resolutions are handled through the Appeal Service rather than written directly in this service.

@@ -1,95 +1,52 @@
-# Demo Bank UI (Live API)
+# Demo Bank UI
 
-The demo uses our real project APIs via API Gateway.
+This folder contains a simple frontend used to demonstrate the live fraud detection platform through the API Gateway.
 
-## What it showcases
+## Features
 
-- Real register/login/refresh/logout cycle (`/api/v1/auth/*`)
-- Profile read + update (`GET/PATCH /api/v1/auth/profile`)
-- Real transaction submission (`POST /api/v1/transactions`)
-- Currency selector (`USD`, `EUR`, `GBP`, `SGD`, `JPY`, `AUD`, `CAD`, `CHF`, `HKD`, `MYR`)
-- Location controls (preset or custom country/city/lat/lng) to make fraud outcomes easier to demo
-- Real transaction status updates from your fraud pipeline (`PENDING`, `APPROVED`, `REJECTED`, `FLAGGED`)
-- Appeal flow on rejected/flagged transactions:
-  - submit customer appeal (`POST /api/v1/appeals`)
-  - analyst resolves appeal via Human Verification (`POST /api/v1/reviews/appeals/:appealId/resolve`)
-- Email inbox preview rendered from real transaction outcomes:
-  - `REJECTED` -> declined customer + declined fraud-team templates
-  - `FLAGGED` -> flagged fraud-team template
+- User register, login, refresh, logout, and profile update
+- Transaction submission with different amount, currency, and location inputs
+- Transaction status refresh for `PENDING`, `APPROVED`, `REJECTED`, and `FLAGGED`
+- Appeal submission and appeal resolution flow
+- Decision explainability view for each transaction
+- Rendered email inbox preview for flagged and declined outcomes
 
 ## Prerequisites
 
-- Your stack is running (`docker compose up --build`)
-- API Gateway reachable at `http://localhost:3000`
+- The main stack is running with `docker compose up --build -d`
+- API Gateway is reachable at `http://localhost:3000`
 
-## Runtime config
+## Run
 
-The demo no longer hardcodes API hosts in `app.js`.
+From the `demo` folder:
 
-- Runtime config lives in `demo/config.js`
-- `apiBase` can point to any gateway URL, for example:
-  - `http://localhost:3000/api/v1`
-  - `http://your-hostname:3000/api/v1`
-  - `/api/v1` if the demo is reverse-proxied behind the same origin as the gateway
-- If `apiBase` is left empty, the demo derives a sensible default from the current hostname
-
-## Run demo UI
-
-From demo folder :
-
-```powershell
+```bash
 python -m http.server 8080
 ```
 
-Open:
+Open `http://localhost:8080`.
 
-- `http://localhost:8080/`
+## Runtime Configuration
 
-If needed, change `API Base URL` in the UI or edit `demo/config.js`.
+Runtime settings are stored in `demo/config.js`:
 
-## Demo flow suggestion
+- `apiBase`
+- `apiPort`
+- `azureHost`
+- `apiTimeoutMs`
+- `pollIntervalMs`
 
-1. Register two users (or one user and use sample recipient IDs).
-2. Login and submit transfers with different risk scenarios.
-3. Click `Refresh` or wait for auto-refresh to see status transitions.
-4. Open Email Inbox section to preview rendered flagged/declined templates.
-5. Click a transaction row in `Transaction History` to open `Decision Explainability`:
-   - decision + risk/ML/rule scores
-   - top decision reasons
-   - trigger type (`HIGH_VALUE`, `GEOGRAPHIC_RISK`, `THRESHOLD_BAND`, etc.)
-   - manual review metadata when available
-6. On a `REJECTED` row, click `Appeal` and submit reason.
-7. In `Appeals` panel, resolve with:
-   - `Uphold` (no transaction status change)
-   - `Reverse` (human-verification submits resolution, `appeal.resolved` is published; transaction moves to `APPROVED`)
+If `apiBase` is empty, the demo builds a default API URL from the current host and port `3000`. You can also change the API base URL directly in the UI.
 
-## Grading Script
+## Suggested Demo Flow
 
-1. Start with one normal transfer and show it becomes `APPROVED`.
-2. Submit one suspicious transfer and show it becomes `FLAGGED`.
-3. Click the flagged row and show explainability reasons/trigger type.
-4. Use `Decline` button on the flagged transaction and show status becomes `REJECTED`.
-5. Submit appeal on the rejected transaction and resolve it as `REVERSE`.
-6. Show transaction status updates to `APPROVED` after appeal resolution.
-7. Show rendered internal email template for the reviewed/declined case.
-8. Open analytics dashboard (`http://localhost:3008`) and point out:
-   - manual reviews count
-   - approved-after-review vs declined-after-review
-   - average review turnaround
-9. Close with model evaluation artifacts:
-   - run `npm run evaluate:model` in `ml-scoring-service`
-   - show generated `evaluation.md` and `evaluation.json`.
+1. Register and log in as a user.
+2. Submit a normal transaction and show it reaches `APPROVED`.
+3. Submit a risky transaction and show it becomes `FLAGGED` or `REJECTED`.
+4. Open the transaction row to show decision explainability.
+5. If needed, submit an appeal and resolve it from the appeals panel.
+6. Open the email inbox preview and the analytics dashboard to show the downstream results.
 
-## Why 10,000 Often Becomes Flagged
+## Note
 
-Your current decision-engine config in `docker-compose.yml` sets:
-
-- `THRESHOLD_HIGH_VALUE_AMOUNT=10000`
-- `THRESHOLD_HIGH_VALUE_AUTO_FLAG=true`
-
-So transactions at/above 10,000 are intentionally auto-flagged for manual review.
-
-To demo declined outcomes:
-
-1. Submit risky transactions below 10,000, or
-2. Use the `Decline` button on `FLAGGED` rows (manual-review API path).
+The current decision-engine settings in `docker-compose.yml` automatically flag transactions at or above `10000`, so high-value transfers are useful for manual review demos.

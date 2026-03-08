@@ -87,6 +87,11 @@
       "type": "string"
     },
     {
+      "key": "decisionTransactionId",
+      "value": "",
+      "type": "string"
+    },
+    {
       "key": "highRiskTransactionId",
       "value": "",
       "type": "string"
@@ -98,6 +103,21 @@
     },
     {
       "key": "customerId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "transactionDraftCustomerId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "transactionDraftMerchantId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "transactionDraftDeviceId",
       "value": "",
       "type": "string"
     },
@@ -628,15 +648,35 @@
           "name": "Create Transaction (Happy Path)",
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.collectionVariables.set('transactionDraftCustomerId', pm.variables.replaceIn('customer_{{$timestamp}}'));",
+                  "pm.collectionVariables.set('transactionDraftMerchantId', pm.variables.replaceIn('merchant_{{$timestamp}}'));",
+                  "pm.collectionVariables.set('transactionDraftDeviceId', pm.variables.replaceIn('device_{{$guid}}'));"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "exec": [
                   "pm.test('created', function(){ pm.response.to.have.status(201); });",
                   "const json = pm.response.json();",
-                  "pm.collectionVariables.set('transactionId', json.data.transactionId);",
-                  "pm.environment.set('transactionId', json.data.transactionId);",
-                  "pm.collectionVariables.set('customerId', json.data.customerId || 'cust_' + Date.now());",
-                  "pm.environment.set('customerId', json.data.customerId || 'cust_' + Date.now());"
+                  "const data = (json && json.data) || {};",
+                  "const transactionId = data.transactionId || data.id || '';",
+                  "const customerId = data.customerId || pm.collectionVariables.get('transactionDraftCustomerId') || '';",
+                  "pm.test('transaction id captured', function(){ pm.expect(transactionId).to.be.a('string').and.not.empty; });",
+                  "if (transactionId) {",
+                  "  pm.collectionVariables.set('transactionId', transactionId);",
+                  "  pm.collectionVariables.set('decisionTransactionId', transactionId);",
+                  "  pm.environment.set('transactionId', transactionId);",
+                  "  pm.environment.set('decisionTransactionId', transactionId);",
+                  "}",
+                  "if (customerId) {",
+                  "  pm.collectionVariables.set('customerId', customerId);",
+                  "  pm.environment.set('customerId', customerId);",
+                  "}"
                 ]
               }
             }
@@ -664,7 +704,7 @@
             "url": "{{baseUrl}}/api/v1/transactions",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"customerId\": \"customer_{{$randomInt}}\",\n  \"merchantId\": \"merchant_{{$randomInt}}\",\n  \"amount\": 120.55,\n  \"currency\": \"USD\",\n  \"cardNumber\": \"4111111111111111\",\n  \"cardType\": \"visa\",\n  \"deviceId\": \"device_{{$guid}}\",\n  \"ipAddress\": \"192.168.1.10\",\n  \"location\": {\n    \"country\": \"SG\",\n    \"city\": \"Singapore\"\n  },\n  \"metadata\": {\n    \"channel\": \"mobile\"\n  }\n}"
+              "raw": "{\n  \"customerId\": \"{{transactionDraftCustomerId}}\",\n  \"merchantId\": \"{{transactionDraftMerchantId}}\",\n  \"amount\": 120.55,\n  \"currency\": \"USD\",\n  \"cardNumber\": \"4111111111111111\",\n  \"cardType\": \"visa\",\n  \"deviceId\": \"{{transactionDraftDeviceId}}\",\n  \"ipAddress\": \"192.168.1.10\",\n  \"location\": {\n    \"country\": \"SG\",\n    \"city\": \"Singapore\"\n  },\n  \"metadata\": {\n    \"channel\": \"mobile\"\n  }\n}"
             }
           }
         },
@@ -842,7 +882,7 @@
           ],
           "request": {
             "method": "GET",
-            "url": "{{decisionServiceUrl}}/api/v1/decisions/{{transactionId}}"
+            "url": "{{decisionServiceUrl}}/api/v1/decisions/{{decisionTransactionId}}"
           }
         },
         {
@@ -1191,7 +1231,12 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "const json = pm.response.json(); if (json.success && json.data) { pm.collectionVariables.set('transactionId', json.data.transactionId); pm.environment.set('transactionId', json.data.transactionId); }",
+                  "const json = pm.response.json();",
+                  "const data = (json && json.data) || {};",
+                  "const transactionId = data.transactionId || data.id || '';",
+                  "const customerId = data.customerId || 'smoke_customer';",
+                  "if (transactionId) { pm.collectionVariables.set('transactionId', transactionId); pm.collectionVariables.set('decisionTransactionId', transactionId); pm.environment.set('transactionId', transactionId); pm.environment.set('decisionTransactionId', transactionId); }",
+                  "if (customerId) { pm.collectionVariables.set('customerId', customerId); pm.environment.set('customerId', customerId); }",
                   "pm.test('txn created', function(){ pm.response.to.have.status(201); });"
                 ]
               }
@@ -1235,7 +1280,7 @@
           ],
           "request": {
             "method": "GET",
-            "url": "{{decisionServiceUrl}}/api/v1/decisions/{{transactionId}}"
+            "url": "{{decisionServiceUrl}}/api/v1/decisions/{{decisionTransactionId}}"
           }
         }
       ]

@@ -255,13 +255,24 @@ async function main() {
   await waitForManualReview(transactionId, accessToken);
   console.log('[e2e] Manual review record available');
 
+  const reviewerId = `e2e-reviewer-${runId.slice(-8)}`;
+  console.log('[e2e] Claiming manual review case');
+  await httpRequest(`/review-cases/${encodeURIComponent(transactionId)}/claim`, {
+    method: 'POST',
+    token: accessToken,
+    body: {
+      reviewerId,
+      claimTtlMinutes: 10,
+    },
+  });
+
   console.log('[e2e] Submitting manual decline');
   await httpRequest(`/reviews/${encodeURIComponent(transactionId)}/decision`, {
     method: 'POST',
     token: accessToken,
     body: {
       decision: 'DECLINED',
-      reviewedBy: `e2e-reviewer-${runId.slice(-8)}`,
+      reviewedBy: reviewerId,
       notes: 'Declined by automated E2E test',
     },
   });

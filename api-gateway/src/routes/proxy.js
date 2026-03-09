@@ -52,6 +52,13 @@ const serviceRoutes = [
     rewriteTo:            '/api/v1/reviews',
   },
   {
+    pathPrefix:           '/review-cases',
+    target:               config.services.humanVerification,
+    serviceName:          'human-verification-service',
+    useTransactionLimiter: false,
+    rewriteTo:            '/api/v1/review-cases',
+  },
+  {
     pathPrefix:           '/appeals',
     target:               config.services.appeal,
     serviceName:          'appeal-service',

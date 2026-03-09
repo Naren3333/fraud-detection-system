@@ -1,3 +1,4 @@
+
 # Human Verification Service
 
 This service handles manual review for flagged transactions and analyst resolution for customer appeals.
@@ -12,9 +13,14 @@ This service handles manual review for flagged transactions and analyst resoluti
 
 ## Main Endpoints
 
-- `GET /api/v1/reviews/pending`
-- `GET /api/v1/reviews/:transactionId`
-- `POST /api/v1/reviews/:transactionId/decision`
+- `GET /api/v1/review-cases?status=PENDING,IN_REVIEW`
+- `GET /api/v1/review-cases/:transactionId`
+- `GET /api/v1/review-cases/:transactionId/history`
+- `POST /api/v1/review-cases/:transactionId/claim`
+- `POST /api/v1/review-cases/:transactionId/release`
+- `POST /api/v1/review-cases/:transactionId/resolve`
+- `GET /api/v1/reviews/pending` (backward compatible)
+- `POST /api/v1/reviews/:transactionId/decision` (backward compatible)
 - `GET /api/v1/reviews/appeals/pending`
 - `POST /api/v1/reviews/appeals/:appealId/resolve`
 - `GET /` for the built-in review dashboard
@@ -67,3 +73,10 @@ Service URLs:
 - The API routes are mounted under `/api/v1`.
 - The service publishes transaction review outcomes for the Transaction Service to apply.
 - Appeal resolutions are handled through the Appeal Service rather than written directly in this service.
+
+## Concurrency Model
+
+- Cases move through `PENDING -> IN_REVIEW -> REVIEWED`.
+- Only the active `claimed_by` reviewer can resolve/release a case.
+- Claim conflicts return HTTP `409`.
+- `review_case_events` stores claim/release/resolve history for auditability.

@@ -15,7 +15,7 @@ const migrate = async () => {
         merchant_id         VARCHAR(255),
         source_topic        VARCHAR(100) NOT NULL DEFAULT 'transaction.flagged',
         queue_status        VARCHAR(50) NOT NULL DEFAULT 'PENDING'
-                          CHECK (queue_status IN ('PENDING','REVIEWED')),
+                          CHECK (queue_status IN ('PENDING','IN_REVIEW','REVIEWED')),
         previous_decision   VARCHAR(50) NOT NULL DEFAULT 'FLAGGED',
         final_decision      VARCHAR(50)
                           CHECK (final_decision IN ('APPROVED','DECLINED')),
@@ -24,10 +24,33 @@ const migrate = async () => {
         payload             JSONB NOT NULL DEFAULT '{}'::jsonb,
         reviewed_by         VARCHAR(255),
         review_notes        TEXT,
+        claimed_by          VARCHAR(255),
+        claimed_at          TIMESTAMPTZ,
+        claim_expires_at    TIMESTAMPTZ,
         correlation_id      VARCHAR(255),
+        version             INTEGER NOT NULL DEFAULT 0,
         created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         reviewed_at         TIMESTAMPTZ,
         updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+    await pool.query(`ALTER TABLE manual_reviews ADD COLUMN IF NOT EXISTS claimed_by VARCHAR(255);`);
+    await pool.query(`ALTER TABLE manual_reviews ADD COLUMN IF NOT EXISTS claimed_at TIMESTAMPTZ;`);
+    await pool.query(`ALTER TABLE manual_reviews ADD COLUMN IF NOT EXISTS claim_expires_at TIMESTAMPTZ;`);
+    await pool.query(`ALTER TABLE manual_reviews ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 0;`);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS review_case_events (
+        event_id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        transaction_id      UUID NOT NULL REFERENCES manual_reviews(transaction_id) ON DELETE CASCADE,
+        event_type          VARCHAR(60) NOT NULL,
+        actor               VARCHAR(255),
+        from_status         VARCHAR(50),
+        to_status           VARCHAR(50),
+        notes               TEXT,
+        metadata            JSONB NOT NULL DEFAULT '{}'::jsonb,
+        created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
 
@@ -39,6 +62,16 @@ const migrate = async () => {
     await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_manual_reviews_customer_id
       ON manual_reviews (customer_id, created_at DESC);
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_manual_reviews_claim_owner
+      ON manual_reviews (claimed_by, queue_status, claim_expires_at);
+    `);
+
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_review_case_events_txn_created
+      ON review_case_events (transaction_id, created_at DESC);
     `);
 
     logger.info('Manual review schema migration complete');

@@ -597,7 +597,7 @@ services:
     container_name: human-verification-service
     networks: [fraud-net]
     ports:
-      - "${INTERNAL_SERVICE_BIND_HOST:-127.0.0.1}:${HUMAN_VERIFICATION_SERVICE_HOST_PORT:-3010}:3010"
+      - "${HUMAN_VERIFICATION_BIND_HOST:-0.0.0.0}:${HUMAN_VERIFICATION_SERVICE_HOST_PORT:-3010}:3010"
     depends_on:
       human-review-db:
         condition: service_healthy

@@ -1,6 +1,20 @@
 const reviewService = require('../services/reviewService');
 
 class ReviewController {
+  async listCases(req, res) {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
+    const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+
+    const data = await reviewService.listCases({
+      status: req.query.status,
+      assignee: req.query.assignee,
+      limit,
+      offset,
+    });
+
+    res.json({ success: true, data, meta: { limit, offset, count: data.length } });
+  }
+
   // Handles list pending.
   async listPending(req, res) {
     const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
@@ -19,6 +33,58 @@ class ReviewController {
       });
     }
     res.json({ success: true, data });
+  }
+
+  async getHistory(req, res) {
+    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
+    const data = await reviewService.getCaseHistory(req.params.transactionId, limit);
+    res.json({ success: true, data, meta: { limit, count: data.length } });
+  }
+
+  async claimCase(req, res) {
+    const { reviewerId, claimTtlMinutes } = req.body;
+    if (!reviewerId || typeof reviewerId !== 'string') {
+      return res.status(400).json({ success: false, error: 'reviewerId is required' });
+    }
+
+    const data = await reviewService.claimCase({
+      transactionId: req.params.transactionId,
+      reviewerId,
+      claimTtlMinutes: Math.min(Math.max(parseInt(claimTtlMinutes, 10) || 10, 1), 120),
+    });
+
+    if (!data) {
+      return res.status(404).json({ success: false, error: 'Review case not found' });
+    }
+
+    if (data.conflict) {
+      return res.status(409).json({ success: false, error: data.conflict, details: data });
+    }
+
+    return res.json({ success: true, data });
+  }
+
+  async releaseCase(req, res) {
+    const { reviewerId, notes } = req.body;
+    if (!reviewerId || typeof reviewerId !== 'string') {
+      return res.status(400).json({ success: false, error: 'reviewerId is required' });
+    }
+
+    const data = await reviewService.releaseCase({
+      transactionId: req.params.transactionId,
+      reviewerId,
+      notes,
+    });
+
+    if (!data) {
+      return res.status(404).json({ success: false, error: 'Review case not found' });
+    }
+
+    if (data.conflict) {
+      return res.status(409).json({ success: false, error: data.conflict, details: data });
+    }
+
+    return res.json({ success: true, data });
   }
 
   // Handles submit decision.
@@ -45,6 +111,10 @@ class ReviewController {
         reviewedBy,
         notes,
       });
+
+      if (data?.conflict) {
+        return res.status(409).json({ success: false, error: data.conflict, details: data });
+      }
 
       res.json({ success: true, data });
     } catch (err) {

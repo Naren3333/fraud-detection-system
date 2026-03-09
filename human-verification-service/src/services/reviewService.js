@@ -22,14 +22,41 @@ class ReviewService {
     return reviewRepository.upsertFromFlagged(event, sourceTopic);
   }
 
-  // Handles list pending.
+  async listCases({ status, assignee, limit, offset }) {
+    const statuses = status
+      ? String(status).split(',').map((s) => s.trim().toUpperCase()).filter(Boolean)
+      : ['PENDING', 'IN_REVIEW'];
+
+    return reviewRepository.listCases({ statuses, assignee, limit, offset });
+  }
+
+  // Backward-compatible endpoint.
   async listPending(limit, offset) {
     return reviewRepository.listPending(limit, offset);
   }
 
-  // Handles get review by transaction.
   async getReviewByTransaction(transactionId) {
     return reviewRepository.getByTransactionId(transactionId);
+  }
+
+  async getCaseHistory(transactionId, limit = 50) {
+    return reviewRepository.getHistory(transactionId, limit);
+  }
+
+  async claimCase({ transactionId, reviewerId, claimTtlMinutes = 10 }) {
+    if (!reviewerId || typeof reviewerId !== 'string') {
+      throw new Error('reviewerId is required');
+    }
+
+    return reviewRepository.claimCase(transactionId, reviewerId.trim(), claimTtlMinutes);
+  }
+
+  async releaseCase({ transactionId, reviewerId, notes }) {
+    if (!reviewerId || typeof reviewerId !== 'string') {
+      throw new Error('reviewerId is required');
+    }
+
+    return reviewRepository.releaseCase(transactionId, reviewerId.trim(), notes);
   }
 
   // Handles apply decision.
@@ -54,6 +81,14 @@ class ReviewService {
       notes
     );
 
+    if (!updated) {
+      throw new Error(`No manual review record for transaction ${transactionId}`);
+    }
+
+    if (updated.conflict) {
+      return updated;
+    }
+
     const correlationId = existing.correlationId || uuidv4();
     const reviewedEvent = {
       eventType: 'transaction.reviewed',
@@ -62,7 +97,7 @@ class ReviewService {
       merchantId: updated.merchantId,
       previousDecision: 'FLAGGED',
       reviewDecision: decision,
-      decision, // keep for compatibility with existing consumers
+      decision,
       reviewNotes: notes || null,
       reviewedBy,
       reviewedAt: updated.reviewedAt,

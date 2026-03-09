@@ -1,3 +1,4 @@
+
 # Fraud Detection Platform
 
 Fraud Detection Platform is a microservices-based payment fraud detection system built for the SMU ESD project. It uses Node.js services, Kafka for event flow, PostgreSQL for service data, Redis for caching and analytics projection, and Docker Compose for local deployment.
@@ -9,19 +10,19 @@ Fraud Detection Platform is a microservices-based payment fraud detection system
 
 ## Services
 
-| Service | Port | Purpose |
-| --- | --- | --- |
-| API Gateway | 3000 | Single entry point for client requests and aggregated API docs |
-| Transaction Service | 3001 | Creates and updates transactions |
-| User Service | 3002 | Authentication, profile, and user data |
-| Fraud Detection Service | 3003 | Rule-based fraud checks and ML scoring request flow |
-| ML Scoring Service | 3004 | Fraud risk scoring |
-| Decision Engine Service | 3005 | Final approve, flag, or decline decision |
-| Notification Service | 3006 | Email and SMS notifications |
-| Audit Service | 3007 | Audit trail storage |
-| Analytics Service | 3008 | Dashboard and real-time analytics |
-| Human Verification Service | 3010 | Manual review for flagged transactions and appeals |
-| Appeal Service | 3011 | Appeal submission and resolution |
+| Service                    | Port | Purpose                                                        |
+| -------------------------- | ---- | -------------------------------------------------------------- |
+| API Gateway                | 3000 | Single entry point for client requests and aggregated API docs |
+| Transaction Service        | 3001 | Creates and updates transactions                               |
+| User Service               | 3002 | Authentication, profile, and user data                         |
+| Fraud Detection Service    | 3003 | Rule-based fraud checks and ML scoring request flow            |
+| ML Scoring Service         | 3004 | Fraud risk scoring                                             |
+| Decision Engine Service    | 3005 | Final approve, flag, or decline decision                       |
+| Notification Service       | 3006 | Email and SMS notifications                                    |
+| Audit Service              | 3007 | Audit trail storage                                            |
+| Analytics Service          | 3008 | Dashboard and real-time analytics                              |
+| Human Verification Service | 3010 | Manual review for flagged transactions and appeals             |
+| Appeal Service             | 3011 | Appeal submission and resolution                               |
 
 ## Quick Start
 
@@ -38,6 +39,8 @@ Useful URLs:
 - Gateway: `http://localhost:3000`
 - API docs: `http://localhost:3000/api-docs`
 - Analytics dashboard: `http://localhost:3008`
+- Human verification dashboard (direct): `http://localhost:3010`
+- Human verification dashboard (via gateway): `http://localhost:3000/human-verification`
 - Grafana: `http://localhost:3009`
 - Prometheus: `http://localhost:9099`
 - Jaeger: `http://localhost:16686`

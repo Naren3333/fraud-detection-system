@@ -17,7 +17,7 @@
       <button id="refreshBtn" type="button" class="time-btn refresh-btn">Refresh Queue</button>
 
       <div class="control-group reviewer-group">
-        <label class="control-alabel" for="reviewerInput">Reviewer</label>
+        <label class="control-label" for="reviewerInput">Reviewer</label>
         <input id="reviewerInput" type="text" placeholder="analyst-01" value="analyst-01" />
       </div>
 
@@ -78,8 +78,7 @@
       <div class="status-filter" id="statusFilterGroup">
         <button type="button" class="status-filter-btn active" data-queue-filter="ALL">All</button>
         <button type="button" class="status-filter-btn" data-queue-filter="PENDING">Pending</button>
-        <button type="button" class="status-filter-btn" data-queue-filter="APPROVED">Approved</button>
-        <button type="button" class="status-filter-btn" data-queue-filter="DECLINED">Declined</button>
+        <button type="button" class="status-filter-btn" data-queue-filter="IN_REVIEW">In Review</button>
       </div>
       <div class="table-wrap">
         <table>
@@ -92,6 +91,7 @@
               <th>Risk</th>
               <th>Reason</th>
               <th>Queue Status</th>
+              <th>Assignee</th>
               <th>Notes</th>
               <th>Action</th>
             </tr>
@@ -138,11 +138,14 @@
       <td data-col="riskScore"></td>
       <td data-col="reason"></td>
       <td data-col="queueStatus"></td>
+      <td data-col="assignee"></td>
       <td>
         <textarea data-input="notes" rows="2" placeholder="Optional analyst notes"></textarea>
       </td>
       <td>
         <div class="actions">
+          <button type="button" data-action="claim" class="status-filter-btn">Claim</button>
+          <button type="button" data-action="release" class="status-filter-btn">Release</button>
           <button type="button" data-decision="APPROVED">Approve</button>
           <button type="button" data-decision="DECLINED" class="danger">Decline</button>
         </div>

@@ -4,6 +4,11 @@ const appealReviewController = require('../controllers/appealReviewController');
 
 const router = express.Router();
 
+router.get('/review-cases', controller.listCases.bind(controller));
+router.post('/review-cases/:transactionId/claim', controller.claimCase.bind(controller));
+router.post('/review-cases/:transactionId/release', controller.releaseCase.bind(controller));
+router.post('/review-cases/:transactionId/resolve', controller.submitDecision.bind(controller));
+
 /**
  * @openapi
  * /api/v1/reviews/pending:

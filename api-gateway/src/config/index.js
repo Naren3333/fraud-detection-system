@@ -32,6 +32,7 @@ module.exports = {
   },
 
   services: {
+    user: process.env.USER_SERVICE_URL || 'http://user-service:3002',
     transaction: process.env.TRANSACTION_SERVICE_URL || 'http://transaction-service:3001',
     decisionEngine: process.env.DECISION_ENGINE_SERVICE_URL || 'http://decision-engine-service:3005',
     mlScoring: process.env.ML_SCORING_SERVICE_URL || 'http://ml-scoring-service:3004',

@@ -1,146 +1,159 @@
 'use strict';
 
 const express = require('express');
-const axios   = require('axios');
-const config  = require('../config');
-const logger  = require('../config/logger');
-const { authenticate }                     = require('../middleware/auth');
+const axios = require('axios');
+const config = require('../config');
+const logger = require('../config/logger');
+const { authenticate } = require('../middleware/auth');
 const { transactionLimiter, standardLimiter } = require('../middleware/rateLimiter');
 
 const router = express.Router();
+
 const serviceRoutes = [
   {
-    pathPrefix:           '/transactions',
-    target:               config.services.transaction,
-    serviceName:          'transaction-service',
+    pathPrefix: '/auth',
+    target: config.services.user,
+    serviceName: 'user-service',
+    useTransactionLimiter: false,
+    requireGatewayAuth: false,
+    rewriteTo: '/api/v1/auth',
+  },
+  {
+    pathPrefix: '/transactions',
+    target: config.services.transaction,
+    serviceName: 'transaction-service',
     useTransactionLimiter: true,
-    rewriteTo:            '/api/v1/transactions',
+    rewriteTo: '/api/v1/transactions',
   },
   {
-    pathPrefix:           '/audit',
-    target:               config.services.audit,
-    serviceName:          'audit-service',
+    pathPrefix: '/audit',
+    target: config.services.audit,
+    serviceName: 'audit-service',
     useTransactionLimiter: false,
-    rewriteTo:            '/api/v1/audit',
+    rewriteTo: '/api/v1/audit',
   },
   {
-    pathPrefix:           '/decisions',
-    target:               config.services.decisionEngine,
-    serviceName:          'decision-engine-service',
+    pathPrefix: '/decisions',
+    target: config.services.decisionEngine,
+    serviceName: 'decision-engine-service',
     useTransactionLimiter: false,
-    rewriteTo:            '/api/v1/decisions',
+    rewriteTo: '/api/v1/decisions',
   },
   {
-    pathPrefix:           '/thresholds',
-    target:               config.services.decisionEngine,
-    serviceName:          'decision-engine-service',
+    pathPrefix: '/thresholds',
+    target: config.services.decisionEngine,
+    serviceName: 'decision-engine-service',
     useTransactionLimiter: false,
-    rewriteTo:            '/api/v1/thresholds',
+    rewriteTo: '/api/v1/thresholds',
   },
   {
-    pathPrefix:           '/analytics',
-    target:               config.services.analytics,
-    serviceName:          'analytics-service',
+    pathPrefix: '/analytics',
+    target: config.services.analytics,
+    serviceName: 'analytics-service',
     useTransactionLimiter: false,
-    rewriteTo:            '/api/v1/analytics',
+    rewriteTo: '/api/v1/analytics',
   },
   {
-    pathPrefix:           '/reviews',
-    target:               config.services.humanVerification,
-    serviceName:          'human-verification-service',
+    pathPrefix: '/reviews',
+    target: config.services.humanVerification,
+    serviceName: 'human-verification-service',
     useTransactionLimiter: false,
-    rewriteTo:            '/api/v1/reviews',
+    rewriteTo: '/api/v1/reviews',
   },
   {
-    pathPrefix:           '/review-cases',
-    target:               config.services.humanVerification,
-    serviceName:          'human-verification-service',
+    pathPrefix: '/review-cases',
+    target: config.services.humanVerification,
+    serviceName: 'human-verification-service',
     useTransactionLimiter: false,
-    rewriteTo:            '/api/v1/review-cases',
+    rewriteTo: '/api/v1/review-cases',
   },
   {
-    pathPrefix:           '/appeals',
-    target:               config.services.appeal,
-    serviceName:          'appeal-service',
+    pathPrefix: '/appeals',
+    target: config.services.appeal,
+    serviceName: 'appeal-service',
     useTransactionLimiter: false,
-    rewriteTo:            '/api/v1/appeals',
+    rewriteTo: '/api/v1/appeals',
   },
 ];
-// Handles make proxy handler.
-const makeProxyHandler = (target, serviceName, rewriteTo, pathPrefix) => {
-  return async (req, res, next) => {
-    const subPath    = req.path === '/' ? '' : req.path;
-    const targetUrl  = `${target}${rewriteTo}${subPath}`;
 
-    const startTime = Date.now();
-    logger.debug('Proxying request', {
-      requestId:  req.requestId,
-      method:     req.method,
-      targetUrl,
-      serviceName,
+const makeProxyHandler = (target, serviceName, rewriteTo) => async (req, res) => {
+  const subPath = req.path === '/' ? '' : req.path;
+  const targetUrl = `${target}${rewriteTo}${subPath}`;
+  const startTime = Date.now();
+
+  logger.debug('Proxying request', {
+    requestId: req.requestId,
+    method: req.method,
+    targetUrl,
+    serviceName,
+  });
+
+  try {
+    const response = await axios({
+      method: req.method,
+      url: targetUrl,
+      params: req.query,
+      data: ['GET', 'HEAD', 'DELETE'].includes(req.method.toUpperCase()) ? undefined : req.body,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: req.headers.authorization || '',
+        'X-Request-ID': req.requestId || '',
+        'X-Correlation-ID': req.correlationId || '',
+        'X-User-ID': req.user?.userId || '',
+        'X-User-Role': req.user?.role || '',
+        'X-Idempotency-Key': req.idempotencyKey || '',
+        'X-Forwarded-For': req.ip || '',
+      },
+      timeout: config.proxy.timeout || 30000,
+      validateStatus: () => true,
+      maxRedirects: 0,
     });
 
-    try {
-      const response = await axios({
-        method:  req.method,
-        url:     targetUrl,
-        params:  req.query,
-        data:    ['GET', 'HEAD', 'DELETE'].includes(req.method.toUpperCase()) ? undefined : req.body,
-        headers: {
-          'Content-Type':      'application/json',
-          'Authorization':     req.headers.authorization || '',
-          'X-Request-ID':      req.requestId    || '',
-          'X-Correlation-ID':  req.correlationId || '',
-          'X-User-ID':         req.user?.userId  || '',
-          'X-User-Role':       req.user?.role    || '',
-          'X-Idempotency-Key': req.idempotencyKey || '',
-          'X-Forwarded-For':   req.ip || '',
-        },
-        timeout:        config.proxy.timeout || 30000,
-        validateStatus: () => true,
-        maxRedirects:   0,
-      });
+    logger.debug('Proxy response received', {
+      requestId: req.requestId,
+      statusCode: response.status,
+      serviceName,
+      durationMs: Date.now() - startTime,
+    });
 
-      const duration = Date.now() - startTime;
-      logger.debug('Proxy response received', {
-        requestId:  req.requestId,
-        statusCode: response.status,
-        serviceName,
-        durationMs: duration,
-      });
-      res.status(response.status).json(response.data);
+    res.status(response.status).json(response.data);
+  } catch (err) {
+    logger.error('Proxy request failed', {
+      requestId: req.requestId,
+      error: err.message,
+      code: err.code,
+      serviceName,
+      targetUrl,
+      durationMs: Date.now() - startTime,
+    });
 
-    } catch (err) {
-      const duration = Date.now() - startTime;
-      logger.error('Proxy request failed', {
-        requestId:  req.requestId,
-        error:      err.message,
-        code:       err.code,
-        serviceName,
-        targetUrl,
-        durationMs: duration,
-      });
-
-      if (res.headersSent) return;
-      const status = (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT') ? 504 : 503;
-      res.status(status).json({
-        success: false,
-        error: {
-          message:    `Service ${serviceName} is currently unavailable`,
-          statusCode: status,
-          timestamp:  new Date().toISOString(),
-          requestId:  req.requestId,
-        },
-      });
+    if (res.headersSent) {
+      return;
     }
-  };
-};
-serviceRoutes.forEach(({ pathPrefix, target, serviceName, useTransactionLimiter: useTxnLimiter, rewriteTo }) => {
-  const rateLimiter  = useTxnLimiter ? transactionLimiter : standardLimiter;
-  const handler      = makeProxyHandler(target, serviceName, rewriteTo, pathPrefix);
-  router.use(pathPrefix, authenticate, rateLimiter, handler);
 
-  logger.info(`Proxy registered: ${pathPrefix} → ${target}${rewriteTo}`);
+    const status = (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT') ? 504 : 503;
+    res.status(status).json({
+      success: false,
+      error: {
+        message: `Service ${serviceName} is currently unavailable`,
+        statusCode: status,
+        timestamp: new Date().toISOString(),
+        requestId: req.requestId,
+      },
+    });
+  }
+};
+
+serviceRoutes.forEach((route) => {
+  const rateLimiter = route.useTransactionLimiter ? transactionLimiter : standardLimiter;
+  const handler = makeProxyHandler(route.target, route.serviceName, route.rewriteTo);
+  const middleware = route.requireGatewayAuth === false
+    ? [rateLimiter, handler]
+    : [authenticate, rateLimiter, handler];
+
+  router.use(route.pathPrefix, ...middleware);
+
+  logger.info(`Proxy registered: ${route.pathPrefix} -> ${route.target}${route.rewriteTo}`);
 });
 
 module.exports = router;

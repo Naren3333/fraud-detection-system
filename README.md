@@ -24,6 +24,72 @@ Fraud Detection Platform is a microservices-based payment fraud detection system
 | Human Verification Service | 3010 | Manual review for flagged transactions and appeals             |
 | Appeal Service             | 3011 | Appeal submission and resolution                               |
 
+## Layered Architecture
+
+```mermaid
+flowchart TB
+  subgraph UI["UI Layer"]
+    DemoUI["Demo UI"]
+    AnalyticsUI["Analytics Dashboard"]
+    ReviewUI["Human Verification Dashboard"]
+  end
+
+  subgraph Composite["Composite Layer"]
+    APIGateway["API Gateway"]
+    FraudDetection["Fraud Detection Service"]
+    HumanVerification["Human Verification Service"]
+    Analytics["Analytics Service"]
+    Appeal["Appeal Service"]
+  end
+
+  subgraph Atomic["Atomic Layer"]
+    Transaction["Transaction Service"]
+    User["User Service"]
+    MLScoring["ML Scoring Service"]
+    DecisionEngine["Decision Engine Service"]
+    Notification["Notification Service"]
+    Audit["Audit Service"]
+  end
+
+  subgraph External["External Layer"]
+    EmailProvider["Email Provider"]
+    SMSProvider["SMS Provider"]
+  end
+
+  DemoUI --> APIGateway
+  AnalyticsUI --> Analytics
+  ReviewUI --> APIGateway
+
+  APIGateway --> Transaction
+  APIGateway --> HumanVerification
+  APIGateway --> Appeal
+
+  Transaction -. transaction created .-> FraudDetection
+  FraudDetection --> MLScoring
+  FraudDetection -. transaction scored .-> DecisionEngine
+  DecisionEngine -. flagged transaction .-> HumanVerification
+  HumanVerification --> Appeal
+  Appeal --> Transaction
+
+  DecisionEngine -. finalised or flagged outcome .-> Notification
+  Transaction -. transaction events .-> Analytics
+  DecisionEngine -. decision events .-> Analytics
+  HumanVerification -. review events .-> Analytics
+  Appeal -. appeal events .-> Analytics
+
+  Transaction -. audit events .-> Audit
+  FraudDetection -. audit events .-> Audit
+  DecisionEngine -. audit events .-> Audit
+  HumanVerification -. audit events .-> Audit
+  Appeal -. audit events .-> Audit
+  Notification -. audit events .-> Audit
+
+  Notification --> EmailProvider
+  Notification --> SMSProvider
+```
+
+`-->` shows synchronous service calls. `-.->` shows event-driven service interactions without drawing Kafka itself.
+
 ## Quick Start
 
 1. Copy `.env.example` to `.env`.

@@ -26,69 +26,7 @@ Fraud Detection Platform is a microservices-based payment fraud detection system
 
 ## Layered Architecture
 
-```mermaid
-flowchart TB
-  subgraph UI["UI Layer"]
-    DemoUI["Demo UI"]
-    AnalyticsUI["Analytics Dashboard"]
-    ReviewUI["Human Verification Dashboard"]
-  end
-
-  subgraph Composite["Composite Layer"]
-    APIGateway["API Gateway"]
-    FraudDetection["Fraud Detection Service"]
-    HumanVerification["Human Verification Service"]
-    Analytics["Analytics Service"]
-    Appeal["Appeal Service"]
-  end
-
-  subgraph Atomic["Atomic Layer"]
-    Transaction["Transaction Service"]
-    User["User Service"]
-    MLScoring["ML Scoring Service"]
-    DecisionEngine["Decision Engine Service"]
-    Notification["Notification Service"]
-    Audit["Audit Service"]
-  end
-
-  subgraph External["External Layer"]
-    EmailProvider["Email Provider"]
-    SMSProvider["SMS Provider"]
-  end
-
-  DemoUI --> APIGateway
-  AnalyticsUI --> Analytics
-  ReviewUI --> APIGateway
-
-  APIGateway --> Transaction
-  APIGateway --> HumanVerification
-  APIGateway --> Appeal
-
-  Transaction -. transaction created .-> FraudDetection
-  FraudDetection --> MLScoring
-  FraudDetection -. transaction scored .-> DecisionEngine
-  DecisionEngine -. flagged transaction .-> HumanVerification
-  HumanVerification --> Appeal
-  Appeal --> Transaction
-
-  DecisionEngine -. finalised or flagged outcome .-> Notification
-  Transaction -. transaction events .-> Analytics
-  DecisionEngine -. decision events .-> Analytics
-  HumanVerification -. review events .-> Analytics
-  Appeal -. appeal events .-> Analytics
-
-  Transaction -. audit events .-> Audit
-  FraudDetection -. audit events .-> Audit
-  DecisionEngine -. audit events .-> Audit
-  HumanVerification -. audit events .-> Audit
-  Appeal -. audit events .-> Audit
-  Notification -. audit events .-> Audit
-
-  Notification --> EmailProvider
-  Notification --> SMSProvider
-```
-
-`-->` shows synchronous service calls. `-.->` shows event-driven service interactions without drawing Kafka itself.
+![SOA layered architecture](docs/soa-layers-diagram.svg)
 
 ## Quick Start
 

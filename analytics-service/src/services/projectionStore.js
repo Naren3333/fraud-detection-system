@@ -163,6 +163,7 @@ class ProjectionStore {
 
     const existing = await this.getAppealById(event.appealId);
     const resolvedAt = this._normalizeTimestamp(event.resolvedAt || new Date().toISOString());
+    const resolution = event.resolution || event.outcome || existing?.resolution || null;
 
     const record = {
       ...(existing || {}),
@@ -175,7 +176,7 @@ class ProjectionStore {
       currentStatus: 'RESOLVED',
       createdAt: existing?.createdAt || resolvedAt,
       resolvedAt,
-      resolution: event.resolution || event.outcome || existing?.resolution || null,
+      resolution,
       outcome: event.outcome || event.resolution || existing?.outcome || null,
       reviewedBy: event.reviewedBy || existing?.reviewedBy || null,
       resolutionNotes: event.resolutionNotes || existing?.resolutionNotes || null,
@@ -186,6 +187,18 @@ class ProjectionStore {
     };
 
     await this._saveAppeal(record);
+
+    if (record.transactionId) {
+      await this._applyAppealResolutionToTransaction(record.transactionId, {
+        resolution,
+        resolvedAt,
+        reviewedBy: record.reviewedBy,
+        resolutionNotes: record.resolutionNotes,
+        correlationId: record.correlationId,
+        lastSourceEvent: record.lastSourceEvent,
+      });
+    }
+
     return record;
   }
 
@@ -288,6 +301,48 @@ class ProjectionStore {
     return asDate ? asDate.toISOString() : null;
   }
 
+  async _applyAppealResolutionToTransaction(transactionId, event) {
+    const existing = await this.getTransactionById(transactionId);
+    if (!existing) {
+      return null;
+    }
+
+    const resolvedDecision = this._mapAppealResolutionToDecision(event.resolution);
+    if (!resolvedDecision) {
+      return existing;
+    }
+
+    const resolvedAt = this._normalizeTimestamp(event.resolvedAt || new Date().toISOString());
+    const appealResolution = {
+      resolution: event.resolution,
+      resolvedDecision,
+      reviewedBy: event.reviewedBy || null,
+      resolutionNotes: event.resolutionNotes || null,
+      resolvedAt,
+    };
+
+    const record = {
+      ...existing,
+      decision: resolvedDecision,
+      decisionReason: `Appeal resolved: ${event.resolution}`,
+      decisionFactors: {
+        ...(existing.decisionFactors || {}),
+        appealResolution,
+      },
+      decidedAt: resolvedAt,
+      stateUpdatedAt: resolvedAt,
+      overrideApplied: true,
+      overrideType: resolvedDecision === 'APPROVED' ? 'APPEAL_REVERSED' : (existing.overrideType || 'MANUAL_REVIEW'),
+      correlationId: event.correlationId || existing.correlationId || null,
+      lastSourceEvent: event.lastSourceEvent || 'appeal.resolved',
+      updatedAt: new Date().toISOString(),
+      snapshotVersion: 1,
+    };
+
+    await this._saveTransaction(record);
+    return record;
+  }
+
   _earliestDate(first, second) {
     if (!first) {
       return second || null;
@@ -322,6 +377,17 @@ class ProjectionStore {
       return value;
     }
     return Boolean(fallback);
+  }
+
+  _mapAppealResolutionToDecision(resolution) {
+    const normalized = String(resolution || '').toUpperCase();
+    if (normalized === 'REVERSE') {
+      return 'APPROVED';
+    }
+    if (normalized === 'UPHOLD') {
+      return 'DECLINED';
+    }
+    return null;
   }
 }
 

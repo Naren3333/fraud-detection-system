@@ -301,8 +301,8 @@ class AnalyticsService {
   // Handles get analyst impact stats.
   async _getAnalystImpactStats(transactions) {
     const manualReviews = transactions.filter((record) => record.manualReview?.applied);
-    const approvedAfterReview = manualReviews.filter((record) => record.decision === 'APPROVED').length;
-    const declinedAfterReview = manualReviews.filter((record) => record.decision === 'DECLINED').length;
+    const approvedAfterReview = manualReviews.filter((record) => record.manualReview?.reviewDecision === 'APPROVED').length;
+    const declinedAfterReview = manualReviews.filter((record) => record.manualReview?.reviewDecision === 'DECLINED').length;
     const turnaroundSeconds = manualReviews
       .map((record) => this._calculateTurnaroundSeconds(record.flaggedAt, record.manualReview?.reviewedAt))
       .filter((value) => value !== null);

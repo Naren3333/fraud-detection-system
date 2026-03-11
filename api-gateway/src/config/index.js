@@ -1,5 +1,10 @@
 require('dotenv').config();
 
+const flagEnabled = (value, fallback = true) => {
+  if (value == null) return fallback;
+  return String(value).toLowerCase() === 'true';
+};
+
 module.exports = {
   env: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT, 10) || 3000,
@@ -40,6 +45,15 @@ module.exports = {
     analytics: process.env.ANALYTICS_SERVICE_URL || 'http://analytics-service:3008',
     humanVerification: process.env.HUMAN_VERIFICATION_SERVICE_URL || 'http://human-verification-service:3010',
     appeal: process.env.APPEAL_SERVICE_URL || 'http://appeal-service:3011',
+  },
+  routeToggles: {
+    auth: flagEnabled(process.env.ENABLE_AUTH_ROUTES),
+    transactions: flagEnabled(process.env.ENABLE_TRANSACTION_ROUTES),
+    decisions: flagEnabled(process.env.ENABLE_DECISION_ROUTES),
+    audit: flagEnabled(process.env.ENABLE_AUDIT_ROUTES),
+    analytics: flagEnabled(process.env.ENABLE_ANALYTICS_ROUTES),
+    humanVerification: flagEnabled(process.env.ENABLE_HUMAN_VERIFICATION_ROUTES),
+    appeals: flagEnabled(process.env.ENABLE_APPEAL_ROUTES),
   },
 
   circuitBreaker: {

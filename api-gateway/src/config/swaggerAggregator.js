@@ -1,39 +1,47 @@
 const axios = require('axios');
+const config = require('./index');
 
 const services = [
   {
     name: 'transaction-service',
-    url: 'http://transaction-service:3001/api-docs.json',
+    enabled: config.routeToggles.transactions,
+    url: `${config.services.transaction.replace(/\/$/, '')}/api-docs.json`,
     includePrefixes: ['/api/v1/transactions'],
   },
   {
     name: 'user-service',
-    url: 'http://user-service:3002/api-docs.json',
+    enabled: config.routeToggles.auth,
+    url: `${config.services.user.replace(/\/$/, '')}/api-docs.json`,
     includePrefixes: ['/api/v1/auth'],
   },
   {
     name: 'decision-engine-service',
-    url: 'http://decision-engine-service:3005/api-docs.json',
+    enabled: config.routeToggles.decisions,
+    url: `${config.services.decisionEngine.replace(/\/$/, '')}/api-docs.json`,
     includePrefixes: ['/api/v1/decisions', '/api/v1/thresholds'],
   },
   {
     name: 'audit-service',
-    url: 'http://audit-service:3007/api-docs.json',
+    enabled: config.routeToggles.audit,
+    url: `${config.services.audit.replace(/\/$/, '')}/api-docs.json`,
     includePrefixes: ['/api/v1/audit'],
   },
   {
     name: 'analytics-service',
-    url: 'http://analytics-service:3008/api-docs.json',
+    enabled: config.routeToggles.analytics,
+    url: `${config.services.analytics.replace(/\/$/, '')}/api-docs.json`,
     includePrefixes: ['/api/v1/analytics'],
   },
   {
     name: 'human-verification-service',
-    url: 'http://human-verification-service:3010/api-docs.json',
+    enabled: config.routeToggles.humanVerification,
+    url: `${config.services.humanVerification.replace(/\/$/, '')}/api-docs.json`,
     includePrefixes: ['/api/v1/reviews'],
   },
   {
     name: 'appeal-service',
-    url: 'http://appeal-service:3011/api-docs.json',
+    enabled: config.routeToggles.appeals,
+    url: `${config.services.appeal.replace(/\/$/, '')}/api-docs.json`,
     includePrefixes: ['/api/v1/appeals'],
   },
 ];
@@ -101,6 +109,10 @@ async function aggregateSwaggerSpecs() {
   Object.assign(mergedSpec.paths, gatewayPaths);
 
   for (const service of services) {
+    if (service.enabled === false) {
+      continue;
+    }
+
     try {
       const { data } = await axios.get(service.url, { timeout: 2000 });
 

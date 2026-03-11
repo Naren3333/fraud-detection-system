@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-topic-init
+data:
+  create-topics.sh: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    cub kafka-ready -b kafka:9092 1 120
+
+    kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic transaction.created --partitions 1 --replication-factor 1
+    kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic transaction.scored --partitions 1 --replication-factor 1
+    kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic transaction.finalised --partitions 1 --replication-factor 1
+    kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic transaction.flagged --partitions 1 --replication-factor 1
+    kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic transaction.reviewed --partitions 1 --replication-factor 1
+    kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic transaction.dlq --partitions 1 --replication-factor 1
+    kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic transaction.decision.dlq --partitions 1 --replication-factor 1
+    kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic appeal.resolved --partitions 1 --replication-factor 1
+
+    kafka-topics --bootstrap-server kafka:9092 --list

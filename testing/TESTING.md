@@ -4,6 +4,13 @@ This guide matches the current Postman collection:
 
 `testing/test.json`
 
+The guide covers two runtime shapes:
+
+- Full platform via Docker Compose
+- Core-only Kubernetes deployment via `k8s/core`
+
+Unless noted otherwise, the original sections below assume the full Compose stack.
+
 ## 1. Prerequisites
 
 - Docker Desktop
@@ -19,6 +26,49 @@ docker compose up --build -d
 
 The stack now reads secrets and host port bindings from `.env`.
 A development `.env` is provided locally, and `.env.example` documents the expected variables.
+
+## 1A. Kubernetes Core Track
+
+If you are running the smaller Kubernetes deployment from `k8s/core`, the supported flow is narrower on purpose.
+
+Included in the Kubernetes slice:
+
+- API Gateway
+- User Service
+- Transaction Service
+- Fraud Detection Service
+- ML Scoring Service
+- Decision Engine Service
+- Redis
+- Kafka
+- PostgreSQL databases for user, transaction, and decision services
+
+Not included in the Kubernetes slice:
+
+- Notification service
+- Audit service
+- Analytics service
+- Human Verification service
+- Appeal service
+- Prometheus, Grafana, Jaeger, and OpenTelemetry Collector
+
+Bring up the Kubernetes core stack by following `k8s/core/README.md`, then port-forward the gateway:
+
+```bash
+kubectl port-forward svc/api-gateway 3000:3000 -n fraud-detection-core
+```
+
+Once the gateway is forwarded to `http://localhost:3000`, these are the most useful checks:
+
+- manual health checks for gateway, user, transaction, fraud, ML, and decision services
+- Postman folders `02 - Auth Lifecycle`, `03 - Transactions Core`, and `04 - Fraud and Decision Async Scenarios`
+- `npm run test:guards`
+
+These full-stack scripts are not expected to pass against `k8s/core` because the supporting services are intentionally omitted:
+
+- `npm run smoke:health`
+- `npm run e2e:happy-path`
+- `npm run proof:notification`
 
 ## 2. Import Collection
 
@@ -49,6 +99,8 @@ The script checks:
 - Grafana health
 - OpenTelemetry Collector health
 - Jaeger UI reachability
+
+This script is for the full Compose stack, not the core Kubernetes slice.
 
 Optional environment variables:
 
@@ -81,6 +133,8 @@ The script covers:
 - missing decision returns `404`
 - logout succeeds
 
+This script is a good fit for both the full Compose stack and the Kubernetes core track, as long as the gateway is reachable at `http://localhost:3000`.
+
 Optional environment variables:
 
 - `E2E_BASE_URL` (default: `http://localhost:3000/api/v1`)
@@ -108,6 +162,8 @@ The script covers:
 - appeal submission
 - appeal reversal
 - analytics verification
+
+This script assumes the full platform. It is not a match for the Kubernetes core track because manual review, appeals, and analytics are intentionally left out there.
 
 Optional environment variables:
 
@@ -149,6 +205,8 @@ Before using strict mode, set provider variables in `.env` and restart the stack
   - `NOTIFICATION_CUSTOMER_FALLBACK_PHONE`
   - `NOTIFICATION_FRAUD_TEAM_EMAIL`
   - `NOTIFICATION_FRAUD_TEAM_PHONE`
+
+This proof is only relevant to the full Compose stack.
 
 Suggested run order for the automated Node scripts:
 

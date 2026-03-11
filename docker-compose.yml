@@ -17,6 +17,24 @@ volumes:
   prometheus-data:
   grafana-data:
 
+configs:
+  otel-collector-config:
+    file: ./monitoring/otel-collector-config.yml
+  jaeger-ui-config:
+    file: ./monitoring/jaeger/ui-config.json
+  prometheus-config:
+    file: ./monitoring/prometheus.yml
+  grafana-ini:
+    file: ./monitoring/grafana/grafana.ini
+  grafana-dashboards-provider:
+    file: ./monitoring/grafana/provisioning/dashboards/dashboards.yml
+  grafana-prometheus-datasource:
+    file: ./monitoring/grafana/provisioning/datasources/prometheus.yml
+  grafana-fraud-dashboard:
+    file: ./monitoring/grafana/dashboards/fraud-detection.json
+  grafana-tracing-dashboard:
+    file: ./monitoring/grafana/dashboards/tracing-operations.json
+
 x-otel-env: &otel-env
   OTEL_ENABLED: "true"
   OTEL_SERVICE_NAMESPACE: fraud-detection-platform
@@ -82,7 +100,6 @@ services:
         condition: service_healthy
     entrypoint: ["/bin/sh", "-c"]
     command: |
-      "
       echo 'Creating Kafka topics...'
       kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic transaction.created  --partitions 6 --replication-factor 1
       kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic transaction.scored   --partitions 6 --replication-factor 1
@@ -97,7 +114,6 @@ services:
       kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic appeal.dlq --partitions 3 --replication-factor 1
       echo 'Topics created successfully!'
       kafka-topics --bootstrap-server kafka:9092 --list
-      "
     restart: "no"
 
   redis:
@@ -763,8 +779,9 @@ services:
     container_name: otel-collector
     networks: [fraud-net]
     command: ["--config=/etc/otel-collector-config.yml"]
-    volumes:
-      - ./monitoring/otel-collector-config.yml:/etc/otel-collector-config.yml:ro
+    configs:
+      - source: otel-collector-config
+        target: /etc/otel-collector-config.yml
     ports:
       - "${INFRA_BIND_HOST:-127.0.0.1}:${OTEL_GRPC_HOST_PORT:-4317}:4317"
       - "${INFRA_BIND_HOST:-127.0.0.1}:${OTEL_HTTP_HOST_PORT:-4318}:4318"
@@ -859,8 +876,9 @@ services:
       - "--set=extensions.jaeger_storage.metric_backends.prometheus_backend.prometheus.metric_namespace="
       - "--set=extensions.jaeger_storage.metric_backends.prometheus_backend.prometheus.latency_unit=ms"
       - "--set=extensions.jaeger_query.storage.metrics=prometheus_backend"
-    volumes:
-      - ./monitoring/jaeger/ui-config.json:/etc/jaeger/ui-config.json:ro
+    configs:
+      - source: jaeger-ui-config
+        target: /etc/jaeger/ui-config.json
     depends_on:
       - prometheus
     healthcheck:
@@ -877,8 +895,10 @@ services:
     ports:
       - "${OBSERVABILITY_BIND_HOST:-0.0.0.0}:${PROMETHEUS_HOST_PORT:-9099}:9090"
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
+    configs:
+      - source: prometheus-config
+        target: /etc/prometheus/prometheus.yml
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -901,9 +921,17 @@ services:
       - "${OBSERVABILITY_BIND_HOST:-0.0.0.0}:${GRAFANA_HOST_PORT:-3009}:3009"
     volumes:
       - grafana-data:/var/lib/grafana
-      - ./monitoring/grafana/grafana.ini:/etc/grafana/grafana.ini:ro
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    configs:
+      - source: grafana-ini
+        target: /etc/grafana/grafana.ini
+      - source: grafana-dashboards-provider
+        target: /etc/grafana/provisioning/dashboards/dashboards.yml
+      - source: grafana-prometheus-datasource
+        target: /etc/grafana/provisioning/datasources/prometheus.yml
+      - source: grafana-fraud-dashboard
+        target: /var/lib/grafana/dashboards/fraud-detection.json
+      - source: grafana-tracing-dashboard
+        target: /var/lib/grafana/dashboards/tracing-operations.json
     environment:
       GF_PATHS_CONFIG: /etc/grafana/grafana.ini
     depends_on:

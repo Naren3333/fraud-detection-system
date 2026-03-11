@@ -1,0 +1,121 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: transaction-service
+spec:
+  selector:
+    app: transaction-service
+  ports:
+    - name: http
+      port: 3001
+      targetPort: 3001
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: transaction-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: transaction-service
+  template:
+    metadata:
+      labels:
+        app: transaction-service
+    spec:
+      initContainers:
+        - name: wait-for-transaction-db
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - until nc -z transaction-db 5432; do echo waiting for transaction-db; sleep 2; done
+        - name: wait-for-kafka
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - until nc -z kafka 9092; do echo waiting for kafka; sleep 2; done
+        - name: wait-for-topics
+          image: confluentinc/cp-kafka:7.5.0
+          command:
+            - /bin/sh
+            - -c
+            - |
+              until topics="$(kafka-topics --bootstrap-server kafka:9092 --list 2>/dev/null)" &&
+                printf '%s\n' "$topics" | grep -q '^transaction.created$' &&
+                printf '%s\n' "$topics" | grep -q '^transaction.finalised$' &&
+                printf '%s\n' "$topics" | grep -q '^transaction.flagged$' &&
+                printf '%s\n' "$topics" | grep -q '^transaction.reviewed$' &&
+                printf '%s\n' "$topics" | grep -q '^appeal.resolved$'
+              do
+                echo waiting for transaction topics
+                sleep 3
+              done
+      containers:
+        - name: transaction-service
+          image: fraud-detection-system-transaction-service:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - node src/db/migrate.js && node src/index.js
+          ports:
+            - containerPort: 3001
+              name: http
+          env:
+            - name: OTEL_ENABLED
+              value: "false"
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: "3001"
+            - name: SERVICE_NAME
+              value: transaction-service
+            - name: LOG_LEVEL
+              value: info
+            - name: DB_HOST
+              value: transaction-db
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              value: transaction_db
+            - name: DB_USER
+              value: txn_user
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: platform-secrets
+                  key: TRANSACTION_DB_PASSWORD
+            - name: KAFKA_BROKERS
+              value: kafka:9092
+            - name: KAFKA_CLIENT_ID
+              value: transaction-service
+            - name: KAFKA_TOPIC_TRANSACTION_CREATED
+              value: transaction.created
+            - name: KAFKA_TOPIC_TRANSACTION_FINALISED
+              value: transaction.finalised
+            - name: KAFKA_TOPIC_TRANSACTION_FLAGGED
+              value: transaction.flagged
+            - name: KAFKA_TOPIC_TRANSACTION_REVIEWED
+              value: transaction.reviewed
+            - name: KAFKA_TOPIC_APPEAL_RESOLVED
+              value: appeal.resolved
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: platform-secrets
+                  key: JWT_SECRET
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health/ready
+              port: 3001
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health/live
+              port: 3001
+            initialDelaySeconds: 35
+            periodSeconds: 20

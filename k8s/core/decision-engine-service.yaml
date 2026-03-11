@@ -1,0 +1,154 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: decision-engine-service
+spec:
+  selector:
+    app: decision-engine-service
+  ports:
+    - name: http
+      port: 3005
+      targetPort: 3005
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: decision-engine-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: decision-engine-service
+  template:
+    metadata:
+      labels:
+        app: decision-engine-service
+    spec:
+      initContainers:
+        - name: wait-for-decision-db
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - until nc -z decision-db 5432; do echo waiting for decision-db; sleep 2; done
+        - name: wait-for-kafka
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - until nc -z kafka 9092; do echo waiting for kafka; sleep 2; done
+        - name: wait-for-topics
+          image: confluentinc/cp-kafka:7.5.0
+          command:
+            - /bin/sh
+            - -c
+            - |
+              until topics="$(kafka-topics --bootstrap-server kafka:9092 --list 2>/dev/null)" &&
+                printf '%s\n' "$topics" | grep -q '^transaction.scored$' &&
+                printf '%s\n' "$topics" | grep -q '^transaction.reviewed$' &&
+                printf '%s\n' "$topics" | grep -q '^transaction.finalised$' &&
+                printf '%s\n' "$topics" | grep -q '^transaction.flagged$' &&
+                printf '%s\n' "$topics" | grep -q '^transaction.decision.dlq$'
+              do
+                echo waiting for decision-engine topics
+                sleep 3
+              done
+      containers:
+        - name: decision-engine-service
+          image: fraud-detection-system-decision-engine-service:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - npm run migrate && npm start
+          ports:
+            - containerPort: 3005
+              name: http
+          env:
+            - name: OTEL_ENABLED
+              value: "false"
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: "3005"
+            - name: SERVICE_NAME
+              value: decision-engine-service
+            - name: SERVICE_VERSION
+              value: 1.0.0
+            - name: LOG_LEVEL
+              value: info
+            - name: DB_HOST
+              value: decision-db
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              value: decision_db
+            - name: DB_USER
+              value: decision_admin
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: platform-secrets
+                  key: DECISION_DB_PASSWORD
+            - name: DB_MAX_CONNECTIONS
+              value: "20"
+            - name: KAFKA_BROKERS
+              value: kafka:9092
+            - name: KAFKA_CLIENT_ID
+              value: decision-engine-service
+            - name: KAFKA_GROUP_ID
+              value: decision-engine-group
+            - name: KAFKA_INPUT_TOPIC
+              value: transaction.scored
+            - name: KAFKA_INPUT_TOPIC_REVIEWED
+              value: transaction.reviewed
+            - name: KAFKA_OUTPUT_TOPIC_APPROVED
+              value: transaction.finalised
+            - name: KAFKA_OUTPUT_TOPIC_FLAGGED
+              value: transaction.flagged
+            - name: KAFKA_DLQ_TOPIC
+              value: transaction.decision.dlq
+            - name: THRESHOLD_APPROVE_MAX
+              value: "49"
+            - name: THRESHOLD_FLAG_MIN
+              value: "50"
+            - name: THRESHOLD_FLAG_MAX
+              value: "79"
+            - name: THRESHOLD_DECLINE_MIN
+              value: "80"
+            - name: THRESHOLD_RULES_FLAGGED_AUTO_DECLINE
+              value: "false"
+            - name: THRESHOLD_CERTAINTY_AUTO_DECLINE_ENABLED
+              value: "true"
+            - name: THRESHOLD_CERTAINTY_DECLINE_MIN_SCORE
+              value: "70"
+            - name: THRESHOLD_CERTAINTY_DECLINE_MIN_CONFIDENCE
+              value: "0.90"
+            - name: THRESHOLD_HIGH_CONFIDENCE_APPROVE
+              value: "0.95"
+            - name: THRESHOLD_LOW_CONFIDENCE_FLAG
+              value: "0.60"
+            - name: THRESHOLD_HIGH_VALUE_AMOUNT
+              value: "10000"
+            - name: THRESHOLD_HIGH_VALUE_AUTO_FLAG
+              value: "true"
+            - name: AUTO_APPROVE_WHITELIST_CUSTOMERS
+              value: ""
+            - name: AUTO_DECLINE_BLACKLIST_CUSTOMERS
+              value: ""
+            - name: REQUIRE_MANUAL_REVIEW_COUNTRIES
+              value: NG,RU,CN,PK
+            - name: METRICS_ENABLED
+              value: "false"
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health/ready
+              port: 3005
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health/live
+              port: 3005
+            initialDelaySeconds: 35
+            periodSeconds: 20

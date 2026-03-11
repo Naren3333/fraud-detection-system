@@ -1,7 +1,7 @@
 
 # Fraud Detection Platform
 
-Fraud Detection Platform is a microservices-based payment fraud detection system built for the SMU ESD project. It uses Node.js services, Kafka for event flow, PostgreSQL for service data, Redis for caching and analytics projection, and Docker Compose for local deployment.
+Fraud Detection Platform is a microservices-based payment fraud detection system built for the SMU ESD project. It uses Node.js services, Kafka for event flow, PostgreSQL for service data, Redis for caching and analytics projection, and Docker Compose for the full local platform. The repo also includes a core-only Kubernetes deployment for the auth edge and async fraud pipeline.
 
 ## Team
 
@@ -28,11 +28,15 @@ Fraud Detection Platform is a microservices-based payment fraud detection system
 
 ![SOA layered architecture](docs/soa-layers-diagram.svg)
 
+For a fuller architecture view with presentation notes, see `docs/soa-full-architecture-notes.md`.
+
 ## Quick Start
+
+The main development environment is still the full Docker Compose stack.
 
 1. Copy `.env.example` to `.env`.
 2. Update secrets or provider settings if needed.
-3. Start the full stack:
+3. Start the full platform:
 
 ```bash
 docker compose up --build -d
@@ -61,6 +65,26 @@ To remove volumes as well:
 docker compose down -v
 ```
 
+## Kubernetes Core Track
+
+If you want a smaller but real Kubernetes deployment, use `k8s/core/`.
+
+The Kubernetes slice includes:
+
+- API Gateway
+- User Service + User DB
+- Transaction Service + Transaction DB
+- Fraud Detection Service
+- ML Scoring Service
+- Decision Engine Service + Decision DB
+- Redis
+- Kafka + Zookeeper
+- Kafka topic bootstrap job
+
+This core track is meant for demos, portfolio use, and Kubernetes learning. It intentionally leaves out notification, audit, analytics, human verification, appeals, and the observability stack so the cluster story stays focused on the transaction-to-decision flow.
+
+See `k8s/core/README.md` for build, apply, port-forward, and demo steps.
+
 ## Testing
 
 Postman collection:
@@ -77,7 +101,7 @@ npm run e2e:happy-path
 npm run proof:notification
 ```
 
-Detailed test instructions are in `testing/TESTING.md`.
+Detailed test instructions are in `testing/TESTING.md`, and the testing guide now distinguishes the full Compose stack from the smaller Kubernetes core track.
 
 ## Demo
 

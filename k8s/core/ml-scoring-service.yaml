@@ -1,0 +1,95 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ml-scoring-service
+spec:
+  selector:
+    app: ml-scoring-service
+  ports:
+    - name: http
+      port: 3004
+      targetPort: 3004
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-scoring-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ml-scoring-service
+  template:
+    metadata:
+      labels:
+        app: ml-scoring-service
+    spec:
+      initContainers:
+        - name: wait-for-redis
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - until nc -z redis 6379; do echo waiting for redis; sleep 2; done
+      containers:
+        - name: ml-scoring-service
+          image: fraud-detection-system-ml-scoring-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3004
+              name: http
+          env:
+            - name: OTEL_ENABLED
+              value: "false"
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: "3004"
+            - name: SERVICE_NAME
+              value: ml-scoring-service
+            - name: SERVICE_VERSION
+              value: 2.0.0
+            - name: LOG_LEVEL
+              value: info
+            - name: REDIS_HOST
+              value: redis
+            - name: REDIS_PORT
+              value: "6379"
+            - name: REDIS_DB
+              value: "4"
+            - name: MODEL_VERSION
+              value: xgboost-v2.1
+            - name: MODEL_CACHE_TTL
+              value: "3600"
+            - name: MODEL_WARM_CACHE
+              value: "true"
+            - name: FEATURE_AMOUNT_BINS
+              value: 5,10,50,100,500,1000,5000,10000
+            - name: FEATURE_HOUR_BINS
+              value: 0,6,12,18,24
+            - name: FEATURE_VELOCITY_DECAY
+              value: "0.5"
+            - name: CONFIDENCE_THRESHOLD
+              value: "0.6"
+            - name: MIN_FEATURES_REQUIRED
+              value: "8"
+            - name: REQUEST_TIMEOUT_MS
+              value: "2500"
+            - name: MAX_BATCH_SIZE
+              value: "100"
+            - name: ENABLE_MODEL_WARMING
+              value: "true"
+            - name: METRICS_ENABLED
+              value: "false"
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health/ready
+              port: 3004
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health/live
+              port: 3004
+            initialDelaySeconds: 30
+            periodSeconds: 20

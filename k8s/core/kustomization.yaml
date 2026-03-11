@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: fraud-detection-core
+resources:
+  - namespace.yaml
+  - platform-secret.yaml
+  - kafka-topics-configmap.yaml
+  - zookeeper.yaml
+  - kafka.yaml
+  - redis.yaml
+  - user-db.yaml
+  - user-service.yaml
+  - transaction-db.yaml
+  - transaction-service.yaml
+  - ml-scoring-service.yaml
+  - fraud-detection-service.yaml
+  - decision-db.yaml
+  - decision-engine-service.yaml
+  - api-gateway.yaml
+  - kafka-init-job.yaml

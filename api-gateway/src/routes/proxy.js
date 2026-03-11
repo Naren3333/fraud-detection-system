@@ -14,6 +14,7 @@ const serviceRoutes = [
     pathPrefix: '/auth',
     target: config.services.user,
     serviceName: 'user-service',
+    enabled: config.routeToggles.auth,
     useTransactionLimiter: false,
     requireGatewayAuth: false,
     rewriteTo: '/api/v1/auth',
@@ -22,6 +23,7 @@ const serviceRoutes = [
     pathPrefix: '/transactions',
     target: config.services.transaction,
     serviceName: 'transaction-service',
+    enabled: config.routeToggles.transactions,
     useTransactionLimiter: true,
     rewriteTo: '/api/v1/transactions',
   },
@@ -29,6 +31,7 @@ const serviceRoutes = [
     pathPrefix: '/audit',
     target: config.services.audit,
     serviceName: 'audit-service',
+    enabled: config.routeToggles.audit,
     useTransactionLimiter: false,
     rewriteTo: '/api/v1/audit',
   },
@@ -36,6 +39,7 @@ const serviceRoutes = [
     pathPrefix: '/decisions',
     target: config.services.decisionEngine,
     serviceName: 'decision-engine-service',
+    enabled: config.routeToggles.decisions,
     useTransactionLimiter: false,
     rewriteTo: '/api/v1/decisions',
   },
@@ -43,6 +47,7 @@ const serviceRoutes = [
     pathPrefix: '/thresholds',
     target: config.services.decisionEngine,
     serviceName: 'decision-engine-service',
+    enabled: config.routeToggles.decisions,
     useTransactionLimiter: false,
     rewriteTo: '/api/v1/thresholds',
   },
@@ -50,6 +55,7 @@ const serviceRoutes = [
     pathPrefix: '/analytics',
     target: config.services.analytics,
     serviceName: 'analytics-service',
+    enabled: config.routeToggles.analytics,
     useTransactionLimiter: false,
     rewriteTo: '/api/v1/analytics',
   },
@@ -57,6 +63,7 @@ const serviceRoutes = [
     pathPrefix: '/reviews',
     target: config.services.humanVerification,
     serviceName: 'human-verification-service',
+    enabled: config.routeToggles.humanVerification,
     useTransactionLimiter: false,
     rewriteTo: '/api/v1/reviews',
   },
@@ -64,6 +71,7 @@ const serviceRoutes = [
     pathPrefix: '/review-cases',
     target: config.services.humanVerification,
     serviceName: 'human-verification-service',
+    enabled: config.routeToggles.humanVerification,
     useTransactionLimiter: false,
     rewriteTo: '/api/v1/review-cases',
   },
@@ -71,6 +79,7 @@ const serviceRoutes = [
     pathPrefix: '/appeals',
     target: config.services.appeal,
     serviceName: 'appeal-service',
+    enabled: config.routeToggles.appeals,
     useTransactionLimiter: false,
     rewriteTo: '/api/v1/appeals',
   },
@@ -145,6 +154,11 @@ const makeProxyHandler = (target, serviceName, rewriteTo) => async (req, res) =>
 };
 
 serviceRoutes.forEach((route) => {
+  if (route.enabled === false) {
+    logger.info(`Proxy skipped: ${route.pathPrefix} disabled by configuration`);
+    return;
+  }
+
   const rateLimiter = route.useTransactionLimiter ? transactionLimiter : standardLimiter;
   const handler = makeProxyHandler(route.target, route.serviceName, route.rewriteTo);
   const middleware = route.requireGatewayAuth === false

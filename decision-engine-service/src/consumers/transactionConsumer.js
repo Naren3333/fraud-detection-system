@@ -27,13 +27,14 @@ const start = async () => {
 
   consumer = await createConsumer();
   await consumer.subscribe({
-    topics: [config.kafka.inputTopic, config.kafka.reviewedTopic],
+    topics: [config.kafka.inputTopic, config.kafka.reviewedTopic, config.kafka.appealResolvedTopic],
     fromBeginning: false,
   });
 
   logger.info('Subscribed to input topics', {
     scoredTopic: config.kafka.inputTopic,
     reviewedTopic: config.kafka.reviewedTopic,
+    appealResolvedTopic: config.kafka.appealResolvedTopic,
   });
 
   await consumer.run({
@@ -92,6 +93,9 @@ const stop = async () => {
 const handleMessage = async ({ topic, partition, message, heartbeat }) => {
   if (topic === config.kafka.reviewedTopic) {
     return handleReviewedMessage({ topic, partition, message });
+  }
+  if (topic === config.kafka.appealResolvedTopic) {
+    return handleAppealResolvedMessage({ topic, partition, message });
   }
 
   const startTime = Date.now();
@@ -391,6 +395,114 @@ const handleReviewedMessage = async ({ topic, partition, message }) => {
       stack: error.stack,
     });
     errorsTotal.inc({ component: 'reviewed_consumer', type: 'unhandled' });
+    await commitOffset(topic, partition, offset);
+    kafkaMessagesConsumed.inc({ topic, status: 'skipped' });
+  }
+};
+
+// Handles appeal resolved message.
+const handleAppealResolvedMessage = async ({ topic, partition, message }) => {
+  const offset = message.offset;
+  let transactionId = null;
+
+  try {
+    const raw = message.value?.toString();
+    if (!raw) {
+      logger.warn('Received empty appeal resolved message - skipping', { topic, partition, offset });
+      await commitOffset(topic, partition, offset);
+      kafkaMessagesConsumed.inc({ topic, status: 'skipped' });
+      return;
+    }
+
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch (parseErr) {
+      logger.error('Malformed JSON in appeal resolved message - skipping', {
+        topic,
+        partition,
+        offset,
+        error: parseErr.message,
+      });
+      await commitOffset(topic, partition, offset);
+      kafkaMessagesConsumed.inc({ topic, status: 'skipped' });
+      return;
+    }
+
+    transactionId = data.transactionId;
+    const resolution = data.outcome || data.resolution;
+    const correlationId = data.correlationId || message.headers?.['x-correlation-id']?.toString() || transactionId;
+
+    if (!transactionId || !resolution) {
+      logger.warn('Appeal resolved event missing required fields - skipping', {
+        topic,
+        partition,
+        offset,
+        transactionId,
+        resolution,
+      });
+      await commitOffset(topic, partition, offset);
+      kafkaMessagesConsumed.inc({ topic, status: 'skipped' });
+      return;
+    }
+
+    if (!['UPHOLD', 'REVERSE'].includes(String(resolution).toUpperCase())) {
+      logger.warn('Appeal resolved event has invalid resolution - skipping', {
+        transactionId,
+        resolution,
+        topic,
+        partition,
+        offset,
+      });
+      await commitOffset(topic, partition, offset);
+      kafkaMessagesConsumed.inc({ topic, status: 'skipped' });
+      return;
+    }
+
+    const updated = await decisionRepository.applyAppealResolution({
+      transactionId,
+      resolution: String(resolution).toUpperCase(),
+      correlationId,
+      reviewedBy: data.reviewedBy,
+      resolutionNotes: data.resolutionNotes || data.notes || null,
+      resolvedAt: data.resolvedAt,
+      rawEvent: data,
+    });
+
+    if (!updated) {
+      logger.warn('No existing decision found for appeal resolution event', {
+        transactionId,
+        resolution,
+        topic,
+      });
+      await commitOffset(topic, partition, offset);
+      kafkaMessagesConsumed.inc({ topic, status: 'skipped' });
+      return;
+    }
+
+    await commitOffset(topic, partition, offset);
+    kafkaMessagesConsumed.inc({ topic, status: 'success' });
+
+    logger.info('Applied appeal resolution to decision record', {
+      transactionId,
+      previousDecision: updated.previousDecision,
+      resolution: updated.resolution,
+      finalDecision: updated.decision,
+      decisionId: updated.decisionId,
+      topic,
+      partition,
+      offset,
+    });
+  } catch (error) {
+    logger.error('Unhandled error processing appeal resolution message', {
+      transactionId,
+      topic,
+      partition,
+      offset,
+      error: error.message,
+      stack: error.stack,
+    });
+    errorsTotal.inc({ component: 'appeal_resolved_consumer', type: 'unhandled' });
     await commitOffset(topic, partition, offset);
     kafkaMessagesConsumed.inc({ topic, status: 'skipped' });
   }

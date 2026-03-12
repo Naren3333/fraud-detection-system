@@ -26,6 +26,7 @@ module.exports = {
     heartbeatInterval: parseInt(process.env.KAFKA_CONSUMER_HEARTBEAT_INTERVAL, 10) || 3000,
     inputTopic: process.env.KAFKA_INPUT_TOPIC || 'transaction.scored',
     reviewedTopic: process.env.KAFKA_INPUT_TOPIC_REVIEWED || 'transaction.reviewed',
+    appealResolvedTopic: process.env.KAFKA_INPUT_TOPIC_APPEAL_RESOLVED || 'appeal.resolved',
     outputTopicApproved: process.env.KAFKA_OUTPUT_TOPIC_APPROVED || 'transaction.finalised',
     outputTopicFlagged: process.env.KAFKA_OUTPUT_TOPIC_FLAGGED || 'transaction.flagged',
     dlqTopic: process.env.KAFKA_DLQ_TOPIC || 'transaction.decision.dlq',

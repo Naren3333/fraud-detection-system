@@ -320,6 +320,13 @@ async function main() {
   await waitForTransactionStatus(transactionId, accessToken, 'APPROVED');
   console.log('[e2e] Transaction reached APPROVED state after appeal reversal');
 
+  const appealedDecision = await waitForDecision(transactionId, accessToken, 'APPROVED');
+  assert(
+    String(appealedDecision.decision_reason || appealedDecision.decisionReason || '').includes('Appeal resolved'),
+    'Decision record did not reflect appeal resolution reason'
+  );
+  console.log('[e2e] Decision record updated after appeal resolution');
+
   const analytics = await waitForAnalyticsChange(accessToken, baseline);
   console.log('[e2e] Analytics updated', {
     manualReviews: analytics.analystImpact?.totalManualReviews,

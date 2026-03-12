@@ -11,6 +11,7 @@ const DECISION_TO_STATUS = {
 };
 const APPEAL_RESOLUTION_TO_STATUS = {
   REVERSE: 'APPROVED',
+  UPHOLD: 'REJECTED',
 };
 
 let consumer = null;

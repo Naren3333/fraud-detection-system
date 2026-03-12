@@ -2,6 +2,16 @@ const { query, getClient } = require('../db/pool');
 const logger = require('../config/logger');
 
 class DecisionRepository {
+  _mapAppealResolutionToDecision(resolution) {
+    const normalized = String(resolution || '').toUpperCase();
+    if (normalized === 'REVERSE') {
+      return 'APPROVED';
+    }
+    if (normalized === 'UPHOLD') {
+      return 'DECLINED';
+    }
+    return null;
+  }
   
   // Handles save decision.
   async saveDecision(decisionData) {
@@ -213,6 +223,136 @@ class DecisionRepository {
       logger.error('Failed to apply manual review decision', {
         transactionId,
         decision,
+        error: err.message,
+        stack: err.stack,
+      });
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Handles apply appeal resolution.
+  async applyAppealResolution({
+    transactionId,
+    resolution,
+    correlationId,
+    reviewedBy,
+    resolutionNotes,
+    resolvedAt,
+    rawEvent,
+  }) {
+    const client = await getClient();
+
+    try {
+      await client.query('BEGIN');
+
+      const existingDecisionRes = await client.query(`
+        SELECT decision_id, decision
+        FROM decisions
+        WHERE transaction_id = $1
+        FOR UPDATE
+      `, [transactionId]);
+
+      if (existingDecisionRes.rowCount === 0) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+
+      const existing = existingDecisionRes.rows[0];
+      const finalDecision = this._mapAppealResolutionToDecision(resolution);
+      if (!finalDecision) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+
+      const resolvedDecisionAt = resolvedAt || new Date().toISOString();
+      const decisionFactorsPatch = {
+        appealResolutionApplied: true,
+        appealResolution: {
+          resolution,
+          finalDecision,
+          reviewedBy: reviewedBy || null,
+          resolutionNotes: resolutionNotes || null,
+          resolvedAt: resolvedDecisionAt,
+          sourceEventType: 'appeal.resolved',
+        },
+      };
+
+      const decisionReason = `Appeal resolved: ${resolution}`;
+      const updateRes = await client.query(`
+        UPDATE decisions
+        SET
+          decision = $2,
+          decision_reason = $3,
+          decision_factors = COALESCE(decision_factors, '{}'::jsonb) || $4::jsonb,
+          override_applied = TRUE,
+          override_reason = $5,
+          override_type = 'APPEAL',
+          decided_at = NOW(),
+          correlation_id = COALESCE($6, correlation_id),
+          decision_version = '1.0.0-appeal-resolution'
+        WHERE transaction_id = $1
+        RETURNING decision_id, decided_at
+      `, [
+        transactionId,
+        finalDecision,
+        decisionReason,
+        JSON.stringify(decisionFactorsPatch),
+        `Appeal resolution: ${resolution}`,
+        correlationId || null,
+      ]);
+
+      const latestHistoryRes = await client.query(`
+        SELECT fraud_analysis, original_transaction
+        FROM decision_history
+        WHERE transaction_id = $1
+        ORDER BY recorded_at DESC
+        LIMIT 1
+      `, [transactionId]);
+
+      const latestHistory = latestHistoryRes.rows[0] || {};
+
+      await client.query(`
+        INSERT INTO decision_history (
+          decision_id, transaction_id,
+          fraud_analysis, original_transaction,
+          decision, decision_metadata
+        )
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, [
+        updateRes.rows[0].decision_id,
+        transactionId,
+        JSON.stringify(latestHistory.fraud_analysis || {}),
+        JSON.stringify(latestHistory.original_transaction || {}),
+        finalDecision,
+        JSON.stringify({
+          source: 'appeal_resolution',
+          previousDecision: existing.decision,
+          resolution,
+          reviewedBy: reviewedBy || null,
+          resolutionNotes: resolutionNotes || null,
+          resolvedAt: resolvedDecisionAt,
+          correlationId: correlationId || null,
+          eventType: 'appeal.resolved',
+          rawEvent: rawEvent || null,
+        }),
+      ]);
+
+      await client.query('COMMIT');
+
+      return {
+        decisionId: updateRes.rows[0].decision_id,
+        decidedAt: updateRes.rows[0].decided_at,
+        previousDecision: existing.decision,
+        decision: finalDecision,
+        resolution,
+      };
+    } catch (err) {
+      await client.query('ROLLBACK');
+      logger.error('Failed to apply appeal resolution', {
+        transactionId,
+        resolution,
         error: err.message,
         stack: err.stack,
       });
